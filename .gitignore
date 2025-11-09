@@ -75,3 +75,5 @@ backend/mvnw.cmd
 frontend/**/.vite/
 frontend/**/dist/
 frontend/**/node_modules/
+
+.claude
