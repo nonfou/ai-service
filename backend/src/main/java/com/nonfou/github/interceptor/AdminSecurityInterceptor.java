@@ -1,0 +1,137 @@
+package com.nonfou.github.interceptor;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nonfou.github.common.Result;
+import com.nonfou.github.config.AdminSecurityConfig;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 管理后台安全拦截器
+ */
+@Slf4j
+@Component
+public class AdminSecurityInterceptor implements HandlerInterceptor {
+
+    @Autowired
+    private AdminSecurityConfig adminSecurityConfig;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        String requestURI = request.getRequestURI();
+
+        // 只拦截管理后台接口
+        if (!requestURI.startsWith("/api/admin")) {
+            return true;
+        }
+
+        // 获取客户端IP
+        String clientIp = getClientIp(request);
+
+        // 记录访问日志(便于安全审计)
+        log.info("管理后台访问: IP={}, URI={}, Method={}", clientIp, requestURI, request.getMethod());
+
+        return true;
+    }
+
+    /**
+     * 获取客户端真实IP
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+
+        // 如果是多级代理,取第一个IP
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+
+        return ip;
+    }
+
+    /**
+     * 检查IP是否在白名单中
+     */
+    private boolean isIpAllowed(String clientIp) {
+        if (adminSecurityConfig.getIpWhitelist().isEmpty()) {
+            return true;
+        }
+
+        // 支持IP段匹配 (如: 192.168.1.*)
+        for (String allowedIp : adminSecurityConfig.getIpWhitelist()) {
+            if (allowedIp.equals(clientIp)) {
+                return true;
+            }
+            if (allowedIp.endsWith("*")) {
+                String prefix = allowedIp.substring(0, allowedIp.length() - 1);
+                if (clientIp.startsWith(prefix)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 检查请求频率限制
+     */
+    private boolean checkRateLimit(String clientIp) {
+        String key = "admin:ratelimit:" + clientIp;
+
+        // 获取当前计数
+        String countStr = redisTemplate.opsForValue().get(key);
+        int count = countStr != null ? Integer.parseInt(countStr) : 0;
+
+        if (count >= adminSecurityConfig.getRateLimit()) {
+            return false;
+        }
+
+        // 递增计数
+        if (count == 0) {
+            redisTemplate.opsForValue().set(key, "1", 1, TimeUnit.MINUTES);
+        } else {
+            redisTemplate.opsForValue().increment(key);
+        }
+
+        return true;
+    }
+
+    /**
+     * 发送错误响应
+     */
+    private void sendErrorResponse(HttpServletResponse response, String message) throws Exception {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json;charset=UTF-8");
+
+        Result<Void> result = Result.error(message);
+        String json = objectMapper.writeValueAsString(result);
+
+        response.getWriter().write(json);
+        response.getWriter().flush();
+    }
+}

@@ -1,0 +1,53 @@
+# 编译输出
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# 日志文件
+*.log
+logs/
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# 环境变量和配置
+.env
+.env.local
+.env.*.local
+application-local.yml
+application-*.local.yml
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+*.swp
+*~
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 其他
+!.mvn/wrapper/maven-wrapper.jar

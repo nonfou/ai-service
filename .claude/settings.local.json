@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout /t 5 /nobreak)",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "WebFetch(domain:codecmd.com)",
+      "mcp__web-search__search",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(nul)",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__evaluate_script",
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "mcp__chrome-devtools__select_page",
+      "Bash(echo:*)",
+      "Bash(C:Codecc-webdocsmulti-account-relay-design.md)",
+      "Bash(mvn clean:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

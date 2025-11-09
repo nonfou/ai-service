@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ai-api-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: ai_api_platform
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+      - ./backend/src/main/resources/db/init_database.sql:/docker-entrypoint-initdb.d/init_database.sql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - ai-api-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai-api-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+    networks:
+      - ai-api-network
+
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-api-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root123
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - ai-api-network
+
+  # 前端服务 - 用户门户 (user-portal)
+  frontend:
+    build:
+      context: ./frontend/user-portal
+      dockerfile: Dockerfile
+    container_name: ai-api-frontend-user
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_BASE_URL=http://backend:8080
+    depends_on:
+      - backend
+    networks:
+      - ai-api-network
+
+  # 后端管理面板 (admin-portal)
+  admin-portal:
+    build:
+      context: ./frontend/admin-portal
+      dockerfile: Dockerfile
+    container_name: ai-api-frontend-admin
+    restart: always
+    ports:
+      - "8081:80"
+    environment:
+      - VITE_API_BASE_URL=http://backend:8080
+    depends_on:
+      - backend
+    networks:
+      - ai-api-network
+
+networks:
+  ai-api-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:

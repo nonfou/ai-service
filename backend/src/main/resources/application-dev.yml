@@ -1,0 +1,71 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-api-platform
+
+  # 数据库配置 - 开发环境使用 MySQL
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: root123
+
+  # Redis 配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+
+  # 邮件配置 - 腾讯企业邮箱
+  mail:
+    host: smtp.exmail.qq.com
+    port: 465
+    username: support@xcoder.plus
+    password: od8vgwT878ny7ebn
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            protocols: TLSv1.2
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
+            fallback: false
+          starttls:
+            enable: false
+            required: false
+          timeout: 5000
+          connectiontimeout: 5000
+
+# MyBatis Plus 配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.nonfou.github.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# JWT 配置
+jwt:
+  secret: 0Qu/3sEdrbX+2BmxsMeahKQYlZpbhdArOCBY2FXFYRo=
+  expiration: 604800000  # 7天（毫秒）
