@@ -2,49 +2,43 @@
   <div class="subscriptions-page">
     <!-- 页面标题 -->
     <div class="page-header-section">
-      <h1 class="page-title">订阅套餐</h1>
-      <p class="page-description">优选订阅一次性套餐,包含套餐点数和按次计费。</p>
+      <span class="hero-badge">订阅方案</span>
+      <h1 class="page-title">选择适合您的套餐</h1>
+      <p class="page-description">根据使用需求灵活选择,按月付费随时升级,透明计费无隐藏费用。</p>
       <div class="tab-switches">
-        <el-button
-          :type="activeTab === 'monthly' ? 'primary' : ''"
+        <button
+          :class="['tab-btn', { active: activeTab === 'monthly' }]"
           @click="activeTab = 'monthly'"
         >
           月付
-        </el-button>
-        <el-button
-          :type="activeTab === 'yearly' ? 'success' : ''"
+        </button>
+        <button
+          :class="['tab-btn', { active: activeTab === 'yearly' }]"
           @click="activeTab = 'yearly'"
         >
-          年付 <el-tag size="small" type="success">省20%</el-tag>
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 新的免费试用卡片 -->
-    <div class="trial-banner v2board-card">
-      <el-icon class="banner-icon"><Gift /></el-icon>
-      <div class="banner-content">
-        <h3>新用户福利</h3>
-        <p>首次订阅享受额外优惠,立即开始体验!</p>
+          年付
+          <span class="save-badge">省20%</span>
+        </button>
       </div>
     </div>
 
     <!-- 订阅套餐卡片 -->
-    <div class="section-title-row">
-      <h2 class="section-title">订阅套餐</h2>
+    <div class="section-heading">
+      <h2>订阅套餐</h2>
+      <p>选择适合您团队规模的套餐方案,随时升级无忧</p>
     </div>
 
     <div class="plans-grid">
       <div
         v-for="plan in subscriptionPlans"
         :key="plan.id"
-        class="plan-card v2board-card"
-        :class="{ featured: plan.featured }"
+        class="plan-card"
+        :class="{ 'plan-card-featured': plan.featured }"
       >
         <!-- 标签 -->
-        <div v-if="plan.badge" class="plan-badge" :class="`badge-${plan.badge.type}`">
+        <span v-if="plan.badge" class="plan-badge" :class="`badge-${plan.badge.type}`">
           {{ plan.badge.text }}
-        </div>
+        </span>
 
         <!-- 套餐标题 -->
         <div class="plan-header">
@@ -59,7 +53,7 @@
           <span class="price-period">/月</span>
         </div>
 
-        <!-- 功能列表 */
+        <!-- 功能列表 -->
         <ul class="plan-features">
           <li v-for="(feature, idx) in plan.features" :key="idx">
             <el-icon class="feature-icon"><Check /></el-icon>
@@ -68,62 +62,22 @@
         </ul>
 
         <!-- 订阅按钮 -->
-        <el-button
-          :type="plan.featured ? 'primary' : 'default'"
-          size="large"
-          class="subscribe-btn"
+        <button
+          :class="['subscribe-btn', { 'subscribe-btn-gradient': plan.featured }]"
           @click="handleSubscribe(plan)"
         >
           {{ plan.buttonText || '立即订阅' }}
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 积分包 -->
-    <div class="section-title-row">
-      <h2 class="section-title">积分包</h2>
-    </div>
-    <p class="section-desc">积分次日自动，赠送积分按月扣费，终及达订阅时计费。</p>
-
-    <div class="credits-grid">
-      <div
-        v-for="credit in creditPackages"
-        :key="credit.id"
-        class="credit-card v2board-card"
-      >
-        <div v-if="credit.hot" class="hot-badge">热销</div>
-
-        <div class="credit-header">
-          <h3 class="credit-amount">{{ credit.amount }}积分加油包</h3>
-        </div>
-
-        <div class="credit-price">
-          <span class="price-symbol">$</span>
-          <span class="price-value">{{ credit.price }}</span>
-        </div>
-
-        <div class="credit-details">
-          <p>获得 {{ credit.amount }} 积分</p>
-          <p class="credit-bonus">{{ credit.bonus }}</p>
-        </div>
-
-        <ul class="credit-features">
-          <li><el-icon><Check /></el-icon>即时到账</li>
-          <li><el-icon><Check /></el-icon>终及达订阅时计费</li>
-        </ul>
-
-        <el-button size="large" class="purchase-btn" @click="handlePurchaseCredit(credit)">
-          立即购买
-        </el-button>
+        </button>
       </div>
     </div>
 
     <!-- 订阅历史 -->
-    <div class="section-title-row">
-      <h2 class="section-title">订阅历史</h2>
+    <div class="section-heading">
+      <h2>订阅历史</h2>
+      <p>查看您的订阅记录和使用情况</p>
     </div>
 
-    <div class="history-table-card v2board-card">
+    <div class="history-table-card">
       <el-table :data="subscriptionHistory" style="width: 100%">
         <el-table-column prop="planName" label="套餐" min-width="120" />
         <el-table-column prop="startDate" label="开启日期" width="120" />
@@ -157,7 +111,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Gift } from '@element-plus/icons-vue'
+import { Check } from '@element-plus/icons-vue'
 import { subscriptionAPI } from '../api'
 import { useUserStore } from '../stores/user'
 
@@ -170,52 +124,29 @@ const subscriptionPlans = ref([
   {
     id: 1,
     name: '体验卡',
-    subtitle: '轻分不听,可以遗缺试',
+    subtitle: '快速体验 AI 开发平台',
     price: 1,
     badge: { text: '新用户专享', type: 'gray' },
     features: [
       '1天有效期',
-      '一次性购买600积分',
-      'Gemini/Code = API 通0元/次',
-      'Claude Code = API $1.5/元',
-      '仅白日程运适用指令CLI + B',
-      '交持Claude 4 Opus & Sonnet',
+      '600 积分额度',
+      'Claude & Gemini 模型',
       '24/7 技术支持'
     ],
     buttonText: '立即试用'
   },
   {
-    id: 2,
-    name: 'Pro 20',
-    subtitle: '适合轻度使用',
-    price: 10,
-    badge: { text: '适合初次订阅200次/月超过', type: 'green' },
-    features: [
-      '30天有效期',
-      '每日3,000积分',
-      'Gemini/Code = API 通0元/次',
-      'Claude Code = API $1.5/元',
-      '仅白日程运适用指令CLI(TC + B)',
-      '交持Claude 4 Opus & Sonnet',
-      '24/7 技术支持'
-    ],
-    buttonText: '选择此套餐',
-    featured: false
-  },
-  {
     id: 3,
     name: 'Max 100',
-    subtitle: '适合专业用户',
+    subtitle: '适合专业开发者',
     price: 50,
-    badge: null,
+    badge: { text: '最受欢迎', type: 'green' },
     features: [
       '30天有效期',
-      '每日50,000积分',
-      'Gemini/Code = API 通0元/次',
-      'Claude Code = API $1/元',
-      '交持所有通道运适用(TC + B)',
-      '仅白日程运适用指令CLI',
-      '24/7 优先支持'
+      '每日 50,000 积分',
+      '全模型访问权限',
+      'IDE 与 CLI 集成',
+      '优先技术支持'
     ],
     buttonText: '选择此套餐',
     featured: true
@@ -223,52 +154,18 @@ const subscriptionPlans = ref([
   {
     id: 4,
     name: 'Max 200',
-    subtitle: '适合高级用户',
+    subtitle: '适合团队协作',
     price: 100,
-    badge: { text: '接适过3100次/月需求—套餐', type: 'orange' },
+    badge: { text: '企业推荐', type: 'orange' },
     features: [
       '30天有效期',
-      '每日100,000积分',
-      'Gemini/Code = API 通0元/次',
-      'Claude Code = API $34/元',
-      '交持所有通道运适用(TC + B)',
-      '仅白日程运适用指令CLI',
-      '24/7 技术支持'
+      '每日 100,000 积分',
+      '全模型访问权限',
+      '多账号管理',
+      '专属技术支持'
     ],
     buttonText: '选择此套餐',
     featured: false
-  }
-])
-
-// 积分包数据
-const creditPackages = ref([
-  {
-    id: 1,
-    amount: 8000,
-    price: 1,
-    bonus: 'Gemini/Code = API $0元',
-    hot: false
-  },
-  {
-    id: 2,
-    amount: 25000,
-    price: 3,
-    bonus: 'Gemini/Code = API $0元',
-    hot: true
-  },
-  {
-    id: 3,
-    amount: 43000,
-    price: 5,
-    bonus: 'Gemini/Code = API $1元',
-    hot: false
-  },
-  {
-    id: 4,
-    amount: 88000,
-    price: 10,
-    bonus: 'Gemini/Code = API $0元',
-    hot: false
   }
 ])
 
@@ -324,31 +221,6 @@ const handleSubscribe = async (plan: any) => {
   }).catch(() => {})
 }
 
-const handlePurchaseCredit = async (credit: any) => {
-  if (!userStore.token) {
-    ElMessage.warning('请先登录')
-    router.push('/login')
-    return
-  }
-
-  ElMessageBox.confirm(
-    `确定购买 ${credit.amount} 积分吗? 价格: $${credit.price}`,
-    '确认购买',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    }
-  ).then(async () => {
-    try {
-      // await subscriptionAPI.purchaseCredits({ packageId: credit.id })
-      ElMessage.success('购买成功!')
-    } catch (error: any) {
-      ElMessage.error(error.response?.data?.message || '购买失败')
-    }
-  }).catch(() => {})
-}
-
 const handleCancelSubscription = async (subscription: any) => {
   ElMessageBox.confirm(
     '确定要取消此订阅吗?',
@@ -385,99 +257,176 @@ onMounted(() => {
 
 <style scoped>
 .subscriptions-page {
+  background: linear-gradient(180deg, #f8f8ff 0%, #ffffff 100%);
+  color: #0f172a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
   padding: 0;
 }
 
 /* 页面头部 */
 .page-header-section {
   text-align: center;
-  margin-bottom: var(--spacing-8);
+  padding: 4rem 0 3rem;
+  background: linear-gradient(135deg, #f7f9ff 0%, #f1f0ff 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.65;
+  pointer-events: none;
+  background: radial-gradient(600px at 50% -20%, rgba(99, 102, 241, 0.3), transparent 60%);
+}
+
+.hero-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  margin-bottom: 1.5rem;
 }
 
 .page-title {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-3) 0;
+  position: relative;
+  z-index: 1;
+  font-size: 3rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.04em;
 }
 
 .page-description {
-  font-size: var(--font-size-base);
-  color: var(--color-text-secondary);
-  margin: 0 0 var(--spacing-6) 0;
+  position: relative;
+  z-index: 1;
+  font-size: 1.05rem;
+  color: #475569;
+  margin: 0 0 2.5rem 0;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.75;
 }
 
 .tab-switches {
-  display: flex;
-  gap: var(--spacing-3);
-  justify-content: center;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 0.375rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  backdrop-filter: blur(6px);
 }
 
-/* 试用横幅 */
-.trial-banner {
-  display: flex;
+.tab-btn {
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-6);
-  margin-bottom: var(--spacing-8);
-  background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%);
-  border: 1px solid var(--color-primary-200);
+  gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
-.banner-icon {
-  font-size: var(--font-size-4xl);
-  color: var(--color-primary);
+.tab-btn.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
 }
 
-.banner-content h3 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-1) 0;
+.save-badge {
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+  font-weight: 700;
 }
 
-.banner-content p {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin: 0;
+.tab-btn.active .save-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
-/* 区块标题 */
-.section-title-row {
-  margin-bottom: var(--spacing-4);
+/* Section Heading */
+.section-heading {
+  max-width: 1200px;
+  margin: 0 auto 3rem;
+  padding: 0 1.75rem;
+  text-align: center;
 }
 
-.section-title {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin: 0;
+.section-heading h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: #1f2937;
 }
 
-.section-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  margin: 0 0 var(--spacing-6) 0;
+.section-heading p {
+  font-size: 1.05rem;
+  color: #64748b;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 /* 套餐网格 */
 .plans-grid {
+  max-width: 1200px;
+  margin: 0 auto 6rem;
+  padding: 0 1.75rem;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-6);
-  margin-bottom: var(--spacing-12);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
 }
 
 .plan-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  transition: all var(--transition-base);
+  padding: 2rem 1.75rem;
+  border-radius: 1.25rem;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.06);
+  transition: all 0.3s ease;
 }
 
-.plan-card.featured {
-  border: 2px solid var(--color-primary);
-  transform: scale(1.02);
+.plan-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.plan-card-featured {
+  border: 2px solid rgba(124, 58, 237, 0.5);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.04), rgba(37, 99, 235, 0.04));
+  box-shadow: 0 20px 60px rgba(76, 29, 149, 0.12);
+  transform: scale(1.05);
+}
+
+.plan-card-featured:hover {
+  transform: scale(1.05) translateY(-6px);
+  box-shadow: 0 28px 70px rgba(76, 29, 149, 0.18);
 }
 
 .plan-badge {
@@ -485,196 +434,234 @@ onMounted(() => {
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  padding: var(--spacing-1) var(--spacing-3);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  padding: 0.375rem 1rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
   white-space: nowrap;
+  color: #ffffff;
+  letter-spacing: 0.02em;
 }
 
 .badge-gray {
-  background: var(--color-gray-600);
-  color: white;
+  background: linear-gradient(135deg, #64748b, #475569);
+  box-shadow: 0 6px 16px rgba(71, 85, 105, 0.3);
 }
 
 .badge-green {
-  background: var(--color-success-500);
-  color: white;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.35);
 }
 
 .badge-orange {
-  background: var(--color-warning-500);
-  color: white;
+  background: linear-gradient(135deg, #fb923c, #f97316);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
 }
 
 .plan-header {
   text-align: center;
-  margin-bottom: var(--spacing-4);
+  margin-bottom: 1.25rem;
 }
 
 .plan-name {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-2) 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
 }
 
 .plan-subtitle {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  color: #64748b;
   margin: 0;
 }
 
 .plan-price {
   text-align: center;
-  margin-bottom: var(--spacing-6);
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .price-symbol {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #475569;
   vertical-align: top;
+  margin-right: 0.125rem;
 }
 
 .price-value {
-  font-size: var(--font-size-4xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: #1f2937;
+  letter-spacing: -0.03em;
 }
 
 .price-period {
-  font-size: var(--font-size-base);
-  color: var(--color-text-tertiary);
+  font-size: 0.95rem;
+  color: #64748b;
+  margin-left: 0.25rem;
+  font-weight: 500;
 }
 
 .plan-features {
   list-style: none;
   padding: 0;
-  margin: 0 0 var(--spacing-6) 0;
+  margin: 0 0 1.75rem 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
 }
 
 .plan-features li {
   display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-2);
-  padding: var(--spacing-2) 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-relaxed);
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.5;
 }
 
 .feature-icon {
-  color: var(--color-success-500);
+  color: #22c55e;
   flex-shrink: 0;
-  margin-top: 2px;
+  font-size: 1.125rem;
 }
 
 .subscribe-btn {
   width: 100%;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid rgba(148, 163, 184, 0.4);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #1f2937;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  letter-spacing: 0.01em;
 }
 
-/* 积分包网格 */
-.credits-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-6);
-  margin-bottom: var(--spacing-12);
+.subscribe-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+  border-color: rgba(124, 58, 237, 0.4);
+  background: #fafbfc;
 }
 
-.credit-card {
-  position: relative;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
+.subscribe-btn-gradient {
+  border: none;
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 16px 40px rgba(79, 70, 229, 0.3);
 }
 
-.hot-badge {
-  position: absolute;
-  top: -8px;
-  right: var(--spacing-4);
-  background: var(--color-danger-500);
-  color: white;
-  padding: var(--spacing-1) var(--spacing-2);
-  border-radius: var(--radius-base);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-}
-
-.credit-header h3 {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-4) 0;
-}
-
-.credit-price {
-  margin-bottom: var(--spacing-4);
-}
-
-.credit-details {
-  margin-bottom: var(--spacing-4);
-}
-
-.credit-details p {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin: var(--spacing-1) 0;
-}
-
-.credit-bonus {
-  color: var(--color-primary) !important;
-  font-weight: var(--font-weight-medium);
-}
-
-.credit-features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--spacing-6) 0;
-  flex: 1;
-}
-
-.credit-features li {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-2);
-  padding: var(--spacing-1) 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-}
-
-.purchase-btn {
-  width: 100%;
+.subscribe-btn-gradient:hover {
+  box-shadow: 0 20px 50px rgba(79, 70, 229, 0.4);
+  transform: translateY(-2px) scale(1.01);
 }
 
 /* 历史表格 */
 .history-table-card {
+  max-width: 1200px;
+  margin: 0 auto 4rem;
+  padding: 0 1.75rem;
+}
+
+.history-table-card :deep(.el-table) {
+  border-radius: 1.5rem;
   overflow: hidden;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.history-table-card :deep(.el-table th) {
+  background: #f8fafc;
+  color: #1f2937;
+  font-weight: 600;
 }
 
 /* 响应式 */
-@media (max-width: 1280px) {
-  .plans-grid,
-  .credits-grid {
+@media (max-width: 1024px) {
+  .plans-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .plan-card-featured {
+    transform: scale(1);
+  }
+
+  .plan-card-featured:hover {
+    transform: translateY(-6px);
   }
 }
 
 @media (max-width: 768px) {
-  .plans-grid,
-  .credits-grid {
-    grid-template-columns: 1fr;
+  .page-header-section {
+    padding: 3rem 1.25rem 2.5rem;
   }
 
-  .trial-banner {
-    flex-direction: column;
-    text-align: center;
+  .page-title {
+    font-size: 2.25rem;
+  }
+
+  .page-description {
+    font-size: 0.95rem;
+  }
+
+  .plans-grid,
+  .history-table-card {
+    padding: 0 1.25rem;
+  }
+
+  .plans-grid {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .plan-card {
+    padding: 1.75rem 1.5rem;
   }
 
   .tab-switches {
     flex-direction: column;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .tab-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .section-heading {
+    padding: 0 1.25rem;
+  }
+
+  .section-heading h2 {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 1.875rem;
+  }
+
+  .section-heading h2 {
+    font-size: 1.75rem;
+  }
+
+  .plan-name {
+    font-size: 1.35rem;
+  }
+
+  .price-value {
+    font-size: 2.5rem;
   }
 }
 </style>
