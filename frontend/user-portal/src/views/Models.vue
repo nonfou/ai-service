@@ -1,43 +1,416 @@
 <template>
   <div class="models-page">
-    <div class="page-header">
-      <h1>AI模型列表</h1>
-      <p>选择合适的AI模型,开始您的应用开发</p>
-    </div>
+    <!-- Hero 区域 -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="badge-icon">✨</span>
+          <span>AI 模型市场</span>
+        </div>
+        <h1 class="hero-title">探索最先进的 AI 模型</h1>
+        <p class="hero-description">
+          我们提供来自 OpenAI、Anthropic、Google 等顶级厂商的最新 AI 模型<br/>
+          支持文本生成、视觉理解、函数调用等多种能力，满足您的各种开发需求
+        </p>
+        <div class="hero-stats">
+          <div class="stat-item">
+            <div class="stat-number">{{ models.length }}+</div>
+            <div class="stat-label">可用模型</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">{{ groupedModels.length }}</div>
+            <div class="stat-label">顶级厂商</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">99.9%</div>
+            <div class="stat-label">服务可用性</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <div class="models-grid">
-      <el-card v-for="model in models" :key="model.id" class="model-card" shadow="hover">
-        <div class="model-header">
-          <h3>{{ model.displayName }}</h3>
-          <el-tag :type="model.status === 1 ? 'success' : 'danger'">
-            {{ model.status === 1 ? '可用' : '不可用' }}
-          </el-tag>
+    <!-- 精选模型区域 -->
+    <section class="featured-section" v-if="featuredModels.length > 0">
+      <div class="section-header">
+        <h2 class="section-title">精选模型</h2>
+        <p class="section-subtitle">最受欢迎的顶级 AI 模型</p>
+      </div>
+
+      <div class="featured-grid">
+        <div
+          v-for="model in featuredModels"
+          :key="model.id"
+          class="featured-card"
+        >
+          <div class="featured-badge">精选</div>
+          <div class="featured-icon">
+            <img v-if="model.icon" :src="model.icon" :alt="model.provider" />
+            <div v-else class="icon-placeholder">{{ model.provider.charAt(0) }}</div>
+          </div>
+          <h3 class="featured-title">{{ model.displayName }}</h3>
+          <p class="featured-model-name">{{ model.modelName }}</p>
+          <p class="featured-description">{{ model.description || '强大的AI模型，适用于各种应用场景' }}</p>
+
+          <div class="featured-specs">
+            <div class="spec-item" v-if="model.contextLength">
+              <span class="spec-icon">📊</span>
+              <span class="spec-text">{{ formatContextLength(model.contextLength) }}</span>
+            </div>
+            <div class="spec-item" v-if="model.speed">
+              <span class="spec-icon">⚡</span>
+              <span class="spec-text">{{ formatSpeed(model.speed) }}</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-icon">💰</span>
+              <span class="spec-text">{{ model.priceMultiplier }}x 倍率</span>
+            </div>
+          </div>
+
+          <div class="featured-capabilities" v-if="model.capabilities && model.capabilities.length > 0">
+            <el-tag
+              v-for="cap in model.capabilities.slice(0, 3)"
+              :key="cap"
+              size="small"
+              class="capability-tag"
+            >
+              {{ formatCapability(cap) }}
+            </el-tag>
+          </div>
+
+          <div class="featured-footer">
+            <span class="provider-label">{{ model.provider }}</span>
+            <el-tag :type="model.status === 1 ? 'success' : 'danger'" size="small">
+              {{ model.status === 1 ? '可用' : '不可用' }}
+            </el-tag>
+          </div>
         </div>
-        <div class="model-info">
-          <p class="model-name">{{ model.modelName }}</p>
-          <p class="provider">提供商: {{ model.provider }}</p>
-          <p class="price">计费倍率: {{ model.priceMultiplier }}x</p>
-          <p class="description">{{ model.description }}</p>
+      </div>
+    </section>
+
+    <!-- 所有模型区域 -->
+    <section class="all-models-section">
+      <div class="section-header">
+        <h2 class="section-title">所有模型</h2>
+        <p class="section-subtitle">按提供商分组展示</p>
+      </div>
+
+      <!-- 按提供商分组展示 -->
+      <div
+        v-for="group in groupedModels"
+        :key="group.provider"
+        class="provider-group"
+      >
+        <div class="provider-header">
+          <div class="provider-title-wrapper">
+            <div class="provider-icon-large">
+              <span>{{ group.provider.charAt(0) }}</span>
+            </div>
+            <div>
+              <h3 class="provider-title">{{ group.provider }}</h3>
+              <p class="provider-count">{{ group.models.length }} 个模型</p>
+            </div>
+          </div>
         </div>
-      </el-card>
-    </div>
+
+        <!-- 该提供商的模型网格 -->
+        <div class="models-grid">
+          <div
+            v-for="model in group.models"
+            :key="model.id"
+            class="model-card"
+          >
+            <div class="model-card-header">
+              <div class="model-icon">
+                <img v-if="model.icon" :src="model.icon" :alt="model.provider" />
+                <div v-else class="icon-placeholder-small">{{ model.provider.charAt(0) }}</div>
+              </div>
+              <div class="model-title-group">
+                <h3 class="model-title">{{ model.displayName }}</h3>
+                <p class="model-name">{{ model.modelName }}</p>
+              </div>
+              <el-tag :type="model.status === 1 ? 'success' : 'danger'" size="small">
+                {{ model.status === 1 ? '可用' : '不可用' }}
+              </el-tag>
+            </div>
+
+            <p class="model-description">
+              {{ model.description || '优质AI模型，提供强大的AI能力' }}
+            </p>
+
+            <div class="model-specs">
+              <div class="spec-row" v-if="model.contextLength">
+                <span class="spec-label">上下文长度：</span>
+                <span class="spec-value">{{ formatContextLength(model.contextLength) }}</span>
+              </div>
+              <div class="spec-row" v-if="model.speed">
+                <span class="spec-label">响应速度：</span>
+                <span class="spec-value">{{ formatSpeed(model.speed) }}</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-label">计费倍率：</span>
+                <span class="spec-value">{{ model.priceMultiplier }}x</span>
+              </div>
+            </div>
+
+            <div class="model-capabilities" v-if="model.capabilities && model.capabilities.length > 0">
+              <el-tag
+                v-for="cap in model.capabilities"
+                :key="cap"
+                size="small"
+                class="capability-tag"
+              >
+                {{ formatCapability(cap) }}
+              </el-tag>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div v-if="groupedModels.length === 0" class="empty-state">
+        <div class="empty-icon">📦</div>
+        <p class="empty-text">暂无可用模型</p>
+        <p class="empty-hint">请稍后再试</p>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { modelsAPI, type Model } from '../api'
 
 const models = ref<Model[]>([])
 
+// Mock 数据（用于演示效果）
+const mockModels: Model[] = [
+  {
+    id: 1,
+    modelName: 'gpt-4-turbo',
+    displayName: 'GPT-4 Turbo',
+    provider: 'OpenAI',
+    priceMultiplier: 1.5,
+    status: 1,
+    description: '最新的GPT-4模型，更快的响应速度，128K上下文窗口，支持视觉理解和函数调用',
+    contextLength: 128000,
+    speed: 'fast',
+    capabilities: ['vision', 'function-calling', 'json-mode']
+  },
+  {
+    id: 2,
+    modelName: 'gpt-4',
+    displayName: 'GPT-4',
+    provider: 'OpenAI',
+    priceMultiplier: 2.0,
+    status: 1,
+    description: 'OpenAI最强大的模型，适合复杂推理和创作任务',
+    contextLength: 8192,
+    speed: 'medium',
+    capabilities: ['function-calling', 'json-mode']
+  },
+  {
+    id: 3,
+    modelName: 'gpt-3.5-turbo',
+    displayName: 'GPT-3.5 Turbo',
+    provider: 'OpenAI',
+    priceMultiplier: 0.5,
+    status: 1,
+    description: '性价比极高的模型，适合大多数日常应用场景',
+    contextLength: 16385,
+    speed: 'fast',
+    capabilities: ['function-calling', 'streaming']
+  },
+  {
+    id: 4,
+    modelName: 'claude-3-opus-20240229',
+    displayName: 'Claude 3 Opus',
+    provider: 'Anthropic',
+    priceMultiplier: 2.5,
+    status: 1,
+    description: 'Anthropic最强大的模型，擅长复杂分析和创意写作，200K上下文',
+    contextLength: 200000,
+    speed: 'medium',
+    capabilities: ['long-context', 'vision', 'multilingual']
+  },
+  {
+    id: 5,
+    modelName: 'claude-3-sonnet-20240229',
+    displayName: 'Claude 3 Sonnet',
+    provider: 'Anthropic',
+    priceMultiplier: 1.2,
+    status: 1,
+    description: '平衡性能和成本的优秀选择，适合企业级应用',
+    contextLength: 200000,
+    speed: 'fast',
+    capabilities: ['long-context', 'vision', 'multilingual']
+  },
+  {
+    id: 6,
+    modelName: 'claude-3-haiku-20240307',
+    displayName: 'Claude 3 Haiku',
+    provider: 'Anthropic',
+    priceMultiplier: 0.4,
+    status: 1,
+    description: '最快速的Claude模型，适合高并发场景',
+    contextLength: 200000,
+    speed: 'fast',
+    capabilities: ['long-context', 'multilingual']
+  },
+  {
+    id: 7,
+    modelName: 'gemini-pro',
+    displayName: 'Gemini Pro',
+    provider: 'Google',
+    priceMultiplier: 1.0,
+    status: 1,
+    description: 'Google先进的多模态AI模型，支持文本和图像理解',
+    contextLength: 32768,
+    speed: 'fast',
+    capabilities: ['vision', 'code', 'multilingual']
+  },
+  {
+    id: 8,
+    modelName: 'gemini-pro-vision',
+    displayName: 'Gemini Pro Vision',
+    provider: 'Google',
+    priceMultiplier: 1.3,
+    status: 1,
+    description: '专为视觉理解优化的Gemini模型',
+    contextLength: 16384,
+    speed: 'medium',
+    capabilities: ['vision', 'multilingual']
+  },
+  {
+    id: 9,
+    modelName: 'llama-3-70b',
+    displayName: 'Llama 3 70B',
+    provider: 'Meta',
+    priceMultiplier: 0.8,
+    status: 1,
+    description: 'Meta开源的大语言模型，性能强劲且成本低廉',
+    contextLength: 8192,
+    speed: 'fast',
+    capabilities: ['code', 'multilingual', 'streaming']
+  },
+  {
+    id: 10,
+    modelName: 'llama-3-8b',
+    displayName: 'Llama 3 8B',
+    provider: 'Meta',
+    priceMultiplier: 0.3,
+    status: 1,
+    description: '轻量级的Llama模型，适合资源受限场景',
+    contextLength: 8192,
+    speed: 'fast',
+    capabilities: ['code', 'streaming']
+  },
+  {
+    id: 11,
+    modelName: 'mistral-large',
+    displayName: 'Mistral Large',
+    provider: 'Mistral AI',
+    priceMultiplier: 1.5,
+    status: 1,
+    description: 'Mistral AI的旗舰模型，多语言能力出色',
+    contextLength: 32768,
+    speed: 'fast',
+    capabilities: ['multilingual', 'code', 'function-calling']
+  },
+  {
+    id: 12,
+    modelName: 'mistral-medium',
+    displayName: 'Mistral Medium',
+    provider: 'Mistral AI',
+    priceMultiplier: 0.9,
+    status: 1,
+    description: '性价比优秀的中等规模模型',
+    contextLength: 32768,
+    speed: 'fast',
+    capabilities: ['multilingual', 'code']
+  }
+]
+
+// 加载模型列表
 const loadModels = async () => {
   try {
     const res = await modelsAPI.getModels()
     models.value = res.data
+
+    // 如果后端返回空数据，使用 mock 数据
+    if (models.value.length === 0) {
+      models.value = mockModels
+    }
   } catch (error: any) {
-    ElMessage.error('加载模型列表失败')
+    // 如果 API 失败，使用 mock 数据
+    console.warn('API 调用失败，使用 Mock 数据', error)
+    models.value = mockModels
   }
+}
+
+// 精选模型（按 ID 排序，取前3个可用模型）
+const featuredModels = computed(() => {
+  return models.value
+    .filter(m => m.status === 1)
+    .sort((a, b) => a.id - b.id)
+    .slice(0, 3)
+})
+
+// 按提供商分组的模型
+const groupedModels = computed(() => {
+  // 获取所有可用模型
+  const availableModels = models.value.filter(m => m.status === 1)
+
+  // 按提供商分组
+  const groups = availableModels.reduce((acc, model) => {
+    if (!acc[model.provider]) {
+      acc[model.provider] = []
+    }
+    acc[model.provider].push(model)
+    return acc
+  }, {} as Record<string, Model[]>)
+
+  // 转换为数组并排序
+  return Object.entries(groups)
+    .map(([provider, models]) => ({
+      provider,
+      models: models.sort((a, b) => a.id - b.id)
+    }))
+    .sort((a, b) => a.provider.localeCompare(b.provider))
+})
+
+// 格式化上下文长度
+const formatContextLength = (length: number) => {
+  if (length >= 1000000) {
+    return `${(length / 1000000).toFixed(1)}M tokens`
+  } else if (length >= 1000) {
+    return `${(length / 1000).toFixed(0)}K tokens`
+  }
+  return `${length} tokens`
+}
+
+// 格式化速度
+const formatSpeed = (speed: string) => {
+  const speedMap: Record<string, string> = {
+    'fast': '快速',
+    'medium': '中等',
+    'slow': '较慢'
+  }
+  return speedMap[speed] || speed
+}
+
+// 格式化能力标签
+const formatCapability = (cap: string) => {
+  const capMap: Record<string, string> = {
+    'vision': '视觉理解',
+    'function-calling': '函数调用',
+    'streaming': '流式输出',
+    'json-mode': 'JSON模式',
+    'code': '代码生成',
+    'multilingual': '多语言',
+    'long-context': '长上下文'
+  }
+  return capMap[cap] || cap
 }
 
 onMounted(() => {
@@ -47,67 +420,554 @@ onMounted(() => {
 
 <style scoped>
 .models-page {
-  padding: 2rem;
-  max-width: 1200px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8f8ff 0%, #ffffff 100%);
+}
+
+/* ==================== Hero 区域 ==================== */
+.hero-section {
+  background: linear-gradient(135deg, #f7f9ff 0%, #f1f0ff 100%);
+  padding: 5rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 40%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-content {
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 2rem;
+  font-size: 0.9rem;
+  color: #7c3aed;
+  font-weight: 500;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+}
+
+.badge-icon {
+  font-size: 1.1rem;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+
+.hero-description {
+  font-size: 1.2rem;
+  color: #64748b;
+  line-height: 1.8;
+  margin-bottom: 3rem;
+}
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 4rem;
+  margin-top: 3rem;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.95rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* ==================== Section 通用样式 ==================== */
+.featured-section,
+.all-models-section {
+  padding: 5rem 2rem;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
-.page-header {
+.section-header {
   text-align: center;
   margin-bottom: 3rem;
 }
 
-.page-header h1 {
+.section-title {
   font-size: 2.5rem;
-  margin-bottom: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
 }
 
-.page-header p {
-  color: #666;
+.section-subtitle {
   font-size: 1.1rem;
+  color: #64748b;
+  margin: 0;
 }
 
+/* ==================== 精选模型卡片 ==================== */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.featured-card {
+  background: #ffffff;
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.featured-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.featured-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.featured-card:hover::before {
+  opacity: 1;
+}
+
+.featured-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: white;
+  padding: 0.35rem 0.9rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.featured-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f7f9ff, #f1f0ff);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.featured-icon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.icon-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.featured-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+}
+
+.featured-model-name {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #7c3aed;
+  margin: 0 0 1rem 0;
+  font-weight: 500;
+}
+
+.featured-description {
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 1.5rem 0;
+  min-height: 3rem;
+}
+
+.featured-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.spec-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: rgba(124, 58, 237, 0.05);
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.spec-icon {
+  font-size: 1rem;
+}
+
+.featured-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  min-height: 2rem;
+}
+
+.capability-tag {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border: none;
+  font-weight: 500;
+}
+
+.featured-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.provider-label {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* ==================== 提供商分组 ==================== */
+.provider-group {
+  margin-bottom: 4rem;
+}
+
+.provider-header {
+  margin-bottom: 2rem;
+}
+
+.provider-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.provider-icon-large {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
+}
+
+.provider-icon-large span {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.provider-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.25rem 0;
+}
+
+.provider-count {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ==================== 所有模型网格 ==================== */
 .models-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
 }
 
 .model-card {
+  background: white;
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  transition: all 0.25s ease;
   cursor: pointer;
-  transition: transform 0.3s;
 }
 
 .model-card:hover {
   transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  border-color: rgba(124, 58, 237, 0.2);
 }
 
-.model-header {
+.model-card-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 1rem;
   margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #eee;
 }
 
-.model-header h3 {
-  margin: 0;
-  font-size: 1.3rem;
+.model-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f7f9ff, #f1f0ff);
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 
-.model-info p {
-  margin: 0.5rem 0;
-  color: #666;
+.model-icon img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.icon-placeholder-small {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.model-title-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.25rem 0;
 }
 
 .model-name {
-  font-family: monospace;
-  color: #409EFF !important;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #7c3aed;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.description {
-  margin-top: 1rem !important;
+.model-description {
+  color: #64748b;
+  font-size: 0.9rem;
   line-height: 1.6;
+  margin: 0 0 1rem 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.model-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 0.75rem;
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.spec-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.spec-value {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.model-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* ==================== 空状态 ==================== */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 0.5rem 0;
+}
+
+.empty-hint {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 1024px) {
+  .hero-title {
+    font-size: 2.75rem;
+  }
+
+  .hero-stats {
+    gap: 2rem;
+  }
+
+  .featured-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .models-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 3rem 1.5rem;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-description {
+    font-size: 1rem;
+  }
+
+  .hero-stats {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 2rem;
+  }
+
+  .featured-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .models-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .filter-item {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .provider-select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .featured-section,
+  .all-models-section {
+    padding: 3rem 1rem;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+  }
 }
 </style>

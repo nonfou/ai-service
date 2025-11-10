@@ -151,6 +151,10 @@ export interface Model {
   priceMultiplier: number
   status: number  // 0-禁用, 1-启用
   description?: string
+  icon?: string  // 模型图标URL
+  contextLength?: number  // 上下文长度
+  speed?: string  // 速度等级：fast, medium, slow
+  capabilities?: string[]  // 能力标签数组，如 ['vision', 'function-calling', 'streaming']
 }
 
 // ==================== 用户相关类型 ====================
