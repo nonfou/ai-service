@@ -11,11 +11,10 @@
             专为开发者打造的 AI 能力平台。统一调度 GPT‑5、Claude、Gemini 等主流模型，无缝集成 IDE、终端与 CI/CD，让 AI 真正赋能开发全流程。
           </p>
           <div class="hero-actions">
-            <router-link to="/getting-started" class="btn btn-primary">
+            <router-link to="/subscriptions" class="btn btn-primary">
               立即开始
               <span class="btn-icon">→</span>
             </router-link>
-            <router-link to="/subscriptions" class="btn btn-outline">订阅套餐</router-link>
           </div>
           <div class="hero-stats">
             <div class="stat-card">
@@ -158,8 +157,7 @@
         <h2>开启你的 AI 开发之旅</h2>
         <p>立即开始构建你的 AI 应用，体验强大的模型能力。</p>
         <div class="cta-actions">
-          <router-link to="/getting-started" class="btn btn-contrast">立即试用</router-link>
-          <router-link to="/documentation" class="btn btn-ghost">浏览文档</router-link>
+          <router-link to="/subscriptions" class="btn btn-contrast">立即试用</router-link>
         </div>
       </div>
     </section>

@@ -173,7 +173,8 @@
               style="margin-top: 12px;"
             >
               发送回复
-          </el-button>
+            </el-button>
+          </div>
         </div>
       </div>
     </el-dialog>

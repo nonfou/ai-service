@@ -31,14 +31,22 @@ const router = createRouter({
         {
           path: 'tickets',
           name: 'Tickets',
-          component: () => import('../views/Tickets.vue'),
-          meta: { requiresAuth: true }
+          component: () => import('../views/Tickets.vue')
+        },
+        {
+          path: 'api-keys',
+          name: 'ApiKeys',
+          component: () => import('../views/ApiKeys.vue')
+        },
+        {
+          path: 'wallet',
+          name: 'Wallet',
+          component: () => import('../views/Wallet.vue')
         },
         {
           path: 'dashboard',
           name: 'Dashboard',
           component: () => import('../views/Dashboard.vue'),
-          meta: { requiresAuth: true },
           children: [
             {
               path: '',
