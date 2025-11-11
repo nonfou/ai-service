@@ -7,10 +7,10 @@
           <span class="badge-icon">✨</span>
           <span>AI 模型市场</span>
         </div>
-        <h1 class="hero-title">探索最先进的 AI 模型</h1>
+        <h1 class="hero-title">丰富的 AI 模型库</h1>
         <p class="hero-description">
-          我们提供来自 OpenAI、Anthropic、Google 等顶级厂商的最新 AI 模型<br/>
-          支持文本生成、视觉理解、函数调用等多种能力，满足您的各种开发需求
+          集成 OpenAI、Anthropic、Google 等主流 AI 厂商的最新模型<br/>
+          为开发者提供统一 API 接口，支持文本、视觉、代码等多种能力，一键调用即可集成到你的应用中
         </p>
         <div class="hero-stats">
           <div class="stat-item">
@@ -33,7 +33,7 @@
     <section class="featured-section" v-if="featuredModels.length > 0">
       <div class="section-header">
         <h2 class="section-title">精选模型</h2>
-        <p class="section-subtitle">最受欢迎的顶级 AI 模型</p>
+        <p class="section-subtitle">开发者最常用的高性能 AI 模型</p>
       </div>
 
       <div class="featured-grid">

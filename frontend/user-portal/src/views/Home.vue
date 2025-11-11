@@ -8,7 +8,7 @@
           <h1>xCoder</h1>
           <p class="hero-tagline">多模型协同的一站式智能研发平台</p>
           <p class="hero-description">
-            统一调度 GPT‑5、Claude、Gemini 等头部模型，接入 IDE、终端与 CI/CD，帮助团队快速构建、测试与发布应用。
+            专为开发者打造的 AI 能力平台。统一调度 GPT‑5、Claude、Gemini 等主流模型，无缝集成 IDE、终端与 CI/CD，让 AI 真正赋能开发全流程。
           </p>
           <div class="hero-actions">
             <router-link to="/getting-started" class="btn btn-primary">
@@ -36,23 +36,23 @@
           <div class="hero-visual-card">
             <div class="hero-visual-header">
               <span class="hero-visual-dot"></span>
-              xCoder Workbench
+              开发者控制台
             </div>
             <div class="hero-visual-body">
               <div class="hero-visual-column">
-                <h4>多模型路由</h4>
+                <h4>API 管理</h4>
                 <ul>
-                  <li>自动选择最优模型</li>
-                  <li>Token 用量实时可视</li>
-                  <li>权限隔离与审计</li>
+                  <li>多模型统一调用</li>
+                  <li>实时用量监控</li>
+                  <li>密钥安全管理</li>
                 </ul>
               </div>
               <div class="hero-visual-column">
-                <h4>智能流水线</h4>
+                <h4>开发工具</h4>
                 <ul>
-                  <li>生成 → 评审 → 测试</li>
-                  <li>一键同步到 Git</li>
-                  <li>CI 失败自动补救</li>
+                  <li>在线调试测试</li>
+                  <li>完整调用日志</li>
+                  <li>代码示例生成</li>
                 </ul>
               </div>
             </div>
@@ -65,48 +65,60 @@
     <section class="platform-support">
       <div class="container">
         <div class="section-heading">
-          <h2>生态兼容</h2>
-          <p>原生适配主流 IDE、终端与自动化工具链，无需改造即可嵌入现有流程。</p>
+          <h2>核心能力</h2>
+          <p>为开发者打造的完整 AI 开发解决方案</p>
         </div>
         <div class="support-panels">
           <div class="support-card">
-            <h3>热门 IDE 原生适配</h3>
-            <div class="ide-grid">
-              <div class="ide-item">
-                <div class="ide-icon ide-icon-blue"></div>
-                <span>VS Code</span>
-                <small>官方扩展</small>
+            <h3>🚀 快速接入</h3>
+            <div class="feature-list">
+              <div class="feature-item">
+                <span class="feature-check">✓</span>
+                <div>
+                  <strong>统一 API 标准</strong>
+                  <p>兼容 OpenAI SDK，零学习成本快速迁移</p>
+                </div>
               </div>
-              <div class="ide-item">
-                <div class="ide-icon ide-icon-purple"></div>
-                <span>Cursor</span>
-                <small>深度协作</small>
+              <div class="feature-item">
+                <span class="feature-check">✓</span>
+                <div>
+                  <strong>简单易用</strong>
+                  <p>三行代码即可开始调用，5分钟完成集成</p>
+                </div>
               </div>
-              <div class="ide-item">
-                <div class="ide-icon ide-icon-orange"></div>
-                <span>JetBrains</span>
-                <small>全系列支持</small>
-              </div>
-              <div class="ide-item">
-                <div class="ide-icon ide-icon-green"></div>
-                <span>Vim / Neovim</span>
-                <small>终端驱动</small>
+              <div class="feature-item">
+                <span class="feature-check">✓</span>
+                <div>
+                  <strong>详细文档</strong>
+                  <p>完善的 API 文档和代码示例</p>
+                </div>
               </div>
             </div>
           </div>
           <div class="support-card">
-            <h3>支持 100+ 主流语言</h3>
-            <div class="language-tags">
-              <span>JavaScript</span>
-              <span>TypeScript</span>
-              <span>Python</span>
-              <span>Go</span>
-              <span>Java</span>
-              <span>Rust</span>
-              <span>C++</span>
-              <span>PHP</span>
-              <span>Swift</span>
-              <span class="highlight">+ 更多语言</span>
+            <h3>⚡ 开发者体验</h3>
+            <div class="feature-list">
+              <div class="feature-item">
+                <span class="feature-check">✓</span>
+                <div>
+                  <strong>实时监控面板</strong>
+                  <p>API 调用量、成本、性能一目了然</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <span class="feature-check">✓</span>
+                <div>
+                  <strong>灵活计费控制</strong>
+                  <p>按需付费，实时查看用量和成本统计</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <span class="feature-check">✓</span>
+                <div>
+                  <strong>高并发支持</strong>
+                  <p>企业级负载均衡，轻松应对流量高峰</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -118,88 +130,33 @@
       <div class="container">
         <div class="section-heading">
           <h2>为何选择 xCoder</h2>
-          <p>我们将智能模型能力与工程方法论结合，持续交付可验证的业务价值。</p>
+          <p>为开发者提供稳定、可靠的 AI 模型调用服务，让你专注于打造卓越产品。</p>
         </div>
         <div class="why-grid">
           <div class="why-card">
             <div class="why-icon why-icon-purple">🤝</div>
-            <h3>多模型协同</h3>
-            <p>统一管理自研模型与公有模型，支持私有化部署与跨云容灾。</p>
+            <h3>开发者友好</h3>
+            <p>兼容 OpenAI 标准接口，三行代码即可调用，丰富的文档和示例助你快速上手。</p>
           </div>
           <div class="why-card">
             <div class="why-icon why-icon-green">📈</div>
-            <h3>高可用架构</h3>
-            <p>全球多区域容灾，毫秒级路由切换，完善限流与监控报警体系。</p>
+            <h3>稳定可靠</h3>
+            <p>企业级基础设施，全球多区域部署，为开发者提供 99.9% 服务可用性保障。</p>
           </div>
           <div class="why-card">
             <div class="why-icon why-icon-orange">💰</div>
-            <h3>精细化成本</h3>
-            <p>按团队规模灵活扩展，实时掌握 token 与算力消耗，成本可预测。</p>
+            <h3>按需付费</h3>
+            <p>灵活的计费模式，实时监控 Token 消耗，开发者可自主控制成本。</p>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- Pricing -->
-    <section class="pricing">
-      <div class="container">
-        <div class="section-heading">
-          <h2>透明计费</h2>
-          <p>根据团队规模灵活选择，按月付费随时升级。</p>
-        </div>
-        <div class="pricing-grid">
-          <div class="pricing-card">
-            <h3>成长版</h3>
-            <div class="pricing-price">
-              $1
-              <span>/月</span>
-            </div>
-            <ul>
-              <li>2000 调用额度</li>
-              <li>个人与小团队</li>
-              <li>基础模型访问</li>
-            </ul>
-            <router-link to="/subscriptions" class="pricing-btn">立即体验</router-link>
-          </div>
-          <div class="pricing-card pricing-card-featured">
-            <span class="pricing-tag">最受欢迎</span>
-            <h3>团队版</h3>
-            <div class="pricing-price">
-              $50
-              <span>/月</span>
-            </div>
-            <ul>
-              <li>50,000 调用额度</li>
-              <li>团队协作与子账号</li>
-              <li>企业级安全策略</li>
-            </ul>
-            <router-link to="/subscriptions" class="pricing-btn pricing-btn-gradient">预约开通</router-link>
-          </div>
-          <div class="pricing-card">
-            <h3>企业版</h3>
-            <div class="pricing-price">
-              $100
-              <span>/月</span>
-            </div>
-            <ul>
-              <li>100,000 调用额度</li>
-              <li>专属技术支持</li>
-              <li>多模型混合编排</li>
-            </ul>
-            <router-link to="/tickets" class="pricing-btn">联系顾问</router-link>
-          </div>
-        </div>
-        <p class="pricing-note">
-          更高配额可定制私有化部署方案，支持本地化合规与 SLA 定制。
-        </p>
       </div>
     </section>
 
     <!-- CTA -->
     <section class="cta">
       <div class="container">
-        <h2>准备好升级团队的研发效率了吗？</h2>
-        <p>加入 12,000+ 开发者，共同构建高效可信的智能研发体系。</p>
+        <h2>开启你的 AI 开发之旅</h2>
+        <p>立即开始构建你的 AI 应用，体验强大的模型能力。</p>
         <div class="cta-actions">
           <router-link to="/getting-started" class="btn btn-contrast">立即试用</router-link>
           <router-link to="/documentation" class="btn btn-ghost">浏览文档</router-link>
@@ -562,6 +519,62 @@
   background: linear-gradient(135deg, #7c3aed, #2563eb);
   color: #ffffff;
   border-color: transparent;
+}
+
+/* Feature List */
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(248, 250, 252, 0.5);
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+  background: rgba(124, 58, 237, 0.05);
+  transform: translateX(4px);
+}
+
+.feature-check {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.feature-item strong {
+  display: block;
+  color: #1f2937;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.feature-item p {
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.support-card h3 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
 }
 
 /* Why Us */

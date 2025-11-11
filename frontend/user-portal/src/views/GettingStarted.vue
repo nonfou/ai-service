@@ -1,742 +1,540 @@
 <template>
   <div class="getting-started-page">
-    <!-- 页面头部装饰 -->
-    <div class="page-header-decoration"></div>
-
-    <!-- 页面标题区域 -->
-    <div class="page-header">
-      <div class="header-content">
-        <el-icon class="header-icon-large"><Rocket /></el-icon>
-        <h1>快速开始</h1>
-        <p class="subtitle">选择你喜欢的AI工具开始使用</p>
-      </div>
+    <!-- 动态网格背景 -->
+    <div class="grid-background">
+      <div class="grid-lines"></div>
+      <div class="glow-effect glow-1"></div>
+      <div class="glow-effect glow-2"></div>
     </div>
 
-    <!-- Claude Code 卡片及安装指南 -->
-    <div class="ai-card-wrapper">
-      <el-card class="ai-card claude-card" shadow="hover">
-        <div class="card-header">
-          <div class="card-title-section">
-            <div class="tool-logo claude-logo">
-              <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="40" height="40" rx="8" fill="url(#claude-gradient)"/>
-                <path d="M20 10L28 18L20 26L12 18L20 10Z" fill="white" opacity="0.9"/>
-                <defs>
-                  <linearGradient id="claude-gradient" x1="0" y1="0" x2="40" y2="40">
-                    <stop offset="0%" stop-color="#667eea"/>
-                    <stop offset="100%" stop-color="#764ba2"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <div>
-              <h2>Claude Code</h2>
-              <p class="description">官方命令行界面工具,为开发者提供强大的AI辅助编程能力</p>
-            </div>
-          </div>
-          <el-tag type="primary" size="large" effect="dark">
-            <el-icon><Star /></el-icon>
-            推荐
-          </el-tag>
-        </div>
-        <div class="card-actions">
-          <el-button
-            type="primary"
-            size="large"
-            @click="toggleSection('claude')"
-            :icon="expandedSection === 'claude' ? ArrowUp : Download"
-          >
-            {{ expandedSection === 'claude' ? '收起指南' : '开始安装' }}
-          </el-button>
-        </div>
-      </el-card>
-
-      <!-- Claude Code 安装指南 -->
-      <el-collapse-transition>
-        <el-card v-show="expandedSection === 'claude'" class="installation-guide claude-guide" shadow="never">
-          <div class="guide-header">
-            <el-icon class="guide-icon"><Guide /></el-icon>
-            <h3>安装 Claude Code</h3>
-          </div>
-
-          <!-- 一键安装 -->
-          <div class="section">
-            <div class="section-title">
-              <el-icon><Download /></el-icon>
-              <h4>一键安装命令</h4>
-            </div>
-            <p class="section-desc">复制以下命令到终端执行,即可自动完成安装:</p>
-
-            <el-tabs v-model="claudeInstallTab" class="install-tabs">
-              <el-tab-pane name="unix">
-                <template #label>
-                  <span class="tab-label">
-                    <el-icon><Monitor /></el-icon>
-                    macOS / Linux
-                  </span>
-                </template>
-                <div class="code-block">
-                  <div class="code-header">
-                    <span class="code-lang">bash</span>
-                  </div>
-                  <pre><code>curl -fsSL https://cli.anthropic.com/install.sh | sh</code></pre>
-                  <el-button size="small" type="primary" @click="copyToClipboard('curl -fsSL https://cli.anthropic.com/install.sh | sh')">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-                <div class="tip success-tip">
-                  <el-icon><SuccessFilled /></el-icon>
-                  <span>该命令会自动检测系统环境并完成安装配置</span>
-                </div>
-              </el-tab-pane>
-
-              <el-tab-pane name="windows">
-                <template #label>
-                  <span class="tab-label">
-                    <el-icon><Platform /></el-icon>
-                    Windows
-                  </span>
-                </template>
-                <div class="code-block">
-                  <div class="code-header">
-                    <span class="code-lang">powershell</span>
-                  </div>
-                  <pre><code>irm https://cli.anthropic.com/install.ps1 | iex</code></pre>
-                  <el-button size="small" type="primary" @click="copyToClipboard('irm https://cli.anthropic.com/install.ps1 | iex')">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-                <div class="tip info-tip">
-                  <el-icon><InfoFilled /></el-icon>
-                  <span>请在 PowerShell 中运行此命令</span>
-                </div>
-              </el-tab-pane>
-            </el-tabs>
-          </div>
-
-          <!-- 手动安装步骤 -->
-          <div class="section">
-            <div class="section-title">
-              <el-icon><Tools /></el-icon>
-              <h4>手动安装步骤</h4>
-            </div>
-            <el-tabs v-model="claudeManualTab" class="platform-tabs">
-              <el-tab-pane label="macOS" name="macos">
-                <div class="steps">
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><Download /></el-icon>
-                      <span>1</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>通过 Homebrew 安装</h5>
-                      <p>如果尚未安装 Homebrew,先执行:</p>
-                      <div class="code-block">
-                        <pre><code>{{ getHomebrewInstallCommand() }}</code></pre>
-                        <el-button size="small" @click="copyToClipboard(getHomebrewInstallCommand())">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                      <p>然后安装 Claude Code:</p>
-                      <div class="code-block">
-                        <pre><code>brew install anthropics/claude/claude</code></pre>
-                        <el-button size="small" @click="copyToClipboard('brew install anthropics/claude/claude')">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><CircleCheck /></el-icon>
-                      <span>2</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>验证安装</h5>
-                      <div class="code-block">
-                        <pre><code>claude --version</code></pre>
-                        <el-button size="small" @click="copyToClipboard('claude --version')">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </el-tab-pane>
-
-              <el-tab-pane label="Linux" name="linux">
-                <div class="steps">
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><Download /></el-icon>
-                      <span>1</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>下载并安装</h5>
-                      <div class="code-block">
-                        <pre><code>curl -fsSL https://cli.anthropic.com/install.sh | sh</code></pre>
-                        <el-button size="small" @click="copyToClipboard('curl -fsSL https://cli.anthropic.com/install.sh | sh')">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><FolderOpened /></el-icon>
-                      <span>2</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>添加到 PATH (如果需要)</h5>
-                      <div class="code-block">
-                        <pre><code>{{ getPathCommand() }}</code></pre>
-                        <el-button size="small" @click="copyToClipboard(getPathCommand())">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><CircleCheck /></el-icon>
-                      <span>3</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>验证安装</h5>
-                      <div class="code-block">
-                        <pre><code>claude --version</code></pre>
-                        <el-button size="small" @click="copyToClipboard('claude --version')">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </el-tab-pane>
-
-              <el-tab-pane label="Windows" name="windows">
-                <div class="steps">
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><Download /></el-icon>
-                      <span>1</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>使用 PowerShell 安装</h5>
-                      <p>以管理员身份运行 PowerShell,然后执行:</p>
-                      <div class="code-block">
-                        <pre><code>irm https://cli.anthropic.com/install.ps1 | iex</code></pre>
-                        <el-button size="small" @click="copyToClipboard('irm https://cli.anthropic.com/install.ps1 | iex')">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="step">
-                    <div class="step-number">
-                      <el-icon><CircleCheck /></el-icon>
-                      <span>2</span>
-                    </div>
-                    <div class="step-content">
-                      <h5>验证安装</h5>
-                      <div class="code-block">
-                        <pre><code>claude --version</code></pre>
-                        <el-button size="small" @click="copyToClipboard('claude --version')">
-                          <el-icon><CopyDocument /></el-icon>
-                          复制
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </el-tab-pane>
-            </el-tabs>
-          </div>
-
-          <!-- 环境变量配置 -->
-          <div class="section">
-            <div class="section-title">
-              <el-icon><Key /></el-icon>
-              <h4>配置环境变量</h4>
-            </div>
-            <p class="section-desc">设置 API Base URL 和 API Key:</p>
-
-            <el-tabs v-model="claudeEnvTab" class="platform-tabs">
-              <el-tab-pane label="macOS / Linux" name="unix">
-                <h5>临时配置 (当前终端会话)</h5>
-                <div class="code-block">
-                  <pre><code>{{ getUnixEnvCommand() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getUnixEnvCommand())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-
-                <h5>永久配置</h5>
-                <p>将以下内容添加到 <code>~/.bashrc</code> 或 <code>~/.zshrc</code>:</p>
-                <div class="code-block">
-                  <pre><code>{{ getUnixEnvCommand() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getUnixEnvCommand())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-                <div class="tip info-tip">
-                  <el-icon><InfoFilled /></el-icon>
-                  <span>修改后执行 <code>source ~/.bashrc</code> 或 <code>source ~/.zshrc</code> 使配置生效</span>
-                </div>
-              </el-tab-pane>
-
-              <el-tab-pane label="Windows" name="windows">
-                <h5>临时配置 (当前 PowerShell 会话)</h5>
-                <div class="code-block">
-                  <pre><code>{{ getWindowsEnvCommand() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getWindowsEnvCommand())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-
-                <h5>永久配置</h5>
-                <p>使用以下命令设置系统环境变量:</p>
-                <div class="code-block">
-                  <pre><code>{{ getWindowsPermanentEnvCommand() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getWindowsPermanentEnvCommand())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-              </el-tab-pane>
-            </el-tabs>
-
-            <div v-if="!apiKey" class="api-key-hint">
-              <el-icon><Warning /></el-icon>
-              <div>
-                <p>登录后可自动获取您的 API Key</p>
-                <el-button type="warning" size="small" @click="$router.push('/login')">
-                  立即登录
-                </el-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 开始使用 -->
-          <div class="section">
-            <div class="section-title">
+    <!-- 主容器 -->
+    <div class="main-container">
+      <!-- 左侧导航栏 -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo-section">
+            <div class="logo-icon">
               <el-icon><Promotion /></el-icon>
-              <h4>开始使用</h4>
             </div>
-            <div class="code-block">
-              <pre><code>claude</code></pre>
-              <el-button size="small" @click="copyToClipboard('claude')">
-                <el-icon><CopyDocument /></el-icon>
-                复制
-              </el-button>
-            </div>
-            <div class="tip success-tip">
-              <el-icon><SuccessFilled /></el-icon>
-              <span>执行此命令即可启动 Claude Code 交互式界面</span>
-            </div>
+            <h2>快速开始</h2>
           </div>
-        </el-card>
-      </el-collapse-transition>
-    </div>
-
-    <!-- Codex 卡片及安装指南 -->
-    <div class="ai-card-wrapper">
-      <el-card class="ai-card codex-card" shadow="hover">
-        <div class="card-header">
-          <div class="card-title-section">
-            <div class="tool-logo codex-logo">
-              <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="40" height="40" rx="8" fill="url(#codex-gradient)"/>
-                <path d="M12 12H28V16H12V12Z M12 18H28V22H12V18Z M12 24H22V28H12V24Z" fill="white" opacity="0.9"/>
-                <defs>
-                  <linearGradient id="codex-gradient" x1="0" y1="0" x2="40" y2="40">
-                    <stop offset="0%" stop-color="#11998e"/>
-                    <stop offset="100%" stop-color="#38ef7d"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <div>
-              <h2>Codex</h2>
-              <p class="description">轻量级配置方案,通过配置文件快速接入各类AI工具</p>
-            </div>
-          </div>
+          <p class="sidebar-subtitle">选择您的接入方式</p>
         </div>
-        <div class="card-actions">
-          <el-button
-            type="success"
-            size="large"
-            @click="toggleSection('codex')"
-            :icon="expandedSection === 'codex' ? ArrowUp : Setting"
+
+        <!-- 导航菜单 -->
+        <nav class="nav-menu">
+          <div
+            class="nav-item"
+            :class="{ 'nav-item--active': activeSection === 'claude-code' }"
+            @click="setActiveSection('claude-code')"
           >
-            {{ expandedSection === 'codex' ? '收起指南' : '开始配置' }}
-          </el-button>
+            <div class="nav-item__icon nav-item__icon--claude">
+              <span>C</span>
+            </div>
+            <div class="nav-item__content">
+              <h3>Claude Code</h3>
+              <p>官方 CLI 工具</p>
+            </div>
+            <el-tag v-if="activeSection === 'claude-code'" type="primary" size="small" effect="dark">
+              <el-icon><Star /></el-icon>
+              推荐
+            </el-tag>
+          </div>
+
+          <div
+            class="nav-item"
+            :class="{ 'nav-item--active': activeSection === 'codex' }"
+            @click="setActiveSection('codex')"
+          >
+            <div class="nav-item__icon nav-item__icon--codex">
+              <span>Co</span>
+            </div>
+            <div class="nav-item__content">
+              <h3>Codex 配置</h3>
+              <p>轻量级方案</p>
+            </div>
+          </div>
+        </nav>
+
+        <!-- 侧边栏底部信息 -->
+        <div class="sidebar-footer">
+          <div class="quick-info">
+            <el-icon><InfoFilled /></el-icon>
+            <span>需要帮助? <a href="#" @click.prevent>查看文档</a></span>
+          </div>
         </div>
-      </el-card>
+      </aside>
 
-      <!-- Codex 安装指南 -->
-      <el-collapse-transition>
-        <el-card v-show="expandedSection === 'codex'" class="installation-guide codex-guide" shadow="never">
-          <div class="guide-header">
-            <el-icon class="guide-icon"><Setting /></el-icon>
-            <h3>配置 Codex</h3>
-          </div>
-
-          <!-- 下载配置文件 -->
-          <div class="section">
-            <div class="section-title">
-              <el-icon><Document /></el-icon>
-              <h4>下载配置文件</h4>
-            </div>
-            <p class="section-desc">选择适合您的 AI 工具的配置文件:</p>
-
-            <div class="config-files">
-              <div class="config-file-card claude-config">
-                <div class="config-card-header">
-                  <div class="config-logo claude-mini-logo">C</div>
-                  <h5>Claude Desktop</h5>
+      <!-- 右侧内容区 -->
+      <main class="content-area">
+        <!-- Claude Code 内容 -->
+        <transition name="fade-slide" mode="out-in">
+          <div v-if="activeSection === 'claude-code'" key="claude" class="content-section">
+            <!-- 头部横幅 -->
+            <div class="section-banner section-banner--claude">
+              <div class="banner-content">
+                <div class="banner-icon">
+                  <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <linearGradient id="banner-claude-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#667eea"/>
+                        <stop offset="100%" stop-color="#764ba2"/>
+                      </linearGradient>
+                    </defs>
+                    <rect x="20" y="30" width="80" height="60" rx="6" fill="url(#banner-claude-grad)" opacity="0.2"/>
+                    <rect x="20" y="30" width="80" height="60" rx="6" fill="none" stroke="url(#banner-claude-grad)" stroke-width="2"/>
+                    <circle cx="30" cy="40" r="2" fill="url(#banner-claude-grad)"/>
+                    <circle cx="38" cy="40" r="2" fill="url(#banner-claude-grad)"/>
+                    <circle cx="46" cy="40" r="2" fill="url(#banner-claude-grad)"/>
+                    <text x="30" y="60" fill="url(#banner-claude-grad)" font-family="monospace" font-size="10">$ claude</text>
+                    <path d="M 55 65 L 65 75 L 55 85" stroke="url(#banner-claude-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M 75 65 L 85 75 L 75 85" stroke="url(#banner-claude-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  </svg>
                 </div>
-                <p>使用 Claude 官方 API 的配置文件</p>
-                <el-button type="primary" size="small" @click="downloadConfig('claude')">
-                  <el-icon><Download /></el-icon>
-                  下载配置
-                </el-button>
-              </div>
-
-              <div class="config-file-card continue-config">
-                <div class="config-card-header">
-                  <div class="config-logo continue-mini-logo">Co</div>
-                  <h5>Continue</h5>
-                </div>
-                <p>适用于 Continue 插件的配置文件</p>
-                <el-button type="primary" size="small" @click="downloadConfig('continue')">
-                  <el-icon><Download /></el-icon>
-                  下载配置
-                </el-button>
-              </div>
-
-              <div class="config-file-card cursor-config">
-                <div class="config-card-header">
-                  <div class="config-logo cursor-mini-logo">Cu</div>
-                  <h5>Cursor</h5>
-                </div>
-                <p>适用于 Cursor 编辑器的配置文件</p>
-                <el-button type="primary" size="small" @click="downloadConfig('cursor')">
-                  <el-icon><Download /></el-icon>
-                  下载配置
-                </el-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 安装步骤 -->
-          <div class="section">
-            <div class="section-title">
-              <el-icon><List /></el-icon>
-              <h4>安装步骤</h4>
-            </div>
-            <div class="steps">
-              <div class="step">
-                <div class="step-number codex-step">
-                  <el-icon><Download /></el-icon>
-                  <span>1</span>
-                </div>
-                <div class="step-content">
-                  <h5>下载配置文件</h5>
-                  <p>根据您使用的工具,点击上方对应的下载按钮获取配置文件</p>
-                </div>
-              </div>
-
-              <div class="step">
-                <div class="step-number codex-step">
-                  <el-icon><Edit /></el-icon>
-                  <span>2</span>
-                </div>
-                <div class="step-content">
-                  <h5>修改配置</h5>
-                  <p>在配置文件中填入您的 API Key:</p>
-                  <div class="code-block">
-                    <pre><code>{
-  "baseURL": "https://api.xcoder.plus",
-  "apiKey": "your-api-key-here"
-}</code></pre>
+                <div class="banner-text">
+                  <h1>Claude Code CLI</h1>
+                  <p>最强大的 AI 编程助手,为开发者打造的官方命令行工具</p>
+                  <div class="banner-features">
+                    <span><el-icon><CircleCheck /></el-icon>交互式界面</span>
+                    <span><el-icon><CircleCheck /></el-icon>代码生成</span>
+                    <span><el-icon><CircleCheck /></el-icon>项目分析</span>
                   </div>
-                  <div v-if="apiKey" class="api-key-display">
-                    <p>您的 API Key:</p>
-                    <div class="code-block inline">
-                      <code>{{ apiKey }}</code>
-                      <el-button size="small" @click="copyToClipboard(apiKey)">
-                        <el-icon><CopyDocument /></el-icon>
-                        复制
-                      </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 配置步骤时间轴 -->
+            <div class="steps-section">
+              <h2 class="section-title">
+                <el-icon><List /></el-icon>
+                配置步骤
+              </h2>
+
+              <div class="steps-timeline">
+                <!-- 步骤 1: 安装 Claude Code -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">1</div>
+                  <div class="timeline-content">
+                    <h3>安装 Claude Code</h3>
+                    <p>选择适合您操作系统的安装方式</p>
+
+                    <el-tabs v-model="installTab" class="tech-tabs">
+                      <el-tab-pane label="macOS" name="macos">
+                        <div class="install-method">
+                          <CodeBlock
+                            :code="INSTALLATION_COMMANDS.homebrew.claudeCode"
+                            language="bash"
+                          />
+                          <el-alert type="info" :closable="false" class="method-tip">
+                            如果尚未安装 Homebrew,请先执行: <code>{{ INSTALLATION_COMMANDS.homebrew.install }}</code>
+                          </el-alert>
+                        </div>
+                      </el-tab-pane>
+
+                      <el-tab-pane label="Linux" name="linux">
+                        <div class="install-method">
+                          <CodeBlock
+                            :code="INSTALLATION_COMMANDS.oneClick.unix"
+                            language="bash"
+                          />
+                          <el-alert type="success" :closable="false" class="method-tip">
+                            该命令会自动检测系统环境并完成安装配置
+                          </el-alert>
+                        </div>
+                      </el-tab-pane>
+
+                      <el-tab-pane label="Windows" name="windows">
+                        <div class="install-method">
+                          <CodeBlock
+                            :code="INSTALLATION_COMMANDS.oneClick.windows"
+                            language="powershell"
+                          />
+                          <el-alert type="warning" :closable="false" class="method-tip">
+                            请在 PowerShell 中以管理员身份运行此命令
+                          </el-alert>
+                        </div>
+                      </el-tab-pane>
+                    </el-tabs>
+                  </div>
+                </div>
+
+                <!-- 步骤 2: 配置 API -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">2</div>
+                  <div class="timeline-content">
+                    <h3>配置 API</h3>
+                    <p>在 Claude Code 配置文件中设置 API Base URL 和 API Key</p>
+
+                    <div class="config-file-section">
+                      <div class="file-path-display">
+                        <el-icon><Setting /></el-icon>
+                        <span>配置文件位置: <code>~/.claude/config.json</code></span>
+                      </div>
+
+                      <CodeBlock
+                        :code="getClaudeCodeConfig()"
+                        language="json"
+                      />
+
+                      <div v-if="!apiKey" class="api-key-reminder">
+                        <el-icon><Warning /></el-icon>
+                        <span>登录后可自动获取 API Key</span>
+                        <el-button type="primary" size="small" @click="$router.push('/login')">
+                          立即登录
+                        </el-button>
+                      </div>
                     </div>
                   </div>
-                  <div v-else class="api-key-hint">
-                    <el-icon><Warning /></el-icon>
-                    <div>
-                      <p>登录后可查看您的 API Key</p>
-                      <el-button type="warning" size="small" @click="$router.push('/login')">
+                </div>
+
+                <!-- 步骤 3: 开始使用 -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">
+                    <el-icon><CircleCheck /></el-icon>
+                  </div>
+                  <div class="timeline-content">
+                    <h3>启动 Claude Code</h3>
+                    <p>在终端中执行以下命令</p>
+                    <CodeBlock
+                      :code="INSTALLATION_COMMANDS.start"
+                      language="bash"
+                    />
+                    <div class="success-message">
+                      <el-icon><SuccessFilled /></el-icon>
+                      <span>现在您可以开始使用 Claude Code 了!</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Codex 内容 -->
+          <div v-else-if="activeSection === 'codex'" key="codex" class="content-section">
+            <!-- 头部横幅 -->
+            <div class="section-banner section-banner--codex">
+              <div class="banner-content">
+                <div class="banner-icon">
+                  <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <linearGradient id="banner-codex-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#11998e"/>
+                        <stop offset="100%" stop-color="#38ef7d"/>
+                      </linearGradient>
+                    </defs>
+                    <rect x="35" y="20" width="50" height="80" rx="4" fill="url(#banner-codex-grad)" opacity="0.2"/>
+                    <rect x="35" y="20" width="50" height="80" rx="4" fill="none" stroke="url(#banner-codex-grad)" stroke-width="2"/>
+                    <line x1="45" y1="35" x2="75" y2="35" stroke="url(#banner-codex-grad)" stroke-width="2"/>
+                    <line x1="45" y1="45" x2="68" y2="45" stroke="url(#banner-codex-grad)" stroke-width="2"/>
+                    <line x1="45" y1="55" x2="75" y2="55" stroke="url(#banner-codex-grad)" stroke-width="2"/>
+                    <line x1="45" y1="65" x2="65" y2="65" stroke="url(#banner-codex-grad)" stroke-width="2"/>
+                    <path d="M 48 75 Q 45 80 48 85" stroke="url(#banner-codex-grad)" stroke-width="2" fill="none"/>
+                    <path d="M 72 75 Q 75 80 72 85" stroke="url(#banner-codex-grad)" stroke-width="2" fill="none"/>
+                    <circle cx="60" cy="80" r="2" fill="url(#banner-codex-grad)"/>
+                  </svg>
+                </div>
+                <div class="banner-text">
+                  <h1>OpenAI Codex CLI</h1>
+                  <p>轻量级编码代理,可在终端中读取、修改和运行代码</p>
+                  <div class="banner-features">
+                    <span><el-icon><CircleCheck /></el-icon>命令行工具</span>
+                    <span><el-icon><CircleCheck /></el-icon>支持多模型</span>
+                    <span><el-icon><CircleCheck /></el-icon>轻量高效</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 配置步骤 -->
+            <div class="steps-section">
+              <h2 class="section-title">
+                <el-icon><List /></el-icon>
+                配置步骤
+              </h2>
+
+              <div class="steps-timeline">
+                <!-- 步骤 1: 安装 Node.js 和 npm -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">1</div>
+                  <div class="timeline-content">
+                    <h3>安装 Node.js 和 npm</h3>
+                    <p>Codex CLI 通过 npm 安装,首先需要安装 Node.js 环境</p>
+
+                    <el-tabs v-model="codexInstallTab" class="tech-tabs">
+                      <el-tab-pane label="Ubuntu/Debian" name="ubuntu">
+                        <div class="install-method">
+                          <h4 class="method-title">更新系统包</h4>
+                          <CodeBlock
+                            code="sudo apt update && sudo apt upgrade -y"
+                            language="bash"
+                          />
+
+                          <h4 class="method-title">添加 NodeSource 仓库</h4>
+                          <CodeBlock
+                            code="curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -"
+                            language="bash"
+                          />
+
+                          <h4 class="method-title">安装 Node.js 和 npm</h4>
+                          <CodeBlock
+                            code="sudo apt install nodejs -y"
+                            language="bash"
+                          />
+
+                          <h4 class="method-title">验证安装</h4>
+                          <CodeBlock
+                            code="node --version  # 应显示 v22.x.x\nnpm --version   # 应显示 10.x.x 或更高"
+                            language="bash"
+                          />
+                        </div>
+                      </el-tab-pane>
+
+                      <el-tab-pane label="macOS" name="macos">
+                        <div class="install-method">
+                          <h4 class="method-title">使用 Homebrew 安装</h4>
+                          <CodeBlock
+                            code="brew install node"
+                            language="bash"
+                          />
+
+                          <h4 class="method-title">验证安装</h4>
+                          <CodeBlock
+                            code="node --version\nnpm --version"
+                            language="bash"
+                          />
+                        </div>
+                      </el-tab-pane>
+
+                      <el-tab-pane label="Windows (WSL)" name="windows">
+                        <div class="install-method">
+                          <el-alert type="warning" :closable="false" class="method-tip">
+                            Windows 用户强烈推荐使用 WSL (Windows Subsystem for Linux),然后按照 Ubuntu 的步骤安装
+                          </el-alert>
+                        </div>
+                      </el-tab-pane>
+                    </el-tabs>
+                  </div>
+                </div>
+
+                <!-- 步骤 2: 安装 Codex CLI -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">2</div>
+                  <div class="timeline-content">
+                    <h3>安装 Codex CLI</h3>
+                    <p>通过 npm 全局安装 Codex CLI</p>
+
+                    <CodeBlock
+                      code="sudo npm install -g @openai/codex@latest"
+                      language="bash"
+                    />
+
+                    <h4 class="method-title">验证安装</h4>
+                    <CodeBlock
+                      code="codex --version  # 应显示版本号,如 0.40.0"
+                      language="bash"
+                    />
+                  </div>
+                </div>
+
+                <!-- 步骤 3: 配置 API Key -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">3</div>
+                  <div class="timeline-content">
+                    <h3>配置 API Key</h3>
+                    <p>将 API Key 写入环境变量</p>
+
+                    <h4 class="method-title">临时保存 (当前会话)</h4>
+                    <CodeBlock
+                      :code="getCodexEnvCommand(false)"
+                      language="bash"
+                    />
+
+                    <h4 class="method-title">永久保存 (推荐)</h4>
+                    <p class="config-hint">编辑 <code>~/.bashrc</code> 或 <code>~/.zshrc</code> 文件,添加:</p>
+                    <CodeBlock
+                      :code="getCodexEnvCommand(false)"
+                      language="bash"
+                    />
+                    <p class="config-hint">然后运行 <code>source ~/.bashrc</code> 或 <code>source ~/.zshrc</code> 使其生效</p>
+
+                    <div v-if="!apiKey" class="api-key-reminder">
+                      <el-icon><Warning /></el-icon>
+                      <span>登录后可自动获取 API Key</span>
+                      <el-button type="primary" size="small" @click="$router.push('/login')">
                         立即登录
                       </el-button>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div class="step">
-                <div class="step-number codex-step">
-                  <el-icon><FolderOpened /></el-icon>
-                  <span>3</span>
-                </div>
-                <div class="step-content">
-                  <h5>放置配置文件</h5>
-                  <p>将配置文件放到对应工具的配置目录:</p>
-                  <ul class="path-list">
-                    <li>
-                      <el-icon><Document /></el-icon>
-                      <strong>Claude Desktop:</strong> <code>~/.config/claude/config.json</code>
-                    </li>
-                    <li>
-                      <el-icon><Document /></el-icon>
-                      <strong>Continue:</strong> <code>~/.continue/config.json</code>
-                    </li>
-                    <li>
-                      <el-icon><Document /></el-icon>
-                      <strong>Cursor:</strong> <code>~/.cursor/config.json</code>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+                <!-- 步骤 4: 配置 config.toml -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">4</div>
+                  <div class="timeline-content">
+                    <h3>配置 config.toml</h3>
+                    <p>在 Codex 配置文件中设置模型和 API 提供商</p>
 
-              <div class="step">
-                <div class="step-number codex-step">
-                  <el-icon><RefreshRight /></el-icon>
-                  <span>4</span>
+                    <div class="config-file-section">
+                      <div class="file-path-display">
+                        <el-icon><Setting /></el-icon>
+                        <span>配置文件: <code>~/.codex/config.toml</code></span>
+                      </div>
+
+                      <CodeBlock
+                        :code="getCodexConfigToml()"
+                        language="toml"
+                      />
+
+                      <el-alert type="info" :closable="false" class="method-tip">
+                        你可以将 model 改成其他支持的模型,如 <code>gpt-5-codex</code>、<code>claude-3-5-sonnet-20241022</code> 等
+                      </el-alert>
+                    </div>
+                  </div>
                 </div>
-                <div class="step-content">
-                  <h5>重启应用</h5>
-                  <p>重启对应的应用程序使配置生效</p>
+
+                <!-- 步骤 5: 开始使用 -->
+                <div class="timeline-item">
+                  <div class="timeline-marker">
+                    <el-icon><CircleCheck /></el-icon>
+                  </div>
+                  <div class="timeline-content">
+                    <h3>开始使用 Codex</h3>
+                    <p>导航到你的代码目录并启动 Codex</p>
+
+                    <h4 class="method-title">启动 Codex</h4>
+                    <CodeBlock
+                      code="cd /path/to/your/project\ncodex"
+                      language="bash"
+                    />
+
+                    <h4 class="method-title">示例命令</h4>
+                    <ul class="command-list">
+                      <li>基本提示: <code>codex "修复这个 bug:在 main.py 的第 42 行添加错误处理"</code></li>
+                      <li>指定模型: <code>codex -m gpt-5-codex "构建一个简单 Web 服务器"</code></li>
+                      <li>模式指定: <code>codex --mode full-auto "部署 ML 模型到 Vercel"</code></li>
+                      <li>退出: 输入 <code>/exit</code> 或按 <code>Ctrl+C</code></li>
+                    </ul>
+
+                    <div class="success-message">
+                      <el-icon><SuccessFilled /></el-icon>
+                      <span>现在您可以开始使用 Codex CLI 了!</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <!-- 配置示例 -->
-          <div class="section">
-            <div class="section-title">
-              <el-icon><View /></el-icon>
-              <h4>完整配置示例</h4>
-            </div>
-            <el-tabs v-model="codexConfigTab" class="config-tabs">
-              <el-tab-pane name="claude">
-                <template #label>
-                  <span class="tab-label">
-                    <span class="config-logo-mini claude-mini-logo">C</span>
-                    Claude Desktop
-                  </span>
-                </template>
-                <div class="code-block">
-                  <div class="code-header">
-                    <span class="code-lang">json</span>
-                  </div>
-                  <pre><code>{{ getClaudeConfig() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getClaudeConfig())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-              </el-tab-pane>
-
-              <el-tab-pane name="continue">
-                <template #label>
-                  <span class="tab-label">
-                    <span class="config-logo-mini continue-mini-logo">Co</span>
-                    Continue
-                  </span>
-                </template>
-                <div class="code-block">
-                  <div class="code-header">
-                    <span class="code-lang">json</span>
-                  </div>
-                  <pre><code>{{ getContinueConfig() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getContinueConfig())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-              </el-tab-pane>
-
-              <el-tab-pane name="cursor">
-                <template #label>
-                  <span class="tab-label">
-                    <span class="config-logo-mini cursor-mini-logo">Cu</span>
-                    Cursor
-                  </span>
-                </template>
-                <div class="code-block">
-                  <div class="code-header">
-                    <span class="code-lang">json</span>
-                  </div>
-                  <pre><code>{{ getCursorConfig() }}</code></pre>
-                  <el-button size="small" @click="copyToClipboard(getCursorConfig())">
-                    <el-icon><CopyDocument /></el-icon>
-                    复制
-                  </el-button>
-                </div>
-              </el-tab-pane>
-            </el-tabs>
-          </div>
-        </el-card>
-      </el-collapse-transition>
+        </transition>
+      </main>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import {
-  Rocket, Star, Download, ArrowUp, Setting, Guide, Monitor, Platform,
-  CopyDocument, SuccessFilled, InfoFilled, Warning, Tools, CircleCheck,
-  FolderOpened, Key, Promotion, Document, List, Edit, RefreshRight, View
-} from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
+import {
+  Star, Download, Setting, Promotion, Key, Lightning,
+  CircleCheck, InfoFilled, Warning, SuccessFilled, List
+} from '@element-plus/icons-vue'
 
-// 展开状态
-const expandedSection = ref<string>('')
+// 导入组件
+import CodeBlock from '@/components/GettingStarted/CodeBlock.vue'
 
-// Tab 状态
-const claudeInstallTab = ref('unix')
-const claudeManualTab = ref('macos')
-const claudeEnvTab = ref('unix')
-const codexConfigTab = ref('claude')
+// 导入常量
+import {
+  API_BASE_URL,
+  INSTALLATION_COMMANDS,
+  ENV_COMMANDS
+} from '@/constants/installation'
 
-// API Key
+const router = useRouter()
+
+// 状态管理
+const activeSection = ref<'claude-code' | 'codex'>('claude-code')
+const installTab = ref('macos')
+const envTab = ref('unix')
+const codexInstallTab = ref('ubuntu')
 const apiKey = ref('')
 
-// 切换展开/收起
-const toggleSection = (section: string) => {
-  expandedSection.value = expandedSection.value === section ? '' : section
+// 切换激活部分
+const setActiveSection = (section: 'claude-code' | 'codex') => {
+  activeSection.value = section
 }
 
-// 复制到剪贴板
-const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
-  } catch (err) {
-    ElMessage.error('复制失败')
-  }
-}
-
-// 获取 Homebrew 安装命令
-const getHomebrewInstallCommand = () => {
-  return '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-}
-
-// 获取 PATH 命令
-const getPathCommand = () => {
-  return 'export PATH="$HOME/.claude/bin:$PATH"'
-}
-
-// 获取 Unix 环境变量命令
-const getUnixEnvCommand = () => {
+// 获取环境变量命令
+const getEnvCommand = (platform: 'unix' | 'windows'): string => {
   const key = apiKey.value || 'your-api-key-here'
-  return `export ANTHROPIC_BASE_URL="https://api.xcoder.plus"\nexport ANTHROPIC_API_KEY="${key}"`
+  return ENV_COMMANDS[platform](key)
 }
 
-// 获取 Windows 环境变量命令
-const getWindowsEnvCommand = () => {
-  const key = apiKey.value || 'your-api-key-here'
-  return `$env:ANTHROPIC_BASE_URL="https://api.xcoder.plus"\n$env:ANTHROPIC_API_KEY="${key}"`
-}
-
-// 获取 Windows 永久环境变量命令
-const getWindowsPermanentEnvCommand = () => {
-  const key = apiKey.value || 'your-api-key-here'
-  return `[System.Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", "https://api.xcoder.plus", "User")\n[System.Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "${key}", "User")`
-}
-
-// 获取 Claude 配置
-const getClaudeConfig = () => {
+// 获取 Claude Code 配置
+const getClaudeCodeConfig = (): string => {
   const key = apiKey.value || 'your-api-key-here'
   return JSON.stringify({
-    baseURL: 'https://api.xcoder.plus',
-    apiKey: key,
-    model: 'claude-3-5-sonnet-20241022'
-  }, null, 2)
-}
-
-// 获取 Continue 配置
-const getContinueConfig = () => {
-  const key = apiKey.value || 'your-api-key-here'
-  return JSON.stringify({
-    models: [{
-      title: 'Claude 3.5 Sonnet',
-      provider: 'anthropic',
-      model: 'claude-3-5-sonnet-20241022',
-      apiKey: key,
-      apiBase: 'https://api.xcoder.plus'
-    }]
-  }, null, 2)
-}
-
-// 获取 Cursor 配置
-const getCursorConfig = () => {
-  const key = apiKey.value || 'your-api-key-here'
-  return JSON.stringify({
-    anthropic: {
-      apiKey: key,
-      baseURL: 'https://api.xcoder.plus'
+    "api": {
+      "baseURL": API_BASE_URL,
+      "key": key
     }
   }, null, 2)
 }
 
-// 下载配置文件
-const downloadConfig = (type: string) => {
-  let config = ''
-  let filename = ''
+// 获取 Continue 配置
+const getContinueConfig = (): string => {
+  const key = apiKey.value || 'your-api-key-here'
+  return JSON.stringify({
+    "title": "Claude (自定义)",
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "apiKey": key,
+    "apiBase": API_BASE_URL
+  }, null, 2)
+}
 
-  switch (type) {
-    case 'claude':
-      config = getClaudeConfig()
-      filename = 'claude-config.json'
-      break
-    case 'continue':
-      config = getContinueConfig()
-      filename = 'continue-config.json'
-      break
-    case 'cursor':
-      config = getCursorConfig()
-      filename = 'cursor-config.json'
-      break
-  }
+// 获取 Cursor 配置
+const getCursorConfig = (): string => {
+  const key = apiKey.value || 'your-api-key-here'
+  return JSON.stringify({
+    "model": "claude-3-5-sonnet-20241022",
+    "apiKey": key,
+    "baseURL": API_BASE_URL
+  }, null, 2)
+}
 
-  const blob = new Blob([config], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+// 获取 Claude Desktop 配置
+const getClaudeDesktopConfig = (): string => {
+  const key = apiKey.value || 'your-api-key-here'
+  return JSON.stringify({
+    "apiKey": key,
+    "apiUrl": API_BASE_URL
+  }, null, 2)
+}
 
-  ElMessage.success('配置文件已下载')
+// 获取 Codex 环境变量命令
+const getCodexEnvCommand = (permanent: boolean): string => {
+  const key = apiKey.value || 'sk-your-api-key-here'
+  return `export OPENAI_API_KEY="${key}"`
+}
+
+// 获取 Codex config.toml 配置
+const getCodexConfigToml = (): string => {
+  return `model = "gpt-4o"
+model_provider = "bianxieai"
+
+[model_providers.bianxieai]
+name = "bianxieai"
+base_url = "${API_BASE_URL}/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "chat"`
+}
+
+// 获取 Codex auth.json 配置 (备选方案)
+const getCodexAuthJson = (): string => {
+  const key = apiKey.value || 'sk-your-api-key-here'
+  return JSON.stringify({
+    "OPENAI_API_KEY": key
+  }, null, 2)
 }
 
 // 获取 API Key
@@ -763,65 +561,151 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 基础布局 */
+/* ========== 基础布局 ========== */
 .getting-started-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 3rem 2rem;
   position: relative;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  color: #2d3748;
+  overflow: hidden;
+  animation: page-fade-in 0.6s ease-out;
 }
 
-/* 页面头部装饰 */
-.page-header-decoration {
-  position: absolute;
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ========== 动态网格背景 ========== */
+.grid-background {
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #11998e 100%);
-}
-
-/* 页面头部 */
-.page-header {
-  text-align: center;
-  margin-bottom: 3rem;
-  padding: 2rem 0;
-  position: relative;
-}
-
-.page-header::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+  bottom: 0;
+  z-index: 0;
   pointer-events: none;
-  z-index: -1;
 }
 
-.header-content {
+.grid-lines {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: grid-move 20s linear infinite;
+}
+
+@keyframes grid-move {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(50px, 50px);
+  }
+}
+
+.glow-effect {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.3;
+  animation: glow-pulse 8s ease-in-out infinite;
+}
+
+.glow-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
+  top: -200px;
+  right: -100px;
+  animation-delay: 0s;
+}
+
+.glow-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(17, 153, 142, 0.15) 0%, transparent 70%);
+  bottom: -150px;
+  left: -100px;
+  animation-delay: 4s;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.1);
+  }
+}
+
+/* ========== 主容器 ========== */
+.main-container {
+  position: relative;
+  display: flex;
+  max-width: 1800px;
+  margin: 0 auto;
+  min-height: 100vh;
+  z-index: 1;
+}
+
+/* ========== 左侧边栏 ========== */
+.sidebar {
+  width: 320px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(99, 102, 241, 0.1);
   display: flex;
   flex-direction: column;
+  padding: 2rem 0;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-header {
+  padding: 0 2rem 2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.logo-section {
+  display: flex;
   align-items: center;
   gap: 1rem;
+  margin-bottom: 0.5rem;
 }
 
-.header-icon-large {
-  font-size: 3.5rem;
-  color: #667eea;
-  animation: float 3s ease-in-out infinite;
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  animation: logo-rotate 10s linear infinite;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+@keyframes logo-rotate {
+  0%, 90%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  95% {
+    transform: rotate(360deg) scale(1.1);
+  }
 }
 
-h1 {
-  font-size: 2.5rem;
+.sidebar-header h2 {
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -830,602 +714,811 @@ h1 {
   background-clip: text;
 }
 
-.subtitle {
-  color: #666;
-  font-size: 1.1rem;
+.sidebar-subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
   margin: 0;
 }
 
-/* AI 卡片容器 */
-.ai-card-wrapper {
-  margin-bottom: 2rem;
+/* ========== 导航菜单 ========== */
+.nav-menu {
+  flex: 1;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-/* 卡片样式 */
-.ai-card {
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid transparent;
   position: relative;
   overflow: hidden;
 }
 
-.ai-card::before {
+.nav-item::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.05);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.nav-item:hover {
+  background: white;
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateX(4px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
+}
+
+.nav-item:hover::after {
+  width: 300px;
+  height: 300px;
+}
+
+.nav-item--active {
+  background: rgba(99, 102, 241, 0.05);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.nav-item--active::before {
+  opacity: 1;
+}
+
+.nav-item__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+.nav-item__icon--claude {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+}
+
+.nav-item:hover .nav-item__icon--claude {
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.6);
+  transform: scale(1.05) rotate(-3deg);
+}
+
+.nav-item__icon--codex {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  box-shadow: 0 4px 12px rgba(17, 153, 142, 0.4);
+  transition: all 0.3s ease;
+}
+
+.nav-item:hover .nav-item__icon--codex {
+  box-shadow: 0 8px 24px rgba(17, 153, 142, 0.6);
+  transform: scale(1.05) rotate(-3deg);
+}
+
+.nav-item__content {
+  flex: 1;
+}
+
+.nav-item__content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: #1e293b;
+}
+
+.nav-item__content p {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ========== 侧边栏底部 ========== */
+.sidebar-footer {
+  padding: 0 2rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding-top: 2rem;
+}
+
+.quick-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.quick-info a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.quick-info a:hover {
+  text-decoration: underline;
+}
+
+/* ========== 右侧内容区 ========== */
+.content-area {
+  flex: 1;
+  padding: 3rem;
+  overflow-y: auto;
+}
+
+.content-section {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ========== 横幅区域 ========== */
+.section-banner {
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  margin-bottom: 3rem;
+  position: relative;
+  overflow: hidden;
+  animation: banner-slide-in 0.6s ease-out;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-banner::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 4px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
 }
 
-.claude-card::before {
+.section-banner--claude::before {
   background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
 }
 
-.codex-card::before {
+.section-banner--codex::before {
   background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
 }
 
-.ai-card:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
-}
-
-.ai-card:hover::before {
-  opacity: 1;
-}
-
-/* 卡片头部 */
-.card-header {
+.banner-content {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
+  gap: 2rem;
+  align-items: center;
 }
 
-.card-title-section {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.tool-logo {
+.banner-icon {
+  width: 120px;
+  height: 120px;
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  animation: icon-float 3s ease-in-out infinite;
 }
 
-.tool-logo svg {
+@keyframes icon-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.banner-icon svg {
   width: 100%;
   height: 100%;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  filter: drop-shadow(0 4px 16px rgba(99, 102, 241, 0.3));
 }
 
-.card-header h2 {
-  font-size: 1.8rem;
-  font-weight: 600;
+.banner-text h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
   margin: 0 0 0.5rem 0;
-  color: #333;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: title-shimmer 3s ease-in-out infinite;
+  background-size: 200% auto;
 }
 
-.description {
-  color: #666;
-  font-size: 1rem;
-  line-height: 1.6;
-  margin: 0;
+@keyframes title-shimmer {
+  0%, 100% {
+    background-position: 0% center;
+  }
+  50% {
+    background-position: 100% center;
+  }
 }
 
-.card-header .el-tag {
-  flex-shrink: 0;
+.section-banner--codex .banner-text h1 {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.card-actions {
+.banner-text p {
+  font-size: 1.1rem;
+  color: #64748b;
+  margin: 0 0 1rem 0;
+}
+
+.banner-features {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
-/* 安装指南 */
-.installation-guide {
-  margin-top: 1rem;
-  border: none;
-  position: relative;
-  overflow: hidden;
-}
-
-.claude-guide {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%);
-  border-left: 4px solid #667eea;
-}
-
-.codex-guide {
-  background: linear-gradient(135deg, rgba(17, 153, 142, 0.03) 0%, rgba(56, 239, 125, 0.03) 100%);
-  border-left: 4px solid #11998e;
-}
-
-.guide-header {
+.banner-features span {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-}
-
-.guide-icon {
-  font-size: 1.8rem;
-  color: #667eea;
-}
-
-.codex-guide .guide-icon {
-  color: #11998e;
-}
-
-.installation-guide h3 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-  color: #333;
-}
-
-/* 区块 */
-.section {
-  margin-bottom: 2.5rem;
-  padding: 1.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: #475569;
+  padding: 0.5rem 1rem;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 20px;
   transition: all 0.3s ease;
 }
 
-.section:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.banner-features span:hover {
+  background: rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
 }
 
+.banner-features .el-icon {
+  color: #667eea;
+  font-size: 1.1rem;
+  animation: icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* ========== 区块标题 ========== */
 .section-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+  color: #1e293b;
 }
 
 .section-title .el-icon {
-  font-size: 1.3rem;
+  font-size: 1.6rem;
   color: #667eea;
 }
 
-.codex-guide .section-title .el-icon {
-  color: #11998e;
+/* ========== 各个内容区块 ========== */
+.quick-install,
+.config-section,
+.start-section,
+.download-section,
+.steps-section {
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  animation: section-fade-in 0.6s ease-out backwards;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
 }
 
-.section h4 {
-  font-size: 1.3rem;
-  font-weight: 600;
-  margin: 0;
-  color: #333;
+.quick-install {
+  animation-delay: 0.1s;
 }
 
-.section h5 {
+.config-section {
+  animation-delay: 0.2s;
+}
+
+.start-section,
+.download-section {
+  animation-delay: 0.3s;
+}
+
+.steps-section {
+  animation-delay: 0.4s;
+}
+
+@keyframes section-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quick-install:hover,
+.config-section:hover,
+.start-section:hover,
+.download-section:hover,
+.steps-section:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.12);
+}
+
+.install-content,
+.config-content {
+  margin-top: 1rem;
+}
+
+.platform-title {
   font-size: 1.1rem;
   font-weight: 600;
-  margin: 1.5rem 0 0.75rem 0;
-  color: #444;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.1);
 }
 
-.section-desc {
-  color: #666;
-  margin-bottom: 1rem;
-  line-height: 1.6;
+.install-method {
+  margin-top: 0.5rem;
 }
 
-/* 代码块 */
-.code-block {
-  position: relative;
-  background: #1e1e1e;
-  border-radius: 8px;
-  padding: 1rem;
-  margin: 1rem 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+.method-tip {
+  margin-top: 1rem;
 }
 
-.code-block:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-.code-header {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-}
-
-.code-lang {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: #888;
-  font-size: 0.75rem;
+.method-tip code {
+  background: rgba(99, 102, 241, 0.1);
+  padding: 0.2rem 0.5rem;
   border-radius: 4px;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.code-block pre {
-  margin: 0;
-  overflow-x: auto;
-  padding-top: 1.5rem;
-}
-
-.code-block code {
-  color: #d4d4d4;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.code-block .el-button {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-}
-
-.code-block.inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  background: #2d2d2d;
-}
-
-.code-block.inline pre {
-  padding-top: 0;
-}
-
-.code-block.inline code {
-  flex: 1;
-}
-
-/* 步骤 */
-.steps {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.step {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(102, 126, 234, 0.02);
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.codex-guide .step {
-  background: rgba(17, 153, 142, 0.02);
-}
-
-.step:hover {
-  background: rgba(102, 126, 234, 0.05);
-  transform: translateX(4px);
-}
-
-.codex-guide .step:hover {
-  background: rgba(17, 153, 142, 0.05);
-}
-
-.step-number {
-  position: relative;
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 1.1rem;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.step-number.codex-step {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-  box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);
-}
-
-.step-number .el-icon {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  font-size: 1rem;
-  background: white;
-  border-radius: 50%;
-  padding: 2px;
-}
-
-.step-content {
-  flex: 1;
-}
-
-/* 提示框 */
-.tip {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
+  color: #667eea;
+  font-family: 'Consolas', 'Monaco', monospace;
   font-size: 0.9rem;
 }
 
-.success-tip {
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.1) 0%, rgba(103, 194, 58, 0.05) 100%);
-  border-left: 3px solid #67c23a;
-  color: #529b2e;
-}
-
-.info-tip {
-  background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(64, 158, 255, 0.05) 100%);
-  border-left: 3px solid #409eff;
-  color: #337ecc;
-}
-
-.tip .el-icon {
-  font-size: 1.1rem;
-}
-
-/* API Key 提示 */
-.api-key-hint {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding: 1rem;
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
-  border-left: 3px solid #ffc107;
-  border-radius: 8px;
-}
-
-.api-key-hint .el-icon {
-  font-size: 1.5rem;
-  color: #f39c12;
-  flex-shrink: 0;
-}
-
-.api-key-hint p {
-  margin: 0 0 0.5rem 0;
-  color: #856404;
-  font-weight: 500;
-}
-
-.api-key-display {
+.config-file-section {
   margin-top: 1rem;
 }
 
-.api-key-display p {
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
-/* 配置文件卡片 */
-.config-files {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.config-file-card {
-  padding: 1.5rem;
-  background: white;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-}
-
-.config-file-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-.claude-config:hover {
-  border-color: #667eea;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
-}
-
-.continue-config:hover {
-  border-color: #f39c12;
-  box-shadow: 0 8px 24px rgba(243, 156, 18, 0.2);
-}
-
-.cursor-config:hover {
-  border-color: #3498db;
-  box-shadow: 0 8px 24px rgba(52, 152, 219, 0.2);
-}
-
-.config-card-header {
+.file-path-display {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-left: 3px solid rgba(99, 102, 241, 0.4);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.file-path-display .el-icon {
+  color: #667eea;
+  font-size: 1.2rem;
+}
+
+.file-path-display code {
+  background: rgba(99, 102, 241, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  color: #667eea;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-weight: 600;
+}
+
+.tool-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.tool-card {
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(99, 102, 241, 0.1);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.tool-card:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
+}
+
+.tool-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 0.5rem;
 }
 
-.config-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 0.9rem;
-}
-
-.claude-mini-logo {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.continue-mini-logo {
-  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-}
-
-.cursor-mini-logo {
-  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-}
-
-.config-file-card h5 {
+.tool-card-header h4 {
   font-size: 1.1rem;
   font-weight: 600;
+  color: #1e293b;
   margin: 0;
 }
 
-.config-file-card p {
-  color: #666;
+.tool-desc {
   font-size: 0.9rem;
-  margin: 0.5rem 0 1rem 0;
-  line-height: 1.5;
+  color: #64748b;
+  margin: 0;
 }
 
-/* 路径列表 */
-.path-list {
+.install-tips {
+  margin-top: 1rem;
+}
+
+.config-hint {
+  margin-top: 1rem;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.config-hint code {
+  background: rgba(99, 102, 241, 0.08);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  color: #667eea;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.method-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.command-list {
   list-style: none;
   padding: 0;
   margin: 1rem 0;
 }
 
-.path-list li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.command-list li {
   padding: 0.75rem;
-  background: rgba(102, 126, 234, 0.02);
-  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.05);
+  border-left: 3px solid rgba(99, 102, 241, 0.4);
+  border-radius: 4px;
   margin-bottom: 0.5rem;
+  color: #475569;
+  font-size: 0.95rem;
   transition: all 0.3s ease;
+  line-height: 1.6;
 }
 
-.codex-guide .path-list li {
-  background: rgba(17, 153, 142, 0.02);
-}
-
-.path-list li:hover {
-  background: rgba(102, 126, 234, 0.05);
+.command-list li:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-left-color: rgba(99, 102, 241, 0.8);
   transform: translateX(4px);
 }
 
-.codex-guide .path-list li:hover {
-  background: rgba(17, 153, 142, 0.05);
-}
-
-.path-list li .el-icon {
-  color: #667eea;
-  font-size: 1.1rem;
-}
-
-.codex-guide .path-list li .el-icon {
-  color: #11998e;
-}
-
-.path-list li code {
-  background: #f5f5f5;
-  padding: 0.2rem 0.5rem;
+.command-list code {
+  background: rgba(99, 102, 241, 0.1);
+  padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 0.85rem;
-  color: #e74c3c;
+  color: #667eea;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-weight: 600;
 }
 
-/* Tabs */
-.install-tabs,
-.platform-tabs,
-.config-tabs {
-  margin: 1rem 0;
-}
-
-.tab-label {
+.api-key-reminder {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 8px;
+  color: #fbbf24;
+  animation: reminder-pulse 2s ease-in-out infinite;
 }
 
-.config-logo-mini {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  display: inline-flex;
+@keyframes reminder-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+  }
+}
+
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  color: #22c55e;
+  font-weight: 500;
+  animation: success-slide-in 0.5s ease-out;
+}
+
+@keyframes success-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ========== 时间轴 ========== */
+.steps-timeline {
+  margin-top: 2rem;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+  position: relative;
+}
+
+.timeline-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 44px;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.5) 0%, transparent 100%);
+}
+
+.timeline-marker {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-weight: 700;
-  font-size: 0.7rem;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+  animation: marker-pop-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) backwards;
 }
 
-/* 响应式 */
-@media (max-width: 768px) {
-  .getting-started-page {
-    padding: 2rem 1rem;
+.timeline-item:nth-child(1) .timeline-marker {
+  animation-delay: 0.1s;
+}
+
+.timeline-item:nth-child(2) .timeline-marker {
+  animation-delay: 0.2s;
+}
+
+.timeline-item:nth-child(3) .timeline-marker {
+  animation-delay: 0.3s;
+}
+
+.timeline-item:nth-child(4) .timeline-marker {
+  animation-delay: 0.4s;
+}
+
+@keyframes marker-pop-in {
+  from {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.timeline-item:hover .timeline-marker {
+  transform: scale(1.15) rotate(5deg);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.6);
+}
+
+.timeline-content {
+  flex: 1;
+  padding-top: 0.5rem;
+}
+
+.timeline-content h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: #1e293b;
+}
+
+.timeline-content p {
+  color: #64748b;
+  margin: 0 0 1rem 0;
+}
+
+.path-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0 0;
+}
+
+.path-list li {
+  padding: 0.75rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-left: 3px solid rgba(99, 102, 241, 0.4);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  color: #475569;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.path-list li:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-left-color: rgba(99, 102, 241, 0.8);
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.path-list code {
+  background: rgba(99, 102, 241, 0.08);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  color: #667eea;
+  font-family: 'Consolas', 'Monaco', monospace;
+  margin-left: 0.5rem;
+}
+
+/* ========== 过渡动画 ========== */
+.fade-slide-enter-active {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(30px) scale(0.95);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.95);
+}
+
+/* ========== Tech Tabs 样式 ========== */
+.tech-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.tech-tabs :deep(.el-tabs__active-bar) {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  height: 3px;
+}
+
+.tech-tabs :deep(.el-tabs__item) {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.tech-tabs :deep(.el-tabs__item.is-active) {
+  color: #667eea;
+}
+
+.tech-tabs :deep(.el-tabs__item:hover) {
+  color: #5a67d8;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 280px;
   }
 
-  .header-icon-large {
-    font-size: 2.5rem;
+  .content-area {
+    padding: 2rem;
   }
 
-  h1 {
-    font-size: 2rem;
-  }
-
-  .subtitle {
-    font-size: 1rem;
-  }
-
-  .card-header {
+  .banner-content {
     flex-direction: column;
-    gap: 1rem;
-  }
-
-  .card-title-section {
-    flex-direction: column;
-    align-items: center;
     text-align: center;
   }
 
-  .config-files {
-    grid-template-columns: 1fr;
-  }
-
-  .step {
-    flex-direction: column;
-  }
-
-  .code-block .el-button {
-    position: static;
-    margin-top: 0.5rem;
-    width: 100%;
-  }
-
-  .code-block pre {
-    padding-top: 0;
-  }
-
-  .code-header {
-    position: static;
-    margin-bottom: 0.5rem;
+  .banner-text h1 {
+    font-size: 2rem;
   }
 }
 
-@media (max-width: 480px) {
-  .card-actions {
-    width: 100%;
+@media (max-width: 768px) {
+  .main-container {
+    flex-direction: column;
   }
 
-  .card-actions .el-button {
-    flex: 1;
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
   }
+
+  .content-area {
+    padding: 1.5rem;
+  }
+
+  .section-banner {
+    padding: 2rem;
+  }
+
+  .banner-text h1 {
+    font-size: 1.75rem;
+  }
+
+  .timeline-item {
+    gap: 1rem;
+  }
+
+  .timeline-marker {
+    width: 36px;
+    height: 36px;
+    font-size: 0.95rem;
+  }
+}
+
+/* ========== 工具类 ========== */
+.mt-2 {
+  margin-top: 0.5rem;
 }
 </style>

@@ -3,21 +3,20 @@
     <!-- 页面标题 -->
     <div class="page-header-section">
       <span class="hero-badge">订阅方案</span>
-      <h1 class="page-title">选择适合您的套餐</h1>
-      <p class="page-description">根据使用需求灵活选择,按月付费随时升级,透明计费无隐藏费用。</p>
+      <h1 class="page-title">灵活的订阅方案</h1>
+      <p class="page-description">按需选择适合你的套餐,专注于构建应用,我们负责 AI 能力。</p>
       <div class="tab-switches">
         <button
           :class="['tab-btn', { active: activeTab === 'monthly' }]"
-          @click="activeTab = 'monthly'"
+          @click="switchPaymentType(1)"
         >
-          月付
+          按月支付
         </button>
         <button
-          :class="['tab-btn', { active: activeTab === 'yearly' }]"
-          @click="activeTab = 'yearly'"
+          :class="['tab-btn', { active: activeTab === 'payAsGo' }]"
+          @click="switchPaymentType(2)"
         >
-          年付
-          <span class="save-badge">省20%</span>
+          按量支付
         </button>
       </div>
     </div>
@@ -25,32 +24,38 @@
     <!-- 订阅套餐卡片 -->
     <div class="section-heading">
       <h2>订阅套餐</h2>
-      <p>选择适合您团队规模的套餐方案,随时升级无忧</p>
+      <p>根据开发需求选择合适的套餐,随时可升级扩容</p>
     </div>
 
-    <div class="plans-grid">
+    <!-- 按月支付 - 卡片网格 -->
+    <div v-if="activeTab === 'monthly'" class="plans-grid">
       <div
-        v-for="plan in subscriptionPlans"
+        v-for="plan in displayPlans"
         :key="plan.id"
         class="plan-card"
         :class="{ 'plan-card-featured': plan.featured }"
       >
         <!-- 标签 -->
-        <span v-if="plan.badge" class="plan-badge" :class="`badge-${plan.badge.type}`">
-          {{ plan.badge.text }}
+        <span v-if="plan.badge" class="plan-badge" :class="`badge-${getBadgeColor(plan.badge)}`">
+          {{ plan.badge }}
         </span>
 
         <!-- 套餐标题 -->
         <div class="plan-header">
-          <h3 class="plan-name">{{ plan.name }}</h3>
-          <p class="plan-subtitle">{{ plan.subtitle }}</p>
+          <h3 class="plan-name">{{ plan.displayName }}</h3>
+          <p class="plan-subtitle">{{ plan.description }}</p>
         </div>
 
         <!-- 价格 -->
         <div class="plan-price">
           <span class="price-symbol">$</span>
           <span class="price-value">{{ plan.price }}</span>
-          <span class="price-period">/月</span>
+          <span class="price-period">{{ getPricePeriod(plan.paymentType) }}</span>
+        </div>
+
+        <!-- 配额信息 -->
+        <div class="plan-quota" v-if="plan.quotaAmount > 0">
+          {{ getQuotaText(plan.paymentType, plan.quotaAmount) }}
         </div>
 
         <!-- 功能列表 -->
@@ -66,7 +71,45 @@
           :class="['subscribe-btn', { 'subscribe-btn-gradient': plan.featured }]"
           @click="handleSubscribe(plan)"
         >
-          {{ plan.buttonText || '立即订阅' }}
+          {{ getButtonText(plan.paymentType) }}
+        </button>
+      </div>
+    </div>
+
+    <!-- 按量支付 - 新的 UI 布局 -->
+    <div v-else class="pay-as-go-container">
+      <div class="pay-as-go-card">
+        <div class="pay-as-go-header">
+          <div class="header-icon">
+            <el-icon :size="48"><Coin /></el-icon>
+          </div>
+          <h3 class="pay-as-go-title">按量付费</h3>
+          <p class="pay-as-go-desc">灵活充值,按实际使用量计费,永久有效</p>
+        </div>
+
+        <div class="pricing-rules">
+          <h4 class="rules-title">计费规则</h4>
+          <div class="rules-grid">
+            <div class="rule-item">
+              <div class="rule-label">输入 Token</div>
+              <div class="rule-price">$2 <span class="rule-unit">/ 1M tokens</span></div>
+            </div>
+            <div class="rule-item">
+              <div class="rule-label">输出 Token</div>
+              <div class="rule-price">$10 <span class="rule-unit">/ 1M tokens</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pay-as-go-features">
+          <div class="feature-item" v-for="(feature, idx) in payAsGoPlans[0].features.slice(2)" :key="idx">
+            <el-icon class="feature-check"><Check /></el-icon>
+            <span>{{ feature }}</span>
+          </div>
+        </div>
+
+        <button class="recharge-btn" @click="handleRecharge">
+          立即充值
         </button>
       </div>
     </div>
@@ -111,63 +154,114 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check } from '@element-plus/icons-vue'
-import { subscriptionAPI } from '../api'
+import { Check, Coin } from '@element-plus/icons-vue'
+import { subscriptionAPI, PaymentType, type SubscriptionPlan } from '../api'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
-const activeTab = ref('monthly')
+const activeTab = ref<'monthly' | 'payAsGo'>('monthly')
+const rechargeAmount = ref<number>()
 
-// 订阅套餐数据
-const subscriptionPlans = ref([
+// Mock 数据 - 按月支付套餐
+const monthlyPlans = ref<SubscriptionPlan[]>([
   {
     id: 1,
-    name: '体验卡',
-    subtitle: '快速体验 AI 开发平台',
+    planName: 'trial',
+    displayName: '体验卡',
+    description: '快速体验 AI 开发平台',
+    originalPrice: 1,
     price: 1,
-    badge: { text: '新用户专享', type: 'gray' },
+    quotaAmount: 5,  // $5 额度/天
+    paymentType: PaymentType.MONTHLY,
+    badge: '新用户专享',
+    featured: false,
     features: [
       '1天有效期',
-      '600 积分额度',
       'Claude & Gemini 模型',
       '24/7 技术支持'
     ],
-    buttonText: '立即试用'
+    status: 1,
+    sortOrder: 1,
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z'
   },
   {
-    id: 3,
-    name: 'Max 100',
-    subtitle: '适合专业开发者',
+    id: 2,
+    planName: 'max_100',
+    displayName: 'Max 100',
+    description: '适合专业开发者',
+    originalPrice: 60,
     price: 50,
-    badge: { text: '最受欢迎', type: 'green' },
+    quotaAmount: 50,  // $50 额度/天
+    paymentType: PaymentType.MONTHLY,
+    badge: '最受欢迎',
+    featured: true,
     features: [
       '30天有效期',
-      '每日 50,000 积分',
       '全模型访问权限',
       'IDE 与 CLI 集成',
       '优先技术支持'
     ],
-    buttonText: '选择此套餐',
-    featured: true
+    status: 1,
+    sortOrder: 2,
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z'
   },
   {
-    id: 4,
-    name: 'Max 200',
-    subtitle: '适合团队协作',
+    id: 3,
+    planName: 'max_200',
+    displayName: 'Max 200',
+    description: '适合团队协作',
+    originalPrice: 120,
     price: 100,
-    badge: { text: '企业推荐', type: 'orange' },
+    quotaAmount: 100,  // $100 额度/天
+    paymentType: PaymentType.MONTHLY,
+    badge: '企业推荐',
+    featured: false,
     features: [
       '30天有效期',
-      '每日 100,000 积分',
       '全模型访问权限',
       '多账号管理',
       '专属技术支持'
     ],
-    buttonText: '选择此套餐',
-    featured: false
+    status: 1,
+    sortOrder: 3,
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z'
   }
 ])
+
+// Mock 数据 - 按量支付套餐
+const payAsGoPlans = ref<SubscriptionPlan[]>([
+  {
+    id: 11,
+    planName: 'pay_as_go',
+    displayName: '按量付费',
+    description: '灵活充值,按实际使用量计费',
+    originalPrice: 0,
+    price: 0,  // 自定义金额
+    quotaAmount: 0,
+    paymentType: PaymentType.PAY_AS_GO,
+    featured: true,
+    features: [
+      '输入: $2 / 1M tokens',
+      '输出: $10 / 1M tokens',
+      '按实际用量扣费',
+      '支持所有模型',
+      '实时消费明细'
+    ],
+    status: 1,
+    sortOrder: 1,
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z'
+  }
+])
+
+// 根据当前 Tab 显示对应的套餐列表
+const displayPlans = computed(() => {
+  return activeTab.value === 'monthly' ? monthlyPlans.value : payAsGoPlans.value
+})
 
 // 订阅历史
 const subscriptionHistory = ref([
@@ -176,6 +270,43 @@ const subscriptionHistory = ref([
   { id: 3, planName: '体验卡', startDate: '2025-09-25', endDate: '2025-09-26', status: 'expired' },
   { id: 4, planName: 'Max 100', startDate: '2025-09-04', endDate: '2025-09-25', status: 'expired' }
 ])
+
+// 切换支付类型
+const switchPaymentType = (type: number) => {
+  activeTab.value = type === 1 ? 'monthly' : 'payAsGo'
+}
+
+// 获取价格周期文本
+const getPricePeriod = (paymentType: PaymentType) => {
+  return paymentType === PaymentType.MONTHLY ? '/月' : ''
+}
+
+// 获取配额文本
+const getQuotaText = (paymentType: PaymentType, quotaAmount: number) => {
+  if (paymentType === PaymentType.MONTHLY) {
+    return `每日 ${quotaAmount.toLocaleString()} 美元`
+  } else {
+    return `${quotaAmount.toLocaleString()} 美元`
+  }
+}
+
+// 获取按钮文本
+const getButtonText = (paymentType: PaymentType) => {
+  return paymentType === PaymentType.MONTHLY ? '立即订阅' : '立即充值'
+}
+
+// 获取标签颜色
+const getBadgeColor = (badge: string) => {
+  const colorMap: Record<string, string> = {
+    '新用户专享': 'gray',
+    '最受欢迎': 'green',
+    '企业推荐': 'orange',
+    '推荐': 'green',
+    '超值': 'orange',
+    '企业': 'purple'
+  }
+  return colorMap[badge] || 'gray'
+}
 
 const getStatusType = (status: string) => {
   const map: Record<string, any> = {
@@ -195,16 +326,19 @@ const getStatusText = (status: string) => {
   return map[status] || status
 }
 
-const handleSubscribe = async (plan: any) => {
+const handleSubscribe = async (plan: SubscriptionPlan) => {
   if (!userStore.token) {
     ElMessage.warning('请先登录')
     router.push('/login')
     return
   }
 
+  const actionText = plan.paymentType === PaymentType.MONTHLY ? '订阅' : '充值'
+  const priceText = plan.paymentType === PaymentType.MONTHLY ? `$${plan.price}/月` : `$${plan.price}`
+
   ElMessageBox.confirm(
-    `确定订阅 ${plan.name} 套餐吗? 价格: $${plan.price}/月`,
-    '确认订阅',
+    `确定${actionText} ${plan.displayName} 吗? 价格: ${priceText}`,
+    `确认${actionText}`,
     {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
@@ -213,12 +347,25 @@ const handleSubscribe = async (plan: any) => {
   ).then(async () => {
     try {
       // await subscriptionAPI.subscribe({ planId: plan.id })
-      ElMessage.success('订阅成功!')
+      ElMessage.success(`${actionText}成功!`)
       loadSubscriptionHistory()
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.message || '订阅失败')
+      ElMessage.error(error.response?.data?.message || `${actionText}失败`)
     }
   }).catch(() => {})
+}
+
+const handleRecharge = async () => {
+  if (!userStore.token) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+
+  // 直接跳转到充值页面或打开充值弹窗
+  ElMessage.info('跳转到充值页面...')
+  // 这里可以调用充值API或跳转到支付页面
+  // router.push('/recharge')
 }
 
 const handleCancelSubscription = async (subscription: any) => {
@@ -232,7 +379,7 @@ const handleCancelSubscription = async (subscription: any) => {
     }
   ).then(async () => {
     try {
-      // await subscriptionAPI.cancelSubscription(subscription.id)
+      // await subscriptionAPI.cancel(subscription.id)
       ElMessage.success('已取消订阅')
       loadSubscriptionHistory()
     } catch (error: any) {
@@ -244,7 +391,7 @@ const handleCancelSubscription = async (subscription: any) => {
 const loadSubscriptionHistory = async () => {
   try {
     // const res = await subscriptionAPI.getHistory()
-    // subscriptionHistory.value = res.data
+    // subscriptionHistory.value = res.data.list
   } catch (error) {
     console.error('Failed to load subscription history')
   }
@@ -353,20 +500,6 @@ onMounted(() => {
   box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
 }
 
-.save-badge {
-  padding: 0.25rem 0.625rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
-  font-weight: 700;
-}
-
-.tab-btn.active .save-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-}
-
 /* Section Heading */
 .section-heading {
   max-width: 1200px;
@@ -395,8 +528,9 @@ onMounted(() => {
   margin: 0 auto 6rem;
   padding: 0 1.75rem;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2rem;
+  justify-items: center;
 }
 
 .plan-card {
@@ -409,6 +543,8 @@ onMounted(() => {
   border: 1px solid rgba(226, 232, 240, 0.7);
   box-shadow: 0 12px 35px rgba(15, 23, 42, 0.06);
   transition: all 0.3s ease;
+  width: 100%;
+  max-width: 420px;
 }
 
 .plan-card:hover {
@@ -421,11 +557,9 @@ onMounted(() => {
   border: 2px solid rgba(124, 58, 237, 0.5);
   background: linear-gradient(180deg, rgba(124, 58, 237, 0.04), rgba(37, 99, 235, 0.04));
   box-shadow: 0 20px 60px rgba(76, 29, 149, 0.12);
-  transform: scale(1.05);
 }
 
 .plan-card-featured:hover {
-  transform: scale(1.05) translateY(-6px);
   box-shadow: 0 28px 70px rgba(76, 29, 149, 0.18);
 }
 
@@ -458,6 +592,11 @@ onMounted(() => {
   box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
 }
 
+.badge-purple {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35);
+}
+
 .plan-header {
   text-align: center;
   margin-bottom: 1.25rem;
@@ -479,17 +618,15 @@ onMounted(() => {
 
 .plan-price {
   text-align: center;
-  margin-bottom: 1.75rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  margin-bottom: 0.75rem;
 }
 
 .price-symbol {
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 2.75rem;
+  font-weight: 800;
   color: #475569;
-  vertical-align: top;
-  margin-right: 0.125rem;
+  vertical-align: baseline;
+  margin-right: 0.25rem;
 }
 
 .price-value {
@@ -499,11 +636,27 @@ onMounted(() => {
   letter-spacing: -0.03em;
 }
 
+.custom-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
 .price-period {
   font-size: 0.95rem;
   color: #64748b;
   margin-left: 0.25rem;
   font-weight: 500;
+}
+
+.plan-quota {
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .plan-features {
@@ -571,6 +724,169 @@ onMounted(() => {
   padding: 0 1.75rem;
 }
 
+/* 按量支付 - 新布局样式 */
+.pay-as-go-container {
+  max-width: 700px;
+  margin: 0 auto 6rem;
+  padding: 0 1.75rem;
+}
+
+.pay-as-go-card {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.05), rgba(37, 99, 235, 0.05));
+  border: 2px solid rgba(124, 58, 237, 0.2);
+  border-radius: 1.5rem;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 20px 60px rgba(76, 29, 149, 0.15);
+}
+
+.pay-as-go-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  border-radius: 50%;
+  margin-bottom: 1.5rem;
+  color: white;
+  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3);
+}
+
+.pay-as-go-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.75rem 0;
+}
+
+.pay-as-go-desc {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.pricing-rules {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.rules-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 1.5rem 0;
+  text-align: center;
+}
+
+.rules-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.rule-item {
+  text-align: center;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f8f9ff, #f1f0ff);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(124, 58, 237, 0.1);
+}
+
+.rule-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.rule-price {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #7c3aed;
+}
+
+.rule-unit {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.pay-as-go-features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.feature-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+  background: white;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
+}
+
+.feature-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.feature-check {
+  color: #22c55e;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.recharge-btn {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: block;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.3);
+}
+
+.recharge-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(79, 70, 229, 0.4);
+}
+
+.recharge-btn:active {
+  transform: translateY(0);
+}
+
+/* 历史表格 */
+.history-table-card {
+  max-width: 1200px;
+  margin: 0 auto 4rem;
+  padding: 0 1.75rem;
+}
+
 .history-table-card :deep(.el-table) {
   border-radius: 1.5rem;
   overflow: hidden;
@@ -590,14 +906,6 @@ onMounted(() => {
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
   }
-
-  .plan-card-featured {
-    transform: scale(1);
-  }
-
-  .plan-card-featured:hover {
-    transform: translateY(-6px);
-  }
 }
 
 @media (max-width: 768px) {
@@ -614,7 +922,8 @@ onMounted(() => {
   }
 
   .plans-grid,
-  .history-table-card {
+  .history-table-card,
+  .pay-as-go-container {
     padding: 0 1.25rem;
   }
 
@@ -644,6 +953,15 @@ onMounted(() => {
 
   .section-heading h2 {
     font-size: 2rem;
+  }
+
+  /* 按量付费响应式 */
+  .pay-as-go-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .rules-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -175,6 +175,12 @@ export interface UserStats {
 }
 
 // ==================== 订阅相关类型 ====================
+// 支付类型枚举
+export enum PaymentType {
+  MONTHLY = 1,    // 按月支付
+  PAY_AS_GO = 2   // 按量支付
+}
+
 export interface SubscriptionPlan {
   id: number
   planName: string
@@ -186,6 +192,9 @@ export interface SubscriptionPlan {
   features: string[]
   status: number  // 0-禁用, 1-启用
   sortOrder: number
+  paymentType: PaymentType  // 支付类型
+  badge?: string  // 标签文字,如"推荐"、"热门"
+  featured?: boolean  // 是否为推荐套餐
   createdAt: string
   updatedAt: string
 }
@@ -366,8 +375,11 @@ export const modelsAPI = {
 // ==================== 订阅管理 ====================
 export const subscriptionAPI = {
   // 获取套餐列表
-  getPlans: () => {
-    return request.get<any, { data: SubscriptionPlan[] }>('/api/subscriptions/plans')
+  getPlans: (paymentType?: PaymentType) => {
+    const url = paymentType
+      ? `/api/subscriptions/plans?paymentType=${paymentType}`
+      : '/api/subscriptions/plans'
+    return request.get<any, { data: SubscriptionPlan[] }>(url)
   },
 
   // 订阅套餐

@@ -1,30 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(timeout /t 5 /nobreak)",
-      "mcp__chrome-devtools__new_page",
-      "mcp__chrome-devtools__list_pages",
-      "mcp__chrome-devtools__navigate_page",
-      "WebFetch(domain:codecmd.com)",
-      "mcp__web-search__search",
-      "Bash(tasklist:*)",
-      "Bash(findstr:*)",
-      "Bash(taskkill:*)",
-      "Bash(nul)",
-      "mcp__chrome-devtools__take_snapshot",
-      "mcp__chrome-devtools__take_screenshot",
-      "mcp__chrome-devtools__click",
-      "mcp__chrome-devtools__evaluate_script",
+      "WebFetch(domain:bianxieai.com)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "WebFetch(domain:blog.csdn.net)",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_close",
       "Bash(tree:*)",
-      "Bash(dir:*)",
-      "Bash(cat:*)",
-      "mcp__chrome-devtools__select_page",
-      "Bash(echo:*)",
-      "Bash(C:Codecc-webdocsmulti-account-relay-design.md)",
-      "Bash(mvn clean:*)",
-      "Bash(curl:*)",
-      "Bash(npm run dev)",
-      "Bash(docs/backend-code-review-full.md)"
+      "Bash(NUL:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
