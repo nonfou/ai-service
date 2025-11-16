@@ -5,12 +5,14 @@ import com.nonfou.github.entity.SystemConfig;
 import com.nonfou.github.mapper.SystemConfigMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 系统配置服务
@@ -22,28 +24,21 @@ public class SystemConfigService {
     @Autowired
     private SystemConfigMapper systemConfigMapper;
 
-    private final Map<String, String> configCache = new HashMap<>();
+    @Value("${system-config.cache-ttl-seconds:60}")
+    private long cacheTtlSeconds;
+
+    private final Map<String, CacheEntry> configCache = new ConcurrentHashMap<>();
 
     /**
      * 获取配置值
      */
     public String get(String key) {
-        // 先从缓存获取
-        if (configCache.containsKey(key)) {
-            return configCache.get(key);
+        CacheEntry cached = configCache.get(key);
+        if (cached != null && !cached.isExpired()) {
+            return cached.value();
         }
 
-        // 从数据库获取
-        LambdaQueryWrapper<SystemConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SystemConfig::getConfigKey, key);
-        SystemConfig config = systemConfigMapper.selectOne(wrapper);
-
-        if (config != null) {
-            configCache.put(key, config.getConfigValue());
-            return config.getConfigValue();
-        }
-
-        return null;
+        return loadAndCache(key);
     }
 
     /**
@@ -82,7 +77,7 @@ public class SystemConfigService {
             config.setConfigValue(value);
             systemConfigMapper.updateById(config);
             // 更新缓存
-            configCache.put(key, value);
+            configCache.put(key, new CacheEntry(value, expireAt()));
             log.info("配置已更新: {} = {}", key, value);
         }
     }
@@ -94,8 +89,43 @@ public class SystemConfigService {
         configCache.clear();
         List<SystemConfig> configs = systemConfigMapper.selectList(null);
         for (SystemConfig config : configs) {
-            configCache.put(config.getConfigKey(), config.getConfigValue());
+            configCache.put(
+                    config.getConfigKey(),
+                    new CacheEntry(config.getConfigValue(), expireAt())
+            );
         }
         log.info("配置缓存已刷新，共 {} 项", configs.size());
+    }
+
+    private String loadAndCache(String key) {
+        LambdaQueryWrapper<SystemConfig> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SystemConfig::getConfigKey, key);
+        SystemConfig config = systemConfigMapper.selectOne(wrapper);
+
+        if (config == null) {
+            configCache.remove(key);
+            return null;
+        }
+
+        CacheEntry entry = new CacheEntry(config.getConfigValue(), expireAt());
+        configCache.put(key, entry);
+        return entry.value();
+    }
+
+    private Instant expireAt() {
+        if (cacheTtlSeconds <= 0) {
+            // 0 或负数表示不缓存
+            return Instant.EPOCH;
+        }
+        return Instant.now().plusSeconds(cacheTtlSeconds);
+    }
+
+    private record CacheEntry(String value, Instant expiresAt) {
+        boolean isExpired() {
+            if (expiresAt.equals(Instant.EPOCH)) {
+                return false;
+            }
+            return Instant.now().isAfter(expiresAt);
+        }
     }
 }

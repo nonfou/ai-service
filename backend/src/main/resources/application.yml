@@ -72,6 +72,17 @@ jwt:
   secret: ${JWT_SECRET:0Qu/3sEdrbX+2BmxsMeahKQYlZpbhdArOCBY2FXFYRo=}
   expiration: ${JWT_EXPIRATION:604800000}  # 7天（毫秒）
 
+auth:
+  verify-code:
+    ttl-seconds: ${AUTH_VERIFY_CODE_TTL_SECONDS:300}
+    min-interval-seconds: ${AUTH_VERIFY_CODE_MIN_INTERVAL:60}
+    max-per-hour: ${AUTH_VERIFY_CODE_MAX_PER_HOUR:10}
+    hash-secret: ${VERIFY_CODE_SECRET:change-me-now}
+
+# 系统配置缓存
+system-config:
+  cache-ttl-seconds: ${SYSTEM_CONFIG_CACHE_TTL:60}
+
 # 支付宝配置
 alipay:
   app-id: ${ALIPAY_APP_ID:}  # 支付宝应用ID
@@ -115,12 +126,18 @@ admin:
 
 # 加密配置
 encryption:
-  algorithm: AES/CBC/PKCS5Padding
-  key: ${ENCRYPTION_KEY:your-32-character-encryption-key}  # 必须是32字符
-  iv: ${ENCRYPTION_IV:your-16-char-iv}  # 必须是16字符
+  key: ${ENCRYPTION_KEY:}  # 必须是随机的 16/24/32 字节
+  iv: ${ENCRYPTION_IV:}  # 已弃用，仅为兼容保留
 
 # 后端账户调度配置
 backend:
+  streaming:
+    timeout-ms: ${BACKEND_STREAM_TIMEOUT_MS:300000}
+    core-pool-size: ${BACKEND_STREAM_CORE_POOL:4}
+    max-pool-size: ${BACKEND_STREAM_MAX_POOL:16}
+    queue-capacity: ${BACKEND_STREAM_QUEUE:200}
+    keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
+
   # 请求路由配置
   routing:
     # 默认提供商: copilot 或 openrouter

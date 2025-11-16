@@ -9,10 +9,13 @@ import com.nonfou.github.entity.BackendAccount;
 import com.nonfou.github.service.CostCalculatorService.CostResult;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import com.nonfou.github.util.SessionUtil;
+import com.nonfou.github.util.TokenEstimator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -25,6 +28,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * OpenRouter 代理服务
@@ -32,12 +36,26 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OpenRouterProxyService {
 
     private final RestTemplate restTemplate;
     private final BackendAccountService backendAccountService;
     private final ObjectMapper objectMapper;
+    private final TokenEstimator tokenEstimator;
+    private final TaskExecutor streamTaskExecutor;
+
+    @Autowired
+    public OpenRouterProxyService(RestTemplate restTemplate,
+                                  BackendAccountService backendAccountService,
+                                  ObjectMapper objectMapper,
+                                  TokenEstimator tokenEstimator,
+                                  @Qualifier("streamTaskExecutor") TaskExecutor streamTaskExecutor) {
+        this.restTemplate = restTemplate;
+        this.backendAccountService = backendAccountService;
+        this.objectMapper = objectMapper;
+        this.tokenEstimator = tokenEstimator;
+        this.streamTaskExecutor = streamTaskExecutor;
+    }
 
     @Autowired
     private AccountSchedulerService accountScheduler;
@@ -59,6 +77,9 @@ public class OpenRouterProxyService {
 
     @Value("${server.domain:http://localhost:8080}")
     private String appUrl;
+
+    @Value("${backend.streaming.timeout-ms:300000}")
+    private long streamTimeoutMs;
 
     /**
      * 非流式聊天（新签名 - 用于 ChatController）
@@ -146,16 +167,14 @@ public class OpenRouterProxyService {
      * 流式聊天（新签名 - 用于 ChatController）
      */
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey) {
-        SseEmitter emitter = new SseEmitter(300000L); // 5 minutes timeout
+        SseEmitter emitter = new SseEmitter(streamTimeoutMs);
 
-        // 1. 生成会话哈希
         String sessionHash = SessionUtil.generateSessionHash(
-            apiKey.getApiKey(),
-            request.getModel(),
-            request.getMessages()
+                apiKey.getApiKey(),
+                request.getModel(),
+                request.getMessages()
         );
 
-        // 2. 选择后端账户
         BackendAccount account;
         try {
             account = accountScheduler.selectAccount(apiKey, request.getModel(), sessionHash);
@@ -164,16 +183,13 @@ public class OpenRouterProxyService {
                 return emitter;
             }
 
-            // 3. 检查配额
             quotaService.checkAndEnforceQuota(apiKey.getUserId());
-
         } catch (Exception e) {
             log.error("准备 OpenRouter 流式请求失败", e);
             emitter.completeWithError(e);
             return emitter;
         }
 
-        // 4. 构建请求体
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", request.getModel());
         requestBody.put("messages", request.getMessages());
@@ -185,86 +201,57 @@ public class OpenRouterProxyService {
         }
         requestBody.put("stream", true);
 
-        // 5. 在新线程中处理流式响应
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            BufferedReader reader = null;
+        StreamingResources resources = new StreamingResources();
+        registerEmitterCallbacks(emitter, resources);
+
+        streamTaskExecutor.execute(() -> {
+            AtomicReference<TokenUsage> usageRef = new AtomicReference<>();
+            StringBuilder contentBuilder = new StringBuilder();
 
             try {
-                String apiKey_token = backendAccountService.getDecryptedToken(account.getId());
-                String url = baseUrl + "/chat/completions";
-                URL urlObj = new URL(url);
-                connection = (HttpURLConnection) urlObj.openConnection();
+                String decryptedToken = backendAccountService.getDecryptedToken(account.getId());
+                HttpURLConnection connection = buildOpenRouterConnection(decryptedToken);
+                resources.connection = connection;
 
-                // 设置请求头
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Content-Type", "application/json");
-                connection.setRequestProperty("Authorization", "Bearer " + apiKey_token);
-                connection.setRequestProperty("HTTP-Referer", appUrl);
-                connection.setRequestProperty("X-Title", appName);
-                connection.setDoOutput(true);
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(300000);
-
-                // 写入请求体
                 String requestBodyJson = objectMapper.writeValueAsString(requestBody);
                 connection.getOutputStream().write(requestBodyJson.getBytes(StandardCharsets.UTF_8));
                 connection.getOutputStream().flush();
 
-                // 读取响应
                 int responseCode = connection.getResponseCode();
-                if (responseCode != 200) {
+                if (responseCode != HttpURLConnection.HTTP_OK) {
                     String errorMessage = "OpenRouter 流式请求失败: HTTP " + responseCode;
-                    log.error(errorMessage);
                     backendAccountService.recordError(account.getId(), errorMessage);
                     emitter.completeWithError(new RuntimeException(errorMessage));
                     return;
                 }
 
-                reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+                resources.reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
                 String line;
-
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("data: ")) {
-                        String data = line.substring(6);
-
-                        // 检查是否是结束标记
-                        if ("[DONE]".equals(data.trim())) {
-                            emitter.send(SseEmitter.event().data("[DONE]"));
-                            break;
-                        }
-
-                        // 发送数据
-                        try {
-                            objectMapper.readTree(data);
-                            emitter.send(SseEmitter.event().data(data));
-                        } catch (Exception e) {
-                            log.warn("跳过无效的 SSE 数据: {}", data);
-                        }
+                while ((line = resources.reader.readLine()) != null) {
+                    if (!line.startsWith("data: ")) {
+                        continue;
                     }
+                    String data = line.substring(6);
+
+                    if ("[DONE]".equals(data.trim())) {
+                        emitter.send(SseEmitter.event().data("[DONE]"));
+                        break;
+                    }
+
+                    emitter.send(SseEmitter.event().data(data));
+                    handleStreamChunk(data, contentBuilder, usageRef);
                 }
 
+                finalizeOpenRouterStream(request, apiKey, account, sessionHash, contentBuilder.toString(), usageRef.get());
                 emitter.complete();
-
-                // 更新成功统计
-                backendAccountService.recordSuccess(account.getId());
-                sessionStickinessService.saveMapping(sessionHash, account.getId());
-
-                log.debug("OpenRouter 流式响应完成");
-
             } catch (Exception e) {
                 log.error("OpenRouter 流式请求异常", e);
                 backendAccountService.recordError(account.getId(), e.getMessage());
                 emitter.completeWithError(e);
             } finally {
-                try {
-                    if (reader != null) reader.close();
-                    if (connection != null) connection.disconnect();
-                } catch (Exception e) {
-                    log.warn("关闭连接时出错", e);
-                }
+                closeResources(resources);
             }
-        }).start();
+        });
 
         return emitter;
     }
@@ -502,5 +489,104 @@ public class OpenRouterProxyService {
             backendAccountService.incrementErrorCount(account.getId(), e.getMessage());
             return false;
         }
+    }
+
+    private HttpURLConnection buildOpenRouterConnection(String token) throws Exception {
+        String url = baseUrl + "/chat/completions";
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setRequestProperty("Authorization", "Bearer " + token);
+        connection.setRequestProperty("HTTP-Referer", appUrl);
+        connection.setRequestProperty("X-Title", appName);
+        connection.setDoOutput(true);
+        connection.setConnectTimeout(10_000);
+        connection.setReadTimeout((int) streamTimeoutMs);
+        return connection;
+    }
+
+    private void handleStreamChunk(String data,
+                                   StringBuilder contentBuilder,
+                                   AtomicReference<TokenUsage> usageRef) {
+        try {
+            JsonNode node = objectMapper.readTree(data);
+            if (node.has("usage")) {
+                Map<String, Object> usageMap = objectMapper.convertValue(node.get("usage"), Map.class);
+                usageRef.set(TokenUsage.from(usageMap));
+            }
+
+            JsonNode choices = node.get("choices");
+            if (choices != null && choices.isArray()) {
+                for (JsonNode choice : choices) {
+                    JsonNode delta = choice.get("delta");
+                    if (delta != null) {
+                        JsonNode contentNode = delta.get("content");
+                        if (contentNode != null && !contentNode.isNull()) {
+                            contentBuilder.append(contentNode.asText(""));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("忽略无法解析的 OpenRouter 流式片段: {}", data);
+        }
+    }
+
+    private void finalizeOpenRouterStream(ChatRequest request,
+                                          ApiKey apiKey,
+                                          BackendAccount account,
+                                          String sessionHash,
+                                          String fullContent,
+                                          TokenUsage usage) {
+        try {
+            TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, fullContent);
+            if (finalUsage == null) {
+                log.warn("OpenRouter 流式响应缺少 usage，跳过计费: account={}, model={}",
+                        account.getAccountName(), request.getModel());
+            } else {
+                CostResult costResult = costCalculatorService.calculate(
+                        finalUsage, request.getModel(), account.getId(), apiKey.getUserId());
+                quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
+                log.info("OpenRouter 流式响应完成: account={}, tokens(in/out)={}/{}, cost=${}",
+                        account.getAccountName(),
+                        finalUsage.getInputTokens(),
+                        finalUsage.getOutputTokens(),
+                        costResult.getTotalCost());
+            }
+
+            backendAccountService.recordSuccess(account.getId());
+            sessionStickinessService.saveMapping(sessionHash, account.getId());
+        } catch (Exception e) {
+            log.error("OpenRouter 流式计费失败: account={}", account.getAccountName(), e);
+            throw new RuntimeException("OpenRouter 计费失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void registerEmitterCallbacks(SseEmitter emitter, StreamingResources resources) {
+        emitter.onCompletion(() -> closeResources(resources));
+        emitter.onTimeout(() -> closeResources(resources));
+        emitter.onError(error -> closeResources(resources));
+    }
+
+    private void closeResources(StreamingResources resources) {
+        if (resources == null) {
+            return;
+        }
+        try {
+            if (resources.reader != null) {
+                resources.reader.close();
+            }
+        } catch (Exception e) {
+            log.warn("关闭连接时出错", e);
+        }
+
+        if (resources.connection != null) {
+            resources.connection.disconnect();
+        }
+    }
+
+    private static class StreamingResources {
+        private volatile HttpURLConnection connection;
+        private volatile BufferedReader reader;
     }
 }

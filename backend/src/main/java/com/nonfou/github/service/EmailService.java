@@ -8,7 +8,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.util.Random;
+import java.security.SecureRandom;
 
 /**
  * 邮件服务
@@ -23,12 +23,13 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String from;
 
+    private final SecureRandom secureRandom = new SecureRandom();
+
     /**
      * 生成6位验证码
      */
     public String generateCode() {
-        Random random = new Random();
-        int code = 100000 + random.nextInt(900000);
+        int code = 100000 + secureRandom.nextInt(900000);
         return String.valueOf(code);
     }
 

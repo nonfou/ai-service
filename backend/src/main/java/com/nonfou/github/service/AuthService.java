@@ -10,7 +10,6 @@ import com.nonfou.github.mapper.UserMapper;
 import com.nonfou.github.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,14 +29,11 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
-    @Autowired(required = false)
-    private RedisService redisService;
-
     @Autowired
     private JwtUtil jwtUtil;
 
-    @Value("${test.auth.fixed-code:123456}")
-    private String testFixedCode;
+    @Autowired
+    private VerifyCodeService verifyCodeService;
 
     /**
      * 发送验证码
@@ -45,16 +41,14 @@ public class AuthService {
     public void sendCode(SendCodeRequest request) {
         String email = request.getEmail();
 
+        verifyCodeService.ensureCanSend(email);
+
         // 生成验证码
         String code = emailService.generateCode();
 
-        // 保存到 Redis（5分钟过期）
-        if (redisService != null) {
-            redisService.saveVerifyCode(email, code);
-        }
-
         // 发送邮件
         emailService.sendVerifyCode(email, code);
+        verifyCodeService.persistCode(email, code);
 
         log.info("验证码已发送: {}", email);
     }
@@ -67,28 +61,9 @@ public class AuthService {
         String email = request.getEmail();
         String code = request.getCode();
 
-        // 验证验证码
-        if (redisService != null) {
-            // 生产环境：从Redis验证
-            String savedCode = redisService.getVerifyCode(email);
-            if (savedCode == null) {
-                log.warn("验证码已过期或不存在: {}", email);
-                throw new RuntimeException("验证码已过期");
-            }
-            if (!savedCode.equals(code)) {
-                log.warn("验证码错误: email={}, expected={}, actual={}", email, savedCode, code);
-                throw new RuntimeException("验证码错误");
-            }
-            // 删除验证码（一次性使用）
-            redisService.deleteVerifyCode(email);
-            log.info("验证码验证成功: {}", email);
-        } else {
-            // 测试环境：使用固定验证码（仅用于开发测试）
-            if (!testFixedCode.equals(code)) {
-                log.warn("测试环境验证码错误: email={}, expected={}, actual={}", email, testFixedCode, code);
-                throw new RuntimeException("验证码错误");
-            }
-            log.info("测试环境验证码验证成功: {}", email);
+        if (!verifyCodeService.verifyCode(email, code)) {
+            log.warn("验证码校验失败: email={}", email);
+            throw new RuntimeException("验证码错误或已过期");
         }
 
         // 查询用户

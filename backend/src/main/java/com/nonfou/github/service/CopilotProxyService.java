@@ -1,5 +1,8 @@
 package com.nonfou.github.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.response.ChatResponse;
 import com.nonfou.github.entity.ApiKey;
@@ -9,9 +12,12 @@ import com.nonfou.github.mapper.ModelMapper;
 import com.nonfou.github.service.CostCalculatorService.CostResult;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import com.nonfou.github.util.SessionUtil;
+import com.nonfou.github.util.TokenEstimator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -23,9 +29,9 @@ import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Copilot 代理服务 - 多账户增强版
@@ -33,6 +39,8 @@ import java.util.Map;
 @Slf4j
 @Service
 public class CopilotProxyService {
+
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     @Autowired
     private RestTemplate restTemplate;
@@ -55,8 +63,21 @@ public class CopilotProxyService {
     @Autowired
     private ModelMapper modelMapper;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private TokenEstimator tokenEstimator;
+
+    @Autowired
+    @Qualifier("streamTaskExecutor")
+    private TaskExecutor streamTaskExecutor;
+
     @Value("${backend.copilot.base-url:https://api.githubcopilot.com}")
     private String copilotBaseUrl;
+
+    @Value("${backend.streaming.timeout-ms:300000}")
+    private long streamTimeoutMs;
 
     /**
      * 非流式聊天
@@ -147,23 +168,20 @@ public class CopilotProxyService {
      * 流式聊天
      */
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey) {
-        SseEmitter emitter = new SseEmitter(300000L); // 5 minutes timeout
+        SseEmitter emitter = new SseEmitter(streamTimeoutMs);
 
-        // 1. 生成会话哈希
         String sessionHash = SessionUtil.generateSessionHash(
-            apiKey.getApiKey(),
-            request.getModel(),
-            request.getMessages()
+                apiKey.getApiKey(),
+                request.getModel(),
+                request.getMessages()
         );
 
-        // 2. 选择后端账户
         BackendAccount account = accountScheduler.selectAccount(apiKey, request.getModel(), sessionHash);
         if (account == null) {
             emitter.completeWithError(new RuntimeException("No available Copilot account"));
             return emitter;
         }
 
-        // 3. 检查配额
         try {
             quotaService.checkAndEnforceQuota(apiKey.getUserId());
         } catch (Exception e) {
@@ -171,22 +189,17 @@ public class CopilotProxyService {
             return emitter;
         }
 
-        // 4. 异步处理流式响应
-        new Thread(() -> {
-            BufferedReader reader = null;
-            HttpURLConnection connection = null;
+        StreamingResources resources = new StreamingResources();
+        registerEmitterCallbacks(emitter, resources);
+
+        streamTaskExecutor.execute(() -> {
+            AtomicReference<TokenUsage> usageRef = new AtomicReference<>();
+            StringBuilder fullContent = new StringBuilder();
 
             try {
-                // 构建请求
-                String endpoint = copilotBaseUrl + "/v1/chat/completions";
-                URL url = new URL(endpoint);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json");
-                connection.setRequestProperty("Authorization", "Bearer " + backendAccountService.decryptToken(account.getAccessToken()));
+                HttpURLConnection connection = buildStreamingConnection(account);
+                resources.connection = connection;
 
-                // 确保流式
                 ChatRequest modifiedRequest = new ChatRequest();
                 modifiedRequest.setModel(request.getModel());
                 modifiedRequest.setMessages(request.getMessages());
@@ -194,92 +207,40 @@ public class CopilotProxyService {
                 modifiedRequest.setTemperature(request.getTemperature());
                 modifiedRequest.setStream(true);
 
-                // 发送请求体
-                String requestBody = com.fasterxml.jackson.databind.ObjectMapper.class
-                        .getDeclaredConstructor()
-                        .newInstance()
-                        .writeValueAsString(modifiedRequest);
+                String requestBody = objectMapper.writeValueAsString(modifiedRequest);
                 connection.getOutputStream().write(requestBody.getBytes(StandardCharsets.UTF_8));
 
                 log.info("流式调用 Copilot API: account={}, model={}",
                         account.getAccountName(), request.getModel());
 
-                // 读取流式响应
-                reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+                resources.reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
                 String line;
-                StringBuilder fullContent = new StringBuilder();
-                int totalTokens = 0;
 
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("data: ")) {
-                        String data = line.substring(6);
-
-                        if ("[DONE]".equals(data)) {
-                            emitter.send(SseEmitter.event().data("[DONE]"));
-                            break;
-                        }
-
-                        // 转发给客户端
-                        emitter.send(SseEmitter.event().data(data));
-
-                        // 尝试解析以累积 token 信息
-                        try {
-                            Map<String, Object> chunk = parseJson(data);
-                            if (chunk.containsKey("choices")) {
-                                List<Map<String, Object>> choices = (List<Map<String, Object>>) chunk.get("choices");
-                                if (!choices.isEmpty() && choices.get(0).containsKey("delta")) {
-                                    Map<String, Object> delta = (Map<String, Object>) choices.get(0).get("delta");
-                                    if (delta.containsKey("content")) {
-                                        fullContent.append(delta.get("content"));
-                                    }
-                                }
-                            }
-                        } catch (Exception ignored) {
-                            // 解析失败不影响流式传输
-                        }
+                while ((line = resources.reader.readLine()) != null) {
+                    if (!line.startsWith("data: ")) {
+                        continue;
                     }
+
+                    String data = line.substring(6);
+                    if ("[DONE]".equals(data.trim())) {
+                        emitter.send(SseEmitter.event().data("[DONE]"));
+                        break;
+                    }
+
+                    emitter.send(SseEmitter.event().data(data));
+                    handleStreamChunk(data, fullContent, usageRef);
                 }
 
-                // 流式完成后,估算成本(如果没有 usage 信息,使用估算)
-                if (fullContent.length() > 0) {
-                    // 简单估算：英文约4字符=1token，中文约1.5字符=1token
-                    int estimatedTokens = fullContent.length() / 3;
-
-                    TokenUsage usage = TokenUsage.builder()
-                            .inputTokens(0) // 流式响应通常不返回详细 token 统计
-                            .outputTokens(estimatedTokens)
-                            .cacheReadTokens(0)
-                            .cacheWriteTokens(0)
-                            .build();
-
-                    CostResult costResult = costCalculatorService.calculate(
-                            usage, request.getModel(), account.getId(), apiKey.getUserId());
-
-                    quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
-
-                    log.info("Copilot 流式响应完成: account={}, estimatedTokens={}, cost=${}",
-                            account.getAccountName(), estimatedTokens, costResult.getTotalCost());
-                }
-
-                // 记录成功
-                backendAccountService.recordSuccess(account.getId());
-
-                // 保存会话粘性
-                sessionStickinessService.saveMapping(sessionHash, account.getId());
-
+                finalizeStreamingCost(request, apiKey, account, sessionHash, fullContent.toString(), usageRef.get());
                 emitter.complete();
-
             } catch (Exception e) {
                 log.error("流式调用 Copilot API 失败: account={}", account.getAccountName(), e);
                 backendAccountService.recordError(account.getId(), e.getMessage());
                 emitter.completeWithError(e);
             } finally {
-                try {
-                    if (reader != null) reader.close();
-                    if (connection != null) connection.disconnect();
-                } catch (Exception ignored) {}
+                closeResources(resources);
             }
-        }).start();
+        });
 
         return emitter;
     }
@@ -385,11 +346,101 @@ public class CopilotProxyService {
         return headers;
     }
 
-    /**
-     * 简单 JSON 解析（避免引入完整的 JSON 库）
-     */
-    private Map<String, Object> parseJson(String json) throws Exception {
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        return mapper.readValue(json, Map.class);
+    private HttpURLConnection buildStreamingConnection(BackendAccount account) throws Exception {
+        String endpoint = copilotBaseUrl + "/v1/chat/completions";
+        URL url = new URL(endpoint);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setRequestProperty("Authorization", "Bearer " + backendAccountService.decryptToken(account.getAccessToken()));
+        connection.setConnectTimeout(10_000);
+        connection.setReadTimeout((int) streamTimeoutMs);
+        return connection;
+    }
+
+    private void handleStreamChunk(String data,
+                                   StringBuilder fullContent,
+                                   AtomicReference<TokenUsage> usageRef) {
+        try {
+            JsonNode node = objectMapper.readTree(data);
+
+            if (node.has("usage")) {
+                Map<String, Object> usageMap = objectMapper.convertValue(node.get("usage"), MAP_TYPE);
+                usageRef.set(TokenUsage.from(usageMap));
+            }
+
+            JsonNode choices = node.get("choices");
+            if (choices != null && choices.isArray()) {
+                for (JsonNode choice : choices) {
+                    JsonNode delta = choice.get("delta");
+                    if (delta != null) {
+                        JsonNode contentNode = delta.get("content");
+                        if (contentNode != null && !contentNode.isNull()) {
+                            fullContent.append(contentNode.asText(""));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("忽略无法解析的 Copilot 流式片段: {}", data);
+        }
+    }
+
+    private void finalizeStreamingCost(ChatRequest request,
+                                       ApiKey apiKey,
+                                       BackendAccount account,
+                                       String sessionHash,
+                                       String fullContent,
+                                       TokenUsage usage) {
+        try {
+            TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, fullContent);
+            if (finalUsage == null) {
+                log.warn("Copilot 流式响应缺少 usage 信息，跳过计费: account={}, model={}",
+                        account.getAccountName(), request.getModel());
+            } else {
+                CostResult costResult = costCalculatorService.calculate(
+                        finalUsage, request.getModel(), account.getId(), apiKey.getUserId());
+                quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
+                log.info("Copilot 流式响应完成: account={}, tokens(in/out)={}/{}, cost=${}",
+                        account.getAccountName(),
+                        finalUsage.getInputTokens(),
+                        finalUsage.getOutputTokens(),
+                        costResult.getTotalCost());
+            }
+
+            backendAccountService.recordSuccess(account.getId());
+            sessionStickinessService.saveMapping(sessionHash, account.getId());
+        } catch (Exception e) {
+            log.error("Copilot 流式计费失败: account={}", account.getAccountName(), e);
+            throw new RuntimeException("Copilot 计费失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void registerEmitterCallbacks(SseEmitter emitter, StreamingResources resources) {
+        emitter.onCompletion(() -> closeResources(resources));
+        emitter.onTimeout(() -> closeResources(resources));
+        emitter.onError(error -> closeResources(resources));
+    }
+
+    private void closeResources(StreamingResources resources) {
+        if (resources == null) {
+            return;
+        }
+        try {
+            if (resources.reader != null) {
+                resources.reader.close();
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (resources.connection != null) {
+            resources.connection.disconnect();
+        }
+    }
+
+    private static class StreamingResources {
+        private volatile BufferedReader reader;
+        private volatile HttpURLConnection connection;
     }
 }
