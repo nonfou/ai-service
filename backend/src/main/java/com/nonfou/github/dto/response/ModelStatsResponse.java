@@ -3,6 +3,7 @@ package com.nonfou.github.dto.response;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 
 /**
@@ -39,24 +40,39 @@ public class ModelStatsResponse {
     private Long failedCalls;
 
     /**
-     * 成功率 (��分比)
+     * 成功率（百分比）
      */
     private BigDecimal successRate;
 
     /**
-     * 总输入Token数
+     * 总输入Token数量
      */
     private Long totalInputTokens;
 
     /**
-     * 总输出Token数
+     * 总输出Token数量
      */
     private Long totalOutputTokens;
 
     /**
-     * 总Token数
+     * 总缓存读取Token数量
+     */
+    private Long totalCacheReadTokens;
+
+    /**
+     * 总缓存写入Token数量
+     */
+    private Long totalCacheWriteTokens;
+
+    /**
+     * 总Token数量（输入+输出）
      */
     private Long totalTokens;
+
+    /**
+     * 包含缓存后的总Token数量
+     */
+    private Long totalAllTokens;
 
     /**
      * 总费用

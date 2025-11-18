@@ -198,3 +198,17 @@ backend:
         api-key: ${OPENROUTER_ACCOUNT_2_KEY:}
         priority: 2
         enabled: ${OPENROUTER_ACCOUNT_2_ENABLED:false}
+
+# Token 使用统计与计费事件配置
+usage:
+  metrics:
+    timezone: ${USAGE_METRICS_TIMEZONE:Asia/Shanghai}
+    daily-ttl-days: ${USAGE_METRICS_DAILY_TTL:32}
+    monthly-ttl-days: ${USAGE_METRICS_MONTHLY_TTL:365}
+    hourly-ttl-days: ${USAGE_METRICS_HOURLY_TTL:7}
+    metrics-window-minutes: ${USAGE_METRICS_WINDOW_MINUTES:5}
+    usage-record-limit: ${USAGE_METRICS_RECORD_LIMIT:200}
+    enable-aggregation: ${USAGE_METRICS_ENABLE_AGGREGATION:true}
+    enable-billing-events: ${USAGE_METRICS_ENABLE_BILLING:false}
+    billing-stream-key: ${USAGE_METRICS_BILLING_STREAM:billing:events}
+    billing-stream-max-length: ${USAGE_METRICS_BILLING_MAXLEN:100000}

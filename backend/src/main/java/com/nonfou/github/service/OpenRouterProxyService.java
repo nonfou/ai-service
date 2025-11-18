@@ -8,6 +8,7 @@ import com.nonfou.github.entity.ApiKey;
 import com.nonfou.github.entity.BackendAccount;
 import com.nonfou.github.service.CostCalculatorService.CostResult;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
+import com.nonfou.github.service.proxy.ModelProxy;
 import com.nonfou.github.util.SessionUtil;
 import com.nonfou.github.util.TokenEstimator;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +32,11 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * OpenRouter 代理服务
- * 负责将请求转发到 OpenRouter API
+ * OpenRouter 代理服务，用于把上游请求转发到 OpenRouter 官方 API。
  */
 @Slf4j
 @Service
-public class OpenRouterProxyService {
+public class OpenRouterProxyService implements ModelProxy {
 
     private final RestTemplate restTemplate;
     private final BackendAccountService backendAccountService;
@@ -81,27 +81,33 @@ public class OpenRouterProxyService {
     @Value("${backend.streaming.timeout-ms:300000}")
     private long streamTimeoutMs;
 
+    @Override
+    public String getProvider() {
+        return "openrouter";
+    }
+
     /**
-     * 非流式聊天（新签名 - 用于 ChatController）
+     * 同步聊天入口，供 ChatController 调用。
      */
+    @Override
     public ChatResponse chat(ChatRequest request, ApiKey apiKey) {
-        // 1. 生成会话哈希（用于会话粘性）
+        // 1. 生成会话哈希，便于做会话粘性路由
         String sessionHash = SessionUtil.generateSessionHash(
             apiKey.getApiKey(),
             request.getModel(),
             request.getMessages()
         );
 
-        // 2. 选择后端账户
+        // 2. 依据会话哈希挑选最合适的后端账号
         BackendAccount account = accountScheduler.selectAccount(apiKey, request.getModel(), sessionHash);
         if (account == null) {
             throw new RuntimeException("No available OpenRouter account");
         }
 
-        // 3. 检查配额
+        // 3. 检查用户配额是否仍可用
         quotaService.checkAndEnforceQuota(apiKey.getUserId());
 
-        // 4. 构建请求体
+        // 4. 组装 OpenRouter /chat/completions 请求体
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", request.getModel());
         requestBody.put("messages", request.getMessages());
@@ -114,8 +120,8 @@ public class OpenRouterProxyService {
         requestBody.put("stream", false);
 
         try {
-            // 5. 发送请求
-            log.info("调用 OpenRouter API: account={}, model={}, messages={}",
+            // 5. 调用 OpenRouter
+            log.info("Calling OpenRouter API: account={}, model={}, messages={}",
                     account.getAccountName(), request.getModel(), request.getMessages().size());
 
             Map<String, Object> responseMap = chatNonStream(
@@ -123,10 +129,10 @@ public class OpenRouterProxyService {
                     requestBody
             );
 
-            // 6. 转换响应
+            // 6. 将响应转成内部 ChatResponse
             ChatResponse chatResponse = objectMapper.convertValue(responseMap, ChatResponse.class);
 
-            // 7. 计算成本
+            // 7. 如果返回 usage，则依据模型价格计算成本
             if (chatResponse.getUsage() != null) {
                 TokenUsage usage = TokenUsage.builder()
                         .inputTokens(chatResponse.getUsage().getPromptTokens())
@@ -138,34 +144,35 @@ public class OpenRouterProxyService {
                 CostResult costResult = costCalculatorService.calculate(
                         usage, request.getModel(), account.getId(), apiKey.getUserId());
 
-                // 8. 扣除配额
+                // 8. 从配额中扣除本次调用成本
                 quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
 
-                log.info("OpenRouter API 响应成功: account={}, tokens={}, cost=${}",
+                log.info("OpenRouter API : account={}, tokens={}, cost=${}",
                         account.getAccountName(),
                         chatResponse.getUsage().getTotalTokens(),
                         costResult.getTotalCost());
             }
 
-            // 9. 更新账户使用统计
+            // 9. 标记账号调用成功
             backendAccountService.recordSuccess(account.getId());
 
-            // 10. 保存会话粘性
+            // 10. 记录会话与账号的粘性映射
             sessionStickinessService.saveMapping(sessionHash, account.getId());
 
             return chatResponse;
 
         } catch (Exception e) {
-            // 11. 记录失败
+            // 11. 失败场景要计入 error 并抛出
             backendAccountService.recordError(account.getId(), e.getMessage());
-            log.error("调用 OpenRouter API 失败: account={}", account.getAccountName(), e);
-            throw new RuntimeException("OpenRouter 服务暂时不可用: " + e.getMessage());
+            log.error("OpenRouter API call failed for account {}", account.getAccountName(), e);
+            throw new RuntimeException("OpenRouter service error: " + e.getMessage());
         }
     }
 
     /**
-     * 流式聊天（新签名 - 用于 ChatController）
+     * Streaming chat entry point used by ChatController.
      */
+    @Override
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey) {
         SseEmitter emitter = new SseEmitter(streamTimeoutMs);
 
@@ -185,7 +192,7 @@ public class OpenRouterProxyService {
 
             quotaService.checkAndEnforceQuota(apiKey.getUserId());
         } catch (Exception e) {
-            log.error("准备 OpenRouter 流式请求失败", e);
+            log.error("Failed to select OpenRouter account for streaming request", e);
             emitter.completeWithError(e);
             return emitter;
         }
@@ -219,7 +226,7 @@ public class OpenRouterProxyService {
 
                 int responseCode = connection.getResponseCode();
                 if (responseCode != HttpURLConnection.HTTP_OK) {
-                    String errorMessage = "OpenRouter 流式请求失败: HTTP " + responseCode;
+                    String errorMessage = "OpenRouter returned HTTP " + responseCode;
                     backendAccountService.recordError(account.getId(), errorMessage);
                     emitter.completeWithError(new RuntimeException(errorMessage));
                     return;
@@ -245,7 +252,7 @@ public class OpenRouterProxyService {
                 finalizeOpenRouterStream(request, apiKey, account, sessionHash, contentBuilder.toString(), usageRef.get());
                 emitter.complete();
             } catch (Exception e) {
-                log.error("OpenRouter 流式请求异常", e);
+                log.error("OpenRouter streaming loop failed", e);
                 backendAccountService.recordError(account.getId(), e.getMessage());
                 emitter.completeWithError(e);
             } finally {
@@ -257,17 +264,17 @@ public class OpenRouterProxyService {
     }
 
     /**
-     * 转发聊天请求到 OpenRouter
+     * 以底层账号调用 OpenRouter API。
      *
-     * @param account     后端账户
-     * @param requestBody 请求体
-     * @param stream      是否流式输出
-     * @return 响应对象或 SseEmitter
+     * @param account     已选中的后端账号
+     * @param requestBody OpenRouter 请求参数
+     * @param stream      是否开启流式返回
+     * @return 非流式返回响应 Map，流式返回 SseEmitter
      */
     public Object chat(BackendAccount account, Map<String, Object> requestBody, boolean stream) {
         String decryptedKey = backendAccountService.getDecryptedToken(account.getId());
         if (decryptedKey == null) {
-            throw new RuntimeException("无法解密 OpenRouter API Key");
+            throw new RuntimeException("OpenRouter API key is missing");
         }
 
         try {
@@ -277,43 +284,48 @@ public class OpenRouterProxyService {
                 return chatNonStream(decryptedKey, requestBody);
             }
         } catch (Exception e) {
-            log.error("OpenRouter 请求失败: accountId={}, error={}", account.getId(), e.getMessage(), e);
-            // 增加错误计数
+            log.error("OpenRouter request failed for accountId={}, error={}", account.getId(), e.getMessage(), e);
             backendAccountService.incrementErrorCount(account.getId(), e.getMessage());
-            throw new RuntimeException("OpenRouter 请求失败: " + e.getMessage(), e);
+            throw new RuntimeException("OpenRouter request failed: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 非流式聊天
+     * 构建访问 OpenRouter 所需的通用请求头。
+     */
+    /**
+     * 调用 OpenRouter 非流式聊天接口。
      */
     private Map<String, Object> chatNonStream(String apiKey, Map<String, Object> requestBody) throws Exception {
         HttpHeaders headers = createHeaders(apiKey);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
         String url = baseUrl + "/chat/completions";
-        log.debug("发送 OpenRouter 请求: url={}", url);
+        log.debug("OpenRouter request url={}", url);
 
         ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
 
         if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-            log.debug("OpenRouter 响应成功");
+            log.debug("OpenRouter responded successfully");
             return response.getBody();
         } else {
-            throw new RuntimeException("OpenRouter 返回错误: " + response.getStatusCode());
+            throw new RuntimeException("OpenRouter request failed: " + response.getStatusCode());
         }
     }
 
     /**
-     * 流式聊天
+     * 调用 OpenRouter 非流式聊天接口。
+     */
+    /**
+     * 调用 OpenRouter 流式聊天接口。
      */
     private SseEmitter chatStream(String apiKey, Map<String, Object> requestBody) throws Exception {
-        SseEmitter emitter = new SseEmitter(300000L); // 5分钟超时
+        SseEmitter emitter = new SseEmitter(300000L); // 5 分钟超时，和上游保持一致
 
-        // 确保请求体包含 stream: true
+        // OpenRouter SSE 需要显式打开 stream
         requestBody.put("stream", true);
 
-        // 在新线程中处理流式响应
+        // 使用独立线程持续读取 SSE，避免阻塞调用方
         new Thread(() -> {
             HttpURLConnection connection = null;
             BufferedReader reader = null;
@@ -323,7 +335,7 @@ public class OpenRouterProxyService {
                 URL urlObj = new URL(url);
                 connection = (HttpURLConnection) urlObj.openConnection();
 
-                // 设置请求头
+                // 设置 HTTP 请求头
                 connection.setRequestMethod("POST");
                 connection.setRequestProperty("Content-Type", "application/json");
                 connection.setRequestProperty("Authorization", "Bearer " + apiKey);
@@ -338,10 +350,10 @@ public class OpenRouterProxyService {
                 connection.getOutputStream().write(requestBodyJson.getBytes(StandardCharsets.UTF_8));
                 connection.getOutputStream().flush();
 
-                // 读取响应
+                // 检查 HTTP 响应码
                 int responseCode = connection.getResponseCode();
                 if (responseCode != 200) {
-                    String errorMessage = "OpenRouter 流式请求失败: HTTP " + responseCode;
+                    String errorMessage = "OpenRouter returned HTTP " + responseCode;
                     log.error(errorMessage);
                     emitter.completeWithError(new RuntimeException(errorMessage));
                     return;
@@ -354,35 +366,35 @@ public class OpenRouterProxyService {
                     if (line.startsWith("data: ")) {
                         String data = line.substring(6);
 
-                        // 检查是否是结束标记
+                        // 读取结束标记
                         if ("[DONE]".equals(data.trim())) {
                             emitter.send(SseEmitter.event().data("[DONE]"));
                             break;
                         }
 
-                        // 发送数据
+                        // 透传 SSE 数据
                         try {
-                            // 验证 JSON 格式
+                            // 确保数据是合法 JSON
                             objectMapper.readTree(data);
                             emitter.send(SseEmitter.event().data(data));
                         } catch (Exception e) {
-                            log.warn("跳过无效的 SSE 数据: {}", data);
+                            log.warn("Invalid SSE payload {}", data);
                         }
                     }
                 }
 
                 emitter.complete();
-                log.debug("OpenRouter 流式响应完成");
+                log.debug("OpenRouter streaming connection closed");
 
             } catch (Exception e) {
-                log.error("OpenRouter 流式请求异常", e);
+                log.error("OpenRouter streaming request failed", e);
                 emitter.completeWithError(e);
             } finally {
                 try {
                     if (reader != null) reader.close();
                     if (connection != null) connection.disconnect();
                 } catch (Exception e) {
-                    log.warn("关闭连接时出错", e);
+                    log.warn("Failed to close streaming connection", e);
                 }
             }
         }).start();
@@ -391,7 +403,7 @@ public class OpenRouterProxyService {
     }
 
     /**
-     * 创建请求头
+     * 构建访问 OpenRouter 所需的通用请求头。
      */
     private HttpHeaders createHeaders(String apiKey) {
         HttpHeaders headers = new HttpHeaders();
@@ -403,12 +415,12 @@ public class OpenRouterProxyService {
     }
 
     /**
-     * 获取模型列表
+     * 获取 OpenRouter 提供的模型列表。
      */
     public Map<String, Object> getModels(BackendAccount account) {
         String decryptedKey = backendAccountService.getDecryptedToken(account.getId());
         if (decryptedKey == null) {
-            throw new RuntimeException("无法解密 OpenRouter API Key");
+            throw new RuntimeException("OpenRouter API key is missing");
         }
 
         try {
@@ -421,21 +433,20 @@ public class OpenRouterProxyService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return response.getBody();
             } else {
-                throw new RuntimeException("获取模型列表失败: " + response.getStatusCode());
+                throw new RuntimeException("OpenRouter models request failed: " + response.getStatusCode());
             }
         } catch (Exception e) {
-            log.error("获取 OpenRouter 模型列表失败", e);
-            throw new RuntimeException("获取模型列表失败: " + e.getMessage(), e);
+            log.error("Failed to fetch OpenRouter models", e);
+            throw new RuntimeException("OpenRouter models request failed: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 获取实时定价信息
+     * 获取指定模型的价格信息。
      */
     public Map<String, Object> getModelPricing(String modelName) {
         try {
-            // OpenRouter 的定价信息通常包含在模型详情中
-            // 这里简化实现，实际可以从 OpenRouter API 获取
+            // 尝试读取 OpenRouter 官方实时价格
             String url = baseUrl + "/models/" + modelName;
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
 
@@ -443,7 +454,7 @@ public class OpenRouterProxyService {
                 return response.getBody();
             }
         } catch (Exception e) {
-            log.warn("获取 OpenRouter 模型定价失败: model={}", modelName, e);
+            log.warn("Failed to load OpenRouter pricing for model={}", modelName, e);
         }
 
         return Map.of(
@@ -452,12 +463,12 @@ public class OpenRouterProxyService {
                         "prompt", 0.0,
                         "completion", 0.0
                 ),
-                "note", "定价信息未获取，使用默认值"
+                "note", "Pricing info unavailable, using defaults"
         );
     }
 
     /**
-     * 健康检查
+     * 调用 OpenRouter 模型接口以执行健康检查。
      */
     public boolean healthCheck(BackendAccount account) {
         String decryptedKey = backendAccountService.getDecryptedToken(account.getId());
@@ -466,7 +477,7 @@ public class OpenRouterProxyService {
         }
 
         try {
-            // 发送一个简单的模型列表请求来验证 API Key 是否有效
+            // 通过真实 API Key 调用 /models 确认链路可用
             HttpHeaders headers = createHeaders(decryptedKey);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
@@ -485,7 +496,7 @@ public class OpenRouterProxyService {
 
             return isHealthy;
         } catch (Exception e) {
-            log.warn("OpenRouter 健康检查失败: accountId={}", account.getId(), e);
+            log.warn("OpenRouter account operation failed accountId={}", account.getId(), e);
             backendAccountService.incrementErrorCount(account.getId(), e.getMessage());
             return false;
         }
@@ -528,7 +539,7 @@ public class OpenRouterProxyService {
                 }
             }
         } catch (Exception ex) {
-            log.debug("忽略无法解析的 OpenRouter 流式片段: {}", data);
+            log.debug("OpenRouter: {}", data);
         }
     }
 
@@ -541,13 +552,13 @@ public class OpenRouterProxyService {
         try {
             TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, fullContent);
             if (finalUsage == null) {
-                log.warn("OpenRouter 流式响应缺少 usage，跳过计费: account={}, model={}",
+                log.warn("OpenRouter usage record missing account={}, model={}",
                         account.getAccountName(), request.getModel());
             } else {
                 CostResult costResult = costCalculatorService.calculate(
                         finalUsage, request.getModel(), account.getId(), apiKey.getUserId());
                 quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
-                log.info("OpenRouter 流式响应完成: account={}, tokens(in/out)={}/{}, cost=${}",
+                log.info("OpenRouter streaming usage: account={}, tokens(in/out)={}/{}, cost=${}",
                         account.getAccountName(),
                         finalUsage.getInputTokens(),
                         finalUsage.getOutputTokens(),
@@ -557,8 +568,8 @@ public class OpenRouterProxyService {
             backendAccountService.recordSuccess(account.getId());
             sessionStickinessService.saveMapping(sessionHash, account.getId());
         } catch (Exception e) {
-            log.error("OpenRouter 流式计费失败: account={}", account.getAccountName(), e);
-            throw new RuntimeException("OpenRouter 计费失败: " + e.getMessage(), e);
+            log.error("OpenRouter streaming accounting failed for account={}", account.getAccountName(), e);
+            throw new RuntimeException("OpenRouter service error: " + e.getMessage(), e);
         }
     }
 
@@ -572,16 +583,21 @@ public class OpenRouterProxyService {
         if (resources == null) {
             return;
         }
+
         try {
             if (resources.reader != null) {
                 resources.reader.close();
             }
         } catch (Exception e) {
-            log.warn("关闭连接时出错", e);
+            log.warn("Failed to close OpenRouter stream reader", e);
         }
 
         if (resources.connection != null) {
-            resources.connection.disconnect();
+            try {
+                resources.connection.disconnect();
+            } catch (Exception e) {
+                log.warn("Failed to close OpenRouter connection", e);
+            }
         }
     }
 

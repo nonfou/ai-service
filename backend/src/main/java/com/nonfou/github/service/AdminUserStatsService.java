@@ -57,7 +57,10 @@ public class AdminUserStatsService {
         if (totalStats != null) {
             response.setTotalInputTokens(getLongValue(totalStats.get("totalInputTokens")));
             response.setTotalOutputTokens(getLongValue(totalStats.get("totalOutputTokens")));
+            response.setTotalCacheReadTokens(getLongValue(totalStats.get("totalCacheReadTokens")));
+            response.setTotalCacheWriteTokens(getLongValue(totalStats.get("totalCacheWriteTokens")));
             response.setTotalTokens(getLongValue(totalStats.get("totalTokens")));
+            response.setTotalAllTokens(getLongValue(totalStats.get("totalAllTokens")));
             response.setTotalCost(getBigDecimalValue(totalStats.get("totalCost")));
             response.setTotalCalls(getLongValue(totalStats.get("totalCalls")));
         }
@@ -67,7 +70,10 @@ public class AdminUserStatsService {
         if (todayStats != null) {
             response.setTodayInputTokens(getLongValue(todayStats.get("todayInputTokens")));
             response.setTodayOutputTokens(getLongValue(todayStats.get("todayOutputTokens")));
+            response.setTodayCacheReadTokens(getLongValue(todayStats.get("todayCacheReadTokens")));
+            response.setTodayCacheWriteTokens(getLongValue(todayStats.get("todayCacheWriteTokens")));
             response.setTodayTokens(getLongValue(todayStats.get("todayTokens")));
+            response.setTodayAllTokens(getLongValue(todayStats.get("todayAllTokens")));
             response.setTodayCost(getBigDecimalValue(todayStats.get("todayCost")));
             response.setTodayCalls(getLongValue(todayStats.get("todayCalls")));
         }
@@ -131,7 +137,10 @@ public class AdminUserStatsService {
 
             response.setTotalInputTokens(getLongValue(stat.get("totalInputTokens")));
             response.setTotalOutputTokens(getLongValue(stat.get("totalOutputTokens")));
+            response.setTotalCacheReadTokens(getLongValue(stat.get("totalCacheReadTokens")));
+            response.setTotalCacheWriteTokens(getLongValue(stat.get("totalCacheWriteTokens")));
             response.setTotalTokens(getLongValue(stat.get("totalTokens")));
+            response.setTotalAllTokens(getLongValue(stat.get("totalAllTokens")));
             response.setTotalCost(getBigDecimalValue(stat.get("totalCost")));
             response.setAvgDuration(getLongValue(stat.get("avgDuration")));
 

@@ -11,6 +11,7 @@ import com.nonfou.github.entity.Model;
 import com.nonfou.github.mapper.ModelMapper;
 import com.nonfou.github.service.CostCalculatorService.CostResult;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
+import com.nonfou.github.service.proxy.ModelProxy;
 import com.nonfou.github.util.SessionUtil;
 import com.nonfou.github.util.TokenEstimator;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +35,11 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Copilot 代理服务 - 多账户增强版
+ * Copilot 浠ｇ悊鏈嶅姟 - 澶氳处鎴峰寮虹増
  */
 @Slf4j
 @Service
-public class CopilotProxyService {
+public class CopilotProxyService implements ModelProxy {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
@@ -79,31 +80,37 @@ public class CopilotProxyService {
     @Value("${backend.streaming.timeout-ms:300000}")
     private long streamTimeoutMs;
 
+    @Override
+    public String getProvider() {
+        return "copilot";
+    }
+
     /**
-     * 非流式聊天
+     * 闈炴祦寮忚亰澶?
      */
+    @Override
     public ChatResponse chat(ChatRequest request, ApiKey apiKey) {
-        // 1. 生成会话哈希（用于会话粘性）
+        // 1. 鐢熸垚浼氳瘽鍝堝笇锛堢敤浜庝細璇濈矘鎬э級
         String sessionHash = SessionUtil.generateSessionHash(
             apiKey.getApiKey(),
             request.getModel(),
             request.getMessages()
         );
 
-        // 2. 选择后端账户
+        // 2. 閫夋嫨鍚庣璐︽埛
         BackendAccount account = accountScheduler.selectAccount(apiKey, request.getModel(), sessionHash);
         if (account == null) {
             throw new RuntimeException("No available Copilot account");
         }
 
-        // 3. 检查配额
+        // 3. 妫€鏌ラ厤棰?
         quotaService.checkAndEnforceQuota(apiKey.getUserId());
 
-        // 4. 构建请求
+        // 4. 鏋勫缓璇锋眰
         String endpoint = copilotBaseUrl + "/v1/chat/completions";
         HttpHeaders headers = buildHeaders(account);
 
-        // 确保非流式
+        // 纭繚闈炴祦寮?
         ChatRequest modifiedRequest = new ChatRequest();
         modifiedRequest.setModel(request.getModel());
         modifiedRequest.setMessages(request.getMessages());
@@ -114,8 +121,8 @@ public class CopilotProxyService {
         HttpEntity<ChatRequest> entity = new HttpEntity<>(modifiedRequest, headers);
 
         try {
-            // 5. 发送请求
-            log.info("调用 Copilot API: account={}, model={}, messages={}",
+            // 5. 鍙戦€佽姹?
+            log.info("璋冪敤 Copilot API: account={}, model={}, messages={}",
                     account.getAccountName(), request.getModel(), request.getMessages().size());
 
             ResponseEntity<ChatResponse> response = restTemplate.postForEntity(endpoint, entity, ChatResponse.class);
@@ -123,7 +130,7 @@ public class CopilotProxyService {
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 ChatResponse chatResponse = response.getBody();
 
-                // 6. 计算成本
+                // 6. 璁＄畻鎴愭湰
                 if (chatResponse.getUsage() != null) {
                     TokenUsage usage = TokenUsage.builder()
                             .inputTokens(chatResponse.getUsage().getPromptTokens())
@@ -135,38 +142,39 @@ public class CopilotProxyService {
                     CostResult costResult = costCalculatorService.calculate(
                             usage, request.getModel(), account.getId(), apiKey.getUserId());
 
-                    // 7. 扣除配额
+                    // 7. 鎵ｉ櫎閰嶉
                     quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
 
-                    log.info("Copilot API 响应成功: account={}, tokens={}, cost=${}",
+                    log.info("Copilot API 鍝嶅簲鎴愬姛: account={}, tokens={}, cost=${}",
                             account.getAccountName(),
                             chatResponse.getUsage().getTotalTokens(),
                             costResult.getTotalCost());
                 }
 
-                // 8. 更新账户使用统计
+                // 8. 鏇存柊璐︽埛浣跨敤缁熻
                 backendAccountService.recordSuccess(account.getId());
 
-                // 9. 保存会话粘性
+                // 9. 淇濆瓨浼氳瘽绮樻€?
                 sessionStickinessService.saveMapping(sessionHash, account.getId());
 
                 return chatResponse;
             } else {
-                // 10. 记录失败
+                // 10. 璁板綍澶辫触
                 backendAccountService.recordError(account.getId(), "HTTP " + response.getStatusCode());
-                throw new RuntimeException("Copilot API 响应异常: " + response.getStatusCode());
+                throw new RuntimeException("Copilot API 鍝嶅簲寮傚父: " + response.getStatusCode());
             }
         } catch (Exception e) {
-            // 11. 记录失败
+            // 11. 璁板綍澶辫触
             backendAccountService.recordError(account.getId(), e.getMessage());
-            log.error("调用 Copilot API 失败: account={}", account.getAccountName(), e);
-            throw new RuntimeException("AI 服务暂时不可用: " + e.getMessage());
+            log.error("璋冪敤 Copilot API 澶辫触: account={}", account.getAccountName(), e);
+            throw new RuntimeException("AI 鏈嶅姟鏆傛椂涓嶅彲鐢? " + e.getMessage());
         }
     }
 
     /**
-     * 流式聊天
+     * 娴佸紡鑱婂ぉ
      */
+    @Override
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey) {
         SseEmitter emitter = new SseEmitter(streamTimeoutMs);
 
@@ -210,7 +218,7 @@ public class CopilotProxyService {
                 String requestBody = objectMapper.writeValueAsString(modifiedRequest);
                 connection.getOutputStream().write(requestBody.getBytes(StandardCharsets.UTF_8));
 
-                log.info("流式调用 Copilot API: account={}, model={}",
+                log.info("娴佸紡璋冪敤 Copilot API: account={}, model={}",
                         account.getAccountName(), request.getModel());
 
                 resources.reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
@@ -234,7 +242,7 @@ public class CopilotProxyService {
                 finalizeStreamingCost(request, apiKey, account, sessionHash, fullContent.toString(), usageRef.get());
                 emitter.complete();
             } catch (Exception e) {
-                log.error("流式调用 Copilot API 失败: account={}", account.getAccountName(), e);
+                log.error("娴佸紡璋冪敤 Copilot API 澶辫触: account={}", account.getAccountName(), e);
                 backendAccountService.recordError(account.getId(), e.getMessage());
                 emitter.completeWithError(e);
             } finally {
@@ -246,7 +254,7 @@ public class CopilotProxyService {
     }
 
     /**
-     * 测试连接（使用调度器选择的账户）
+     * 娴嬭瘯杩炴帴锛堜娇鐢ㄨ皟搴﹀櫒閫夋嫨鐨勮处鎴凤級
      */
     public boolean testConnection(ApiKey apiKey) {
         try {
@@ -271,13 +279,13 @@ public class CopilotProxyService {
 
             return success;
         } catch (Exception e) {
-            log.error("Copilot API 连接测试失败", e);
+            log.error("Copilot API 杩炴帴娴嬭瘯澶辫触", e);
             return false;
         }
     }
 
     /**
-     * 获取可用模型列表（使用第一个可用账户）
+     * 鑾峰彇鍙敤妯″瀷鍒楄〃锛堜娇鐢ㄧ涓€涓彲鐢ㄨ处鎴凤級
      */
     public String getModels(ApiKey apiKey) {
         try {
@@ -295,13 +303,13 @@ public class CopilotProxyService {
 
             return response.getBody();
         } catch (Exception e) {
-            log.error("获取 Copilot 模型列表失败", e);
+            log.error("鑾峰彇 Copilot 妯″瀷鍒楄〃澶辫触", e);
             throw new RuntimeException("Failed to get models: " + e.getMessage());
         }
     }
 
     /**
-     * 健康检查指定账户
+     * 鍋ュ悍妫€鏌ユ寚瀹氳处鎴?
      */
     public boolean healthCheck(Long accountId) {
         try {
@@ -320,21 +328,21 @@ public class CopilotProxyService {
             boolean healthy = response.getStatusCode() == HttpStatus.OK;
 
             if (healthy) {
-                backendAccountService.updateHealth(accountId, "active", "健康检查通过");
+                backendAccountService.updateHealth(accountId, "active", "鍋ュ悍妫€鏌ラ€氳繃");
             } else {
-                backendAccountService.updateHealth(accountId, "error", "健康检查失败: HTTP " + response.getStatusCode());
+                backendAccountService.updateHealth(accountId, "error", "鍋ュ悍妫€鏌ュけ璐? HTTP " + response.getStatusCode());
             }
 
             return healthy;
         } catch (Exception e) {
-            log.error("Copilot 账户健康检查失败: accountId={}", accountId, e);
-            backendAccountService.updateHealth(accountId, "error", "健康检查异常: " + e.getMessage());
+            log.error("Copilot 璐︽埛鍋ュ悍妫€鏌ュけ璐? accountId={}", accountId, e);
+            backendAccountService.updateHealth(accountId, "error", "鍋ュ悍妫€鏌ュ紓甯? " + e.getMessage());
             return false;
         }
     }
 
     /**
-     * 构建请求头
+     * 鏋勫缓璇锋眰澶?
      */
     private HttpHeaders buildHeaders(BackendAccount account) {
         HttpHeaders headers = new HttpHeaders();
@@ -383,7 +391,7 @@ public class CopilotProxyService {
                 }
             }
         } catch (Exception ex) {
-            log.debug("忽略无法解析的 Copilot 流式片段: {}", data);
+            log.debug("蹇界暐鏃犳硶瑙ｆ瀽鐨?Copilot 娴佸紡鐗囨: {}", data);
         }
     }
 
@@ -396,13 +404,13 @@ public class CopilotProxyService {
         try {
             TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, fullContent);
             if (finalUsage == null) {
-                log.warn("Copilot 流式响应缺少 usage 信息，跳过计费: account={}, model={}",
+                log.warn("Copilot 娴佸紡鍝嶅簲缂哄皯 usage 淇℃伅锛岃烦杩囪璐? account={}, model={}",
                         account.getAccountName(), request.getModel());
             } else {
                 CostResult costResult = costCalculatorService.calculate(
                         finalUsage, request.getModel(), account.getId(), apiKey.getUserId());
                 quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
-                log.info("Copilot 流式响应完成: account={}, tokens(in/out)={}/{}, cost=${}",
+                log.info("Copilot 娴佸紡鍝嶅簲瀹屾垚: account={}, tokens(in/out)={}/{}, cost=${}",
                         account.getAccountName(),
                         finalUsage.getInputTokens(),
                         finalUsage.getOutputTokens(),
@@ -412,8 +420,8 @@ public class CopilotProxyService {
             backendAccountService.recordSuccess(account.getId());
             sessionStickinessService.saveMapping(sessionHash, account.getId());
         } catch (Exception e) {
-            log.error("Copilot 流式计费失败: account={}", account.getAccountName(), e);
-            throw new RuntimeException("Copilot 计费失败: " + e.getMessage(), e);
+            log.error("Copilot 娴佸紡璁¤垂澶辫触: account={}", account.getAccountName(), e);
+            throw new RuntimeException("Copilot 璁¤垂澶辫触: " + e.getMessage(), e);
         }
     }
 

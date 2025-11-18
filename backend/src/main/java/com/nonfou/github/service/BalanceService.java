@@ -164,35 +164,12 @@ public class BalanceService {
      * 记录 API 调用
      */
     @Transactional
-    public Long logApiCall(Long userId, String apiKey, String model,
-                           int inputTokens, int outputTokens, BigDecimal cost,
-                           LocalDateTime requestTime, LocalDateTime responseTime,
-                           Integer duration, Integer status, String errorMsg) {
-        ApiCall apiCall = new ApiCall();
-        apiCall.setUserId(userId);
-        apiCall.setApiKey(apiKey);
-        apiCall.setModel(model);
-        apiCall.setInputTokens(inputTokens);
-        apiCall.setOutputTokens(outputTokens);
-        apiCall.setCost(cost);
-        apiCall.setRequestTime(requestTime);
-        apiCall.setResponseTime(responseTime);
-        apiCall.setDuration(duration);
-        apiCall.setStatus(status);
-        apiCall.setErrorMsg(errorMsg);
-        apiCall.setCreatedAt(LocalDateTime.now());
-
+    public Long logApiCall(ApiCall apiCall) {
+        if (apiCall.getCreatedAt() == null) {
+            apiCall.setCreatedAt(LocalDateTime.now());
+        }
         apiCallMapper.insert(apiCall);
         return apiCall.getId();
-    }
-
-    /**
-     * 根据 API Key 查询用户
-     */
-    public User getUserByApiKey(String apiKey) {
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getApiKey, apiKey);
-        return userMapper.selectOne(wrapper);
     }
 
     /**
@@ -271,5 +248,18 @@ public class BalanceService {
      */
     public User getUserById(Long userId) {
         return userMapper.selectById(userId);
+    }
+
+    /**
+     * 根据 API Key 查询用户（兼容 legacy 密钥流�?
+     */
+    public User getUserByApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            return null;
+        }
+
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getApiKey, apiKey);
+        return userMapper.selectOne(wrapper);
     }
 }
