@@ -6,9 +6,20 @@
 # 数据库配置
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai}
+    # 开发环境数据库 URL
+    # useSSL=false: 本地开发无需 SSL
+    # allowPublicKeyRetrieval=true: MySQL 8.0 需要
+    # cachePrepStmts=true: 启用预编译语句缓存
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root123}
+
+    # 开发环境连接池配置 (相对宽松)
+    hikari:
+      minimum-idle: 3  # 开发环境可以更小
+      maximum-pool-size: 10  # 开发环境不需要太多连接
+      connection-timeout: 30000  # 开发环境可以更长
+      leak-detection-threshold: 0  # 开发环境关闭泄漏检测(避免误报)
 
   # Redis 配置
   data:
@@ -22,7 +33,7 @@ spring:
     host: ${MAIL_HOST:smtp.exmail.qq.com}
     port: ${MAIL_PORT:465}
     username: ${MAIL_USERNAME:support@xcoder.plus}
-    password: ${MAIL_PASSWORD:od8vgwT878ny7ebn}
+    password: ${MAIL_PASSWORD:}  # ⚠️ 请设置环境变量 MAIL_PASSWORD
     properties:
       mail:
         smtp:

@@ -19,14 +19,17 @@ spring:
     username: ${DB_USERNAME}  # 必须设置
     password: ${DB_PASSWORD}  # 必须设置
 
-    # 连接池��置
+    # 连接池配置 (生产环境优化)
     hikari:
-      minimum-idle: 5
-      maximum-pool-size: 20
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      connection-test-query: SELECT 1
+      minimum-idle: 10  # 生产环境保持更多空闲连接
+      maximum-pool-size: 30  # 根据并发量调整
+      connection-timeout: 20000  # 连接超时 20秒
+      idle-timeout: 300000  # 空闲连接超时 5分钟
+      max-lifetime: 1800000  # 连接最大生命周期 30分钟
+      leak-detection-threshold: 60000  # ✅ 连接泄漏检测 60秒
+      pool-name: HikariPool-AIService-Prod  # 便于监控识别
+      register-mbeans: true  # ✅ 启用 JMX 监控
+      # 注意: connection-test-query 已移除,HikariCP 自动使用 JDBC4 isValid()
 
   # Redis 配置 - 生产环境
   data:

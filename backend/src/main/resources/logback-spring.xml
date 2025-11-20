@@ -92,15 +92,19 @@
     <!-- MyBatis SQL 日志 (开发环境DEBUG,生产环境建议关闭) -->
     <logger name="com.nonfou.github.mapper" level="INFO"/>
 
+    <!-- MyBatis-Plus 框架日志 -->
+    <logger name="com.baomidou.mybatisplus" level="INFO"/>
+
     <!-- Spring 框架日志 -->
     <logger name="org.springframework" level="INFO"/>
     <logger name="org.springframework.web" level="INFO"/>
     <logger name="org.springframework.security" level="INFO"/>
 
-    <!-- ���发环境配置 -->
+    <!-- 开发环境配置 -->
     <springProfile name="dev">
         <!-- MyBatis SQL 日志在开发环境启用 -->
         <logger name="com.nonfou.github.mapper" level="DEBUG"/>
+        <logger name="com.baomidou.mybatisplus" level="DEBUG"/>
 
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
@@ -116,6 +120,10 @@
             <appender-ref ref="FILE"/>
             <appender-ref ref="ERROR"/>
         </root>
+
+        <!-- MyBatis 日志在生产环境只记录警告和错误 -->
+        <logger name="com.nonfou.github.mapper" level="WARN"/>
+        <logger name="com.baomidou.mybatisplus" level="WARN"/>
 
         <!-- 安全日志保持 INFO 级别 -->
         <logger name="com.nonfou.github.service.AuthService" level="INFO"/>
