@@ -1,0 +1,231 @@
+# ====================================================
+# 生产环境配置 - AI API Platform
+# ====================================================
+# 注意: 所有敏感信息必须通过环境变量设置,禁止硬编码
+# ====================================================
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: ai-api-platform
+
+  # 数据库配置 - 生产环境
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # ⚠️ 生产环境建议启�� SSL: useSSL=true&requireSSL=true
+    url: ${DB_URL}  # 必须设置,示例: jdbc:mysql://your-db-host:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME}  # 必须设置
+    password: ${DB_PASSWORD}  # 必须设置
+
+    # 连接池��置
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+  # Redis 配置 - 生产环境
+  data:
+    redis:
+      host: ${REDIS_HOST}  # 必须设置
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}  # 必须设置(如Redis启用了密码)
+      database: ${REDIS_DATABASE:0}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 2
+
+  # 邮件配置 - 生产环境
+  mail:
+    host: ${MAIL_HOST}  # 必须设置
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}  # 必须设置
+    password: ${MAIL_PASSWORD}  # 必须设置
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: ${MAIL_SSL_ENABLE:false}
+            protocols: TLSv1.2
+          socketFactory:
+            class: ${MAIL_SOCKET_FACTORY_CLASS:}
+            port: ${MAIL_PORT:587}
+            fallback: false
+          starttls:
+            enable: ${MAIL_STARTTLS_ENABLE:true}
+            required: ${MAIL_STARTTLS_REQUIRED:true}
+          timeout: 10000
+          connectiontimeout: 10000
+
+# MyBatis Plus 配置 - 生产环境
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.nonfou.github.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    # ✅ 生产环境使用 Slf4j 而非 StdOut
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# JWT 配置 - 生产环境
+jwt:
+  secret: ${JWT_SECRET}  # ⚠️ 必须设置,长度>=32字符,使用: openssl rand -base64 32
+  expiration: ${JWT_EXPIRATION:604800000}  # 7天
+
+# 认证配置 - 生产环境
+auth:
+  verify-code:
+    ttl-seconds: ${AUTH_VERIFY_CODE_TTL_SECONDS:300}
+    min-interval-seconds: ${AUTH_VERIFY_CODE_MIN_INTERVAL:60}
+    max-per-hour: ${AUTH_VERIFY_CODE_MAX_PER_HOUR:10}
+    hash-secret: ${VERIFY_CODE_SECRET}  # ⚠️ 必须设置
+
+# 系统配置缓存
+system-config:
+  cache-ttl-seconds: ${SYSTEM_CONFIG_CACHE_TTL:60}
+
+# 支付宝配置 - 生产环境
+alipay:
+  app-id: ${ALIPAY_APP_ID}  # 必须设置
+  private-key: ${ALIPAY_PRIVATE_KEY}  # 必须设置
+  public-key: ${ALIPAY_PUBLIC_KEY}  # 必须设置
+  gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipay.com/gateway.do}  # 生产网关
+  notify-url: ${ALIPAY_NOTIFY_URL}  # ⚠️ 必须使用 HTTPS
+  return-url: ${ALIPAY_RETURN_URL}  # ⚠️ 必须使用 HTTPS
+  sign-type: RSA2
+  charset: UTF-8
+  format: json
+
+# 微信支付配置 - 生产环境
+wechat:
+  app-id: ${WECHAT_APP_ID}  # 必须设置
+  mch-id: ${WECHAT_MCH_ID}  # 必须设置
+  api-v3-key: ${WECHAT_API_V3_KEY}  # 必须设置
+  merchant-serial-number: ${WECHAT_MERCHANT_SERIAL_NUMBER}  # 必须设置
+  private-key-path: ${WECHAT_PRIVATE_KEY_PATH:classpath:apiclient_key.pem}
+  notify-url: ${WECHAT_NOTIFY_URL}  # ⚠️ 必须使用 HTTPS
+
+# 管理后台安全配置 - 生产环境
+admin:
+  security:
+    # IP白名单
+    enable-ip-whitelist: ${ADMIN_ENABLE_IP_WHITELIST:false}
+    ip-whitelist: ${ADMIN_IP_WHITELIST:}  # 逗号分隔的IP列表
+
+    # ✅ 生产环境强制启用请求频率限制
+    enable-rate-limit: true
+    rate-limit: ${ADMIN_RATE_LIMIT:60}  # 每分钟最大请求数
+
+    # ✅ 生产环境强制启用登录失败锁定
+    enable-login-lock: true
+    max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}  # 最大失败次数
+    lock-duration: ${ADMIN_LOCK_DURATION:30}  # 锁定时长(分钟)
+
+# 加密配置 - 生产环境
+encryption:
+  key: ${ENCRYPTION_KEY}  # ⚠️ 必须设置,32字节随机hex: openssl rand -hex 32
+  iv: ${ENCRYPTION_IV:}  # 已弃用,仅为兼容保留
+
+# 后端账户调度配置 - 生产环境
+backend:
+  streaming:
+    timeout-ms: ${BACKEND_STREAM_TIMEOUT_MS:300000}
+    core-pool-size: ${BACKEND_STREAM_CORE_POOL:8}
+    max-pool-size: ${BACKEND_STREAM_MAX_POOL:32}
+    queue-capacity: ${BACKEND_STREAM_QUEUE:500}
+    keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
+
+  routing:
+    default-provider: ${BACKEND_DEFAULT_PROVIDER:copilot}
+
+  copilot:
+    base-url: ${COPILOT_BASE_URL:https://api.githubcopilot.com}
+
+  scheduler:
+    strategy: ${BACKEND_SCHEDULER_STRATEGY:HYBRID}
+
+    session-stickiness:
+      enabled: ${SESSION_STICKINESS_ENABLED:true}
+      ttl-hours: ${SESSION_STICKINESS_TTL_HOURS:1}
+      renewal-on-request: ${SESSION_RENEWAL_ON_REQUEST:true}
+
+    health-check:
+      enabled: ${HEALTH_CHECK_ENABLED:true}
+      interval-seconds: ${HEALTH_CHECK_INTERVAL:30}
+      timeout-seconds: ${HEALTH_CHECK_TIMEOUT:5}
+      failure-threshold: ${HEALTH_CHECK_FAILURE_THRESHOLD:3}
+      success-threshold: ${HEALTH_CHECK_SUCCESS_THRESHOLD:2}
+
+    load-balance:
+      enable-concurrent-limit: ${LOAD_BALANCE_CONCURRENT_LIMIT:true}
+      enable-rate-limit: ${LOAD_BALANCE_RATE_LIMIT:true}
+
+  pricing:
+    markup-rate: ${PRICING_MARKUP_RATE:1.2}
+    enable-account-multiplier: ${PRICING_ENABLE_ACCOUNT_MULTIPLIER:true}
+    enable-model-multiplier: ${PRICING_ENABLE_MODEL_MULTIPLIER:true}
+
+  quota:
+    default-daily-limit: ${QUOTA_DEFAULT_DAILY_LIMIT:100.00}
+    default-monthly-limit: ${QUOTA_DEFAULT_MONTHLY_LIMIT:2000.00}
+    enforce: ${QUOTA_ENFORCE:true}
+    alert-threshold: ${QUOTA_ALERT_THRESHOLD:80.0}
+
+  openrouter:
+    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+    fetch-realtime-pricing: ${OPENROUTER_FETCH_REALTIME_PRICING:true}
+    accounts:
+      - name: ${OPENROUTER_ACCOUNT_1_NAME:openrouter-1}
+        api-key: ${OPENROUTER_ACCOUNT_1_KEY:}
+        priority: 1
+        enabled: ${OPENROUTER_ACCOUNT_1_ENABLED:false}
+      - name: ${OPENROUTER_ACCOUNT_2_NAME:openrouter-2}
+        api-key: ${OPENROUTER_ACCOUNT_2_KEY:}
+        priority: 2
+        enabled: ${OPENROUTER_ACCOUNT_2_ENABLED:false}
+
+# Token 使用统计与计费事件配置 - 生产环境
+usage:
+  metrics:
+    timezone: ${USAGE_METRICS_TIMEZONE:Asia/Shanghai}
+    daily-ttl-days: ${USAGE_METRICS_DAILY_TTL:32}
+    monthly-ttl-days: ${USAGE_METRICS_MONTHLY_TTL:365}
+    hourly-ttl-days: ${USAGE_METRICS_HOURLY_TTL:7}
+    metrics-window-minutes: ${USAGE_METRICS_WINDOW_MINUTES:5}
+    usage-record-limit: ${USAGE_METRICS_RECORD_LIMIT:200}
+    enable-aggregation: ${USAGE_METRICS_ENABLE_AGGREGATION:true}
+    enable-billing-events: ${USAGE_METRICS_ENABLE_BILLING:false}
+    billing-stream-key: ${USAGE_METRICS_BILLING_STREAM:billing:events}
+    billing-stream-max-length: ${USAGE_METRICS_BILLING_MAXLEN:100000}
+
+# ====================================================
+# 日志配置 - 生产环境
+# ====================================================
+logging:
+  level:
+    root: WARN
+    com.nonfou.github: INFO
+    org.springframework: WARN
+    org.mybatis: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+    max-size: 100MB
+    max-history: 30

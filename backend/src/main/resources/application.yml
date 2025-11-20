@@ -1,23 +1,29 @@
+# ====================================================
+# 通用配置 - 所有环境共享
+# ====================================================
+# 环境特定配置请放在 application-{profile}.yml 中
+# ====================================================
+
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: ai-api-platform
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  # 数据库配置
+  # 数据库配置 - 具体值由环境配置提供
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
-  # Redis 配置
+  # Redis 配置 - 具体值由环境配置提供
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
@@ -29,12 +35,12 @@ spring:
           max-idle: 8
           min-idle: 0
 
-  # 邮件配置
+  # 邮件配置 - 具体值由环境配置提供
   mail:
-    host: ${MAIL_HOST:smtp.qq.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     default-encoding: UTF-8
     properties:
       mail:
@@ -68,8 +74,10 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 # JWT 配置
+# ⚠️ [安全要求] JWT_SECRET 必须通过环境变量设置,长度至少32字符
+# 生成方法: openssl rand -base64 32
 jwt:
-  secret: ${JWT_SECRET:0Qu/3sEdrbX+2BmxsMeahKQYlZpbhdArOCBY2FXFYRo=}
+  secret: ${JWT_SECRET}  # ✅ 移除默认值,强制使用环境变量
   expiration: ${JWT_EXPIRATION:604800000}  # 7天（毫秒）
 
 auth:
@@ -77,7 +85,8 @@ auth:
     ttl-seconds: ${AUTH_VERIFY_CODE_TTL_SECONDS:300}
     min-interval-seconds: ${AUTH_VERIFY_CODE_MIN_INTERVAL:60}
     max-per-hour: ${AUTH_VERIFY_CODE_MAX_PER_HOUR:10}
-    hash-secret: ${VERIFY_CODE_SECRET:change-me-now}
+    # ⚠️ [安全要求] VERIFY_CODE_SECRET 必须通过环境变量设置
+    hash-secret: ${VERIFY_CODE_SECRET}  # ✅ 移除默认值
 
 # 系统配置缓存
 system-config:
@@ -108,17 +117,17 @@ wechat:
 admin:
   security:
     # IP白名单(不建议在IP不固定的情况下使用)
-    enable-ip-whitelist: false
+    enable-ip-whitelist: ${ADMIN_ENABLE_IP_WHITELIST:false}
     ip-whitelist: []
 
-    # 请求频率限制(推荐开启)
-    enable-rate-limit: false  # 临时禁用以便开发测试
-    rate-limit: 60  # 每分钟最大请求数
+    # ✅ 请求频率限制(已启用)
+    enable-rate-limit: ${ADMIN_ENABLE_RATE_LIMIT:true}  # 防止暴力破解
+    rate-limit: ${ADMIN_RATE_LIMIT:60}  # 每分钟最大请求数
 
-    # 登录失败锁定(推荐开启)
-    enable-login-lock: false  # 临时禁用以便开发测试
-    max-login-attempts: 5  # 最大失败次数
-    lock-duration: 30  # 锁定时长(分钟)
+    # ✅ 登录失败锁定(已启用)
+    enable-login-lock: ${ADMIN_ENABLE_LOGIN_LOCK:true}  # 防止暴力破解
+    max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}  # 最大失败次数
+    lock-duration: ${ADMIN_LOCK_DURATION:30}  # 锁定时长(分钟)
 
 # ====================================================
 # 多账户中继服务配置

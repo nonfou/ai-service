@@ -42,8 +42,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/recharge/wechat/notify").permitAll()
                 // 公开接口:允许管理员登录
                 .requestMatchers("/api/admin/login").permitAll()
-                // 公开接口:允许重置密码(临时,仅用于开发)
-                .requestMatchers("/api/admin/reset-password").permitAll()
+                // ✅ [安全修复] 已删除不安全的重置密码接口 (CVSS 9.8 - CWE-306)
+                // 该接口允许任何人无需身份验证即可重置管理员密码,存在严重安全风险
+                // 管理员密码重置请通过数据库直接修改,或使用需要身份验证的修改密码功能
 
                 // 管理端接口:仅管理员可访问
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

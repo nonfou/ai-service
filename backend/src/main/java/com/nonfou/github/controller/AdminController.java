@@ -48,26 +48,15 @@ public class AdminController {
         }
     }
 
-    /**
-     * 重置管理员密码 (临时接口,仅用于开发测试)
-     */
-    @PostMapping("/reset-password")
-    public Result<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
-        try {
-            String username = body.get("username");
-            String newPassword = body.get("newPassword");
-
-            if (username == null || newPassword == null) {
-                return Result.error("用户名和新密码不能为空");
-            }
-
-            Map<String, Object> result = adminService.resetAdminPassword(username, newPassword);
-            return Result.success(result);
-        } catch (Exception e) {
-            log.error("重置密码失败", e);
-            return Result.error(e.getMessage());
-        }
-    }
+    // ✅ [安全修复] 已删除不安全的重置密码接口 (CVSS 9.8 - CWE-306)
+    // 该接口允许任何人无需身份验证即可重置管理员密码,存在严重安全风险
+    //
+    // 管理员密码重置的替代方案:
+    // 1. 管理员自行通过"修改密码"功能修改(需要输入旧密码并先登录)
+    // 2. 系统管理员通过数据库直接修改密码:
+    //    UPDATE admin SET password = '$2a$10$...' WHERE id = 1;
+    //    (使用 BCrypt 加密后的密码,可通过 BCryptPasswordEncoder.encode() 生成)
+    // 3. 后续可考虑添加"忘记密码"功能,通过邮箱验证码重置(需要验证邮箱所有权)
 
     /**
      * 获取用户统计数据
