@@ -1,6 +1,7 @@
 package com.nonfou.github.config;
 
 import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.LogMaskUtil;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
@@ -82,38 +83,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             } catch (ExpiredJwtException e) {
                 // ✅ Token 过期 (正常情况,INFO级别)
-                log.info("JWT Token已过期: uri={}, ip={}", requestUri, clientIp);
+                log.info("JWT Token已过期: uri={}, ip={}", requestUri, LogMaskUtil.maskIp(clientIp));
                 SecurityContextHolder.clearContext();
 
             } catch (SignatureException e) {
                 // ✅ 签名验证失败 (可能是攻击,WARN级别)
                 log.warn("⚠️ JWT签名验证失败(可能是伪造攻击): uri={}, ip={}, error={}",
-                    requestUri, clientIp, e.getMessage());
+                    requestUri, LogMaskUtil.maskIp(clientIp), e.getMessage());
                 SecurityContextHolder.clearContext();
                 // TODO: 可以在这里记录可疑IP到黑名单
 
             } catch (MalformedJwtException e) {
                 // ✅ Token 格式错误
                 log.warn("JWT格式错误: uri={}, ip={}, error={}",
-                    requestUri, clientIp, e.getMessage());
+                    requestUri, LogMaskUtil.maskIp(clientIp), e.getMessage());
                 SecurityContextHolder.clearContext();
 
             } catch (UnsupportedJwtException e) {
                 // ✅ 不支持的Token类型
                 log.warn("不支持的JWT类型: uri={}, ip={}, error={}",
-                    requestUri, clientIp, e.getMessage());
+                    requestUri, LogMaskUtil.maskIp(clientIp), e.getMessage());
                 SecurityContextHolder.clearContext();
 
             } catch (IllegalArgumentException e) {
                 // ✅ Token为空或null
                 log.warn("JWT参数非法: uri={}, ip={}, error={}",
-                    requestUri, clientIp, e.getMessage());
+                    requestUri, LogMaskUtil.maskIp(clientIp), e.getMessage());
                 SecurityContextHolder.clearContext();
 
             } catch (Exception e) {
                 // ✅ 未知错误 (ERROR级别,需要关注)
                 log.error("❌ JWT验证未知错误: uri={}, ip={}, error={}",
-                    requestUri, clientIp, e.getMessage(), e);
+                    requestUri, LogMaskUtil.maskIp(clientIp), e.getMessage(), e);
                 SecurityContextHolder.clearContext();
             }
         }

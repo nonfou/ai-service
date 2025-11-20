@@ -8,6 +8,7 @@ import com.nonfou.github.dto.response.LoginResponse;
 import com.nonfou.github.entity.User;
 import com.nonfou.github.mapper.UserMapper;
 import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.LogMaskUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -50,7 +51,7 @@ public class AuthService {
         emailService.sendVerifyCode(email, code);
         verifyCodeService.persistCode(email, code);
 
-        log.info("验证码已发送: {}", email);
+        log.info("验证码已发送: {}", LogMaskUtil.maskEmail(email));
     }
 
     /**
@@ -62,7 +63,7 @@ public class AuthService {
         String code = request.getCode();
 
         if (!verifyCodeService.verifyCode(email, code)) {
-            log.warn("验证码校验失败: email={}", email);
+            log.warn("验证码校验失败: email={}", LogMaskUtil.maskEmail(email));
             throw new RuntimeException("验证码错误或已过期");
         }
 
@@ -71,19 +72,19 @@ public class AuthService {
 
         // 如果用户不存在，则注册
         if (user == null) {
-            log.info("用户不存在，开始自动注册: {}", email);
+            log.info("用户不存在，开始自动注册: {}", LogMaskUtil.maskEmail(email));
             user = registerUser(email);
         }
 
         // 检查用户状态
         if (user.getStatus() == 0) {
-            log.warn("账户已被禁用: {}", email);
+            log.warn("账户已被禁用: {}", LogMaskUtil.maskEmail(email));
             throw new RuntimeException("账户已被禁用");
         }
 
         // 生成 JWT Token (USER 角色)
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), "USER");
-        log.info("用户登录成功: userId={}, email={}, role=USER", user.getId(), email);
+        log.info("用户登录成功: userId={}, email={}, role=USER", user.getId(), LogMaskUtil.maskEmail(email));
 
         // 构建响应
         return LoginResponse.builder()
@@ -117,7 +118,7 @@ public class AuthService {
         user.setUpdatedAt(LocalDateTime.now());
 
         userMapper.insert(user);
-        log.info("新用户注册成功: {}", email);
+        log.info("新用户注册成功: {}", LogMaskUtil.maskEmail(email));
 
         return user;
     }

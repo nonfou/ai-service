@@ -3,6 +3,7 @@ package com.nonfou.github.interceptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonfou.github.common.Result;
 import com.nonfou.github.config.AdminSecurityConfig;
+import com.nonfou.github.util.LogMaskUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -41,8 +42,23 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
         // 获取客户端IP
         String clientIp = getClientIp(request);
 
+        // 1. IP白名单检查
+        if (adminSecurityConfig.isEnableIpWhitelist() && !isIpAllowed(clientIp)) {
+            log.warn("⚠️ 管理后台访问被拒绝(IP不在白名单): IP={}, URI={}", LogMaskUtil.maskIp(clientIp), requestURI);
+            sendErrorResponse(response, "访问被拒绝: IP地址不在白名单中");
+            return false;
+        }
+
+        // 2. 请求频率限制检查
+        if (adminSecurityConfig.isEnableRateLimit() && !checkRateLimit(clientIp)) {
+            log.warn("⚠️ 管理后台访问被限流: IP={}, URI={}, 限制={}/分钟",
+                LogMaskUtil.maskIp(clientIp), requestURI, adminSecurityConfig.getRateLimit());
+            sendErrorResponse(response, "请求过于频繁,请稍后再试");
+            return false;
+        }
+
         // 记录访问日志(便于安全审计)
-        log.info("管理后台访问: IP={}, URI={}, Method={}", clientIp, requestURI, request.getMethod());
+        log.info("管理后台访问: IP={}, URI={}, Method={}", LogMaskUtil.maskIp(clientIp), requestURI, request.getMethod());
 
         return true;
     }

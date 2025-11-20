@@ -7,6 +7,7 @@ import com.nonfou.github.entity.User;
 import com.nonfou.github.mapper.AdminMapper;
 import com.nonfou.github.mapper.UserMapper;
 import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.LogMaskUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -93,7 +94,7 @@ public class AdminService {
         result.put("username", admin.getUsername());
         result.put("role", admin.getRole());
 
-        log.info("管理员登录成功: username={}", username);
+        log.info("管理员登录成功: username={}", LogMaskUtil.mask(username, 2, 1));
 
         return result;
     }
@@ -118,7 +119,7 @@ public class AdminService {
         // 超过最大次数,锁定账号
         if (failCount >= adminSecurityConfig.getMaxLoginAttempts()) {
             redisTemplate.opsForValue().set(lockKey, "1", adminSecurityConfig.getLockDuration(), TimeUnit.MINUTES);
-            log.warn("管理员账号已锁定: username={}, 失败次数={}", username, failCount);
+            log.warn("管理员账号已锁定: username={}, 失败次数={}", LogMaskUtil.mask(username, 2, 1), failCount);
         }
     }
 
@@ -255,7 +256,7 @@ public class AdminService {
         result.put("passwordHash", hash);
         result.put("hashLength", hash.length());
 
-        log.info("管理员密码已重置: username={}, hashLength={}", username, hash.length());
+        log.info("管理员密码已重置: username={}, hashLength={}", LogMaskUtil.mask(username, 2, 1), hash.length());
 
         return result;
     }
