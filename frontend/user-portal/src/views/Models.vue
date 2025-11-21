@@ -42,10 +42,18 @@
           :key="model.id"
           class="featured-card"
         >
-          <div class="featured-badge">精选</div>
-          <div class="featured-icon">
-            <img v-if="model.icon" :src="model.icon" :alt="model.provider" />
-            <div v-else class="icon-placeholder">{{ model.provider.charAt(0) }}</div>
+          <div class="featured-tags-top" v-if="model.tags && model.tags.length > 0">
+            <el-tag
+              v-for="tag in model.tags.slice(0, 2)"
+              :key="tag"
+              size="small"
+              class="tag-item"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+          <div class="featured-header">
+            <span class="provider-badge">{{ model.provider }}</span>
           </div>
           <h3 class="featured-title">{{ model.displayName }}</h3>
           <p class="featured-model-name">{{ model.modelName }}</p>
@@ -64,24 +72,6 @@
               <span class="spec-icon">💰</span>
               <span class="spec-text">{{ model.priceMultiplier }}x 倍率</span>
             </div>
-          </div>
-
-          <div class="featured-capabilities" v-if="model.capabilities && model.capabilities.length > 0">
-            <el-tag
-              v-for="cap in model.capabilities.slice(0, 3)"
-              :key="cap"
-              size="small"
-              class="capability-tag"
-            >
-              {{ formatCapability(cap) }}
-            </el-tag>
-          </div>
-
-          <div class="featured-footer">
-            <span class="provider-label">{{ model.provider }}</span>
-            <el-tag :type="model.status === 1 ? 'success' : 'danger'" size="small">
-              {{ model.status === 1 ? '可用' : '不可用' }}
-            </el-tag>
           </div>
         </div>
       </div>
@@ -128,9 +118,16 @@
                 <h3 class="model-title">{{ model.displayName }}</h3>
                 <p class="model-name">{{ model.modelName }}</p>
               </div>
-              <el-tag :type="model.status === 1 ? 'success' : 'danger'" size="small">
-                {{ model.status === 1 ? '可用' : '不可用' }}
-              </el-tag>
+              <div class="model-tags-header" v-if="model.tags && model.tags.length > 0">
+                <el-tag
+                  v-for="tag in model.tags.slice(0, 2)"
+                  :key="tag"
+                  size="small"
+                  class="tag-item"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
             </div>
 
             <p class="model-description">
@@ -150,17 +147,6 @@
                 <span class="spec-label">计费倍率：</span>
                 <span class="spec-value">{{ model.priceMultiplier }}x</span>
               </div>
-            </div>
-
-            <div class="model-capabilities" v-if="model.capabilities && model.capabilities.length > 0">
-              <el-tag
-                v-for="cap in model.capabilities"
-                :key="cap"
-                size="small"
-                class="capability-tag"
-              >
-                {{ formatCapability(cap) }}
-              </el-tag>
             </div>
           </div>
         </div>
@@ -195,7 +181,7 @@ const mockModels: Model[] = [
     description: '最新的GPT-4模型，更快的响应速度，128K上下文窗口，支持视觉理解和函数调用',
     contextLength: 128000,
     speed: 'fast',
-    capabilities: ['vision', 'function-calling', 'json-mode']
+    tags: ['推荐', '视觉理解', '函数调用']
   },
   {
     id: 2,
@@ -207,7 +193,7 @@ const mockModels: Model[] = [
     description: 'OpenAI最强大的模型，适合复杂推理和创作任务',
     contextLength: 8192,
     speed: 'medium',
-    capabilities: ['function-calling', 'json-mode']
+    tags: ['强大', '复杂推理']
   },
   {
     id: 3,
@@ -219,7 +205,7 @@ const mockModels: Model[] = [
     description: '性价比极高的模型，适合大多数日常应用场景',
     contextLength: 16385,
     speed: 'fast',
-    capabilities: ['function-calling', 'streaming']
+    tags: ['低价', '高性价比']
   },
   {
     id: 4,
@@ -231,7 +217,7 @@ const mockModels: Model[] = [
     description: 'Anthropic最强大的模型，擅长复杂分析和创意写作，200K上下文',
     contextLength: 200000,
     speed: 'medium',
-    capabilities: ['long-context', 'vision', 'multilingual']
+    tags: ['长上下文', '视觉理解', '多语言']
   },
   {
     id: 5,
@@ -243,7 +229,7 @@ const mockModels: Model[] = [
     description: '平衡性能和成本的优秀选择，适合企业级应用',
     contextLength: 200000,
     speed: 'fast',
-    capabilities: ['long-context', 'vision', 'multilingual']
+    tags: ['长上下文', '视觉理解', '多语言']
   },
   {
     id: 6,
@@ -255,7 +241,7 @@ const mockModels: Model[] = [
     description: '最快速的Claude模型，适合高并发场景',
     contextLength: 200000,
     speed: 'fast',
-    capabilities: ['long-context', 'multilingual']
+    tags: ['低价', '快速', '高并发']
   },
   {
     id: 7,
@@ -267,7 +253,7 @@ const mockModels: Model[] = [
     description: 'Google先进的多模态AI模型，支持文本和图像理解',
     contextLength: 32768,
     speed: 'fast',
-    capabilities: ['vision', 'code', 'multilingual']
+    tags: ['视觉理解', '代码生成', '多语言']
   },
   {
     id: 8,
@@ -279,7 +265,7 @@ const mockModels: Model[] = [
     description: '专为视觉理解优化的Gemini模型',
     contextLength: 16384,
     speed: 'medium',
-    capabilities: ['vision', 'multilingual']
+    tags: ['视觉理解', '图像分析']
   },
   {
     id: 9,
@@ -291,7 +277,7 @@ const mockModels: Model[] = [
     description: 'Meta开源的大语言模型，性能强劲且成本低廉',
     contextLength: 8192,
     speed: 'fast',
-    capabilities: ['code', 'multilingual', 'streaming']
+    tags: ['开源', '代码生成', '多语言']
   },
   {
     id: 10,
@@ -303,7 +289,7 @@ const mockModels: Model[] = [
     description: '轻量级的Llama模型，适合资源受限场景',
     contextLength: 8192,
     speed: 'fast',
-    capabilities: ['code', 'streaming']
+    tags: ['低价', '轻量级']
   },
   {
     id: 11,
@@ -315,7 +301,7 @@ const mockModels: Model[] = [
     description: 'Mistral AI的旗舰模型，多语言能力出色',
     contextLength: 32768,
     speed: 'fast',
-    capabilities: ['multilingual', 'code', 'function-calling']
+    tags: ['多语言', '代码生成', '函数调用']
   },
   {
     id: 12,
@@ -327,7 +313,7 @@ const mockModels: Model[] = [
     description: '性价比优秀的中等规模模型',
     contextLength: 32768,
     speed: 'fast',
-    capabilities: ['multilingual', 'code']
+    tags: ['性价比', '多语言']
   }
 ]
 
@@ -336,15 +322,9 @@ const loadModels = async () => {
   try {
     const res = await modelsAPI.getModels()
     models.value = res.data
-
-    // 如果后端返回空数据，使用 mock 数据
-    if (models.value.length === 0) {
-      models.value = mockModels
-    }
   } catch (error: any) {
-    // 如果 API 失败，使用 mock 数据
-    console.warn('API 调用失败，使用 Mock 数据', error)
-    models.value = mockModels
+    console.error('加载模型列表失败', error)
+    ElMessage.error('加载模型列表失败')
   }
 }
 
@@ -399,19 +379,6 @@ const formatSpeed = (speed: string) => {
   return speedMap[speed] || speed
 }
 
-// 格式化能力标签
-const formatCapability = (cap: string) => {
-  const capMap: Record<string, string> = {
-    'vision': '视觉理解',
-    'function-calling': '函数调用',
-    'streaming': '流式输出',
-    'json-mode': 'JSON模式',
-    'code': '代码生成',
-    'multilingual': '多语言',
-    'long-context': '长上下文'
-  }
-  return capMap[cap] || cap
-}
 
 onMounted(() => {
   loadModels()
@@ -582,46 +549,28 @@ onMounted(() => {
   opacity: 1;
 }
 
-.featured-badge {
+.featured-tags-top {
+  position: absolute;
+  top: 2rem;
+  right: 2rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
+.featured-header {
+  margin-bottom: 1.5rem;
+}
+
+.provider-badge {
   display: inline-block;
-  background: linear-gradient(135deg, #7c3aed, #2563eb);
-  color: white;
-  padding: 0.35rem 0.9rem;
-  border-radius: 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.featured-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f7f9ff, #f1f0ff);
-  border-radius: 1rem;
-  overflow: hidden;
-}
-
-.featured-icon img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-}
-
-.icon-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  font-weight: 700;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(37, 99, 235, 0.1));
   color: #7c3aed;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid rgba(124, 58, 237, 0.2);
 }
 
 .featured-title {
@@ -668,33 +617,11 @@ onMounted(() => {
   font-size: 1rem;
 }
 
-.featured-capabilities {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  min-height: 2rem;
-}
-
-.capability-tag {
-  background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
-  border: none;
+.tag-item {
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: #2563eb !important;
+  border: none !important;
   font-weight: 500;
-}
-
-.featured-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(226, 232, 240, 0.7);
-}
-
-.provider-label {
-  font-size: 0.9rem;
-  color: #64748b;
-  font-weight: 600;
 }
 
 /* ==================== 提供商分组 ==================== */
@@ -770,6 +697,13 @@ onMounted(() => {
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.model-tags-header {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .model-icon {
@@ -858,12 +792,6 @@ onMounted(() => {
 .spec-value {
   color: #1e293b;
   font-weight: 600;
-}
-
-.model-capabilities {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
 }
 
 /* ==================== 空状态 ==================== */

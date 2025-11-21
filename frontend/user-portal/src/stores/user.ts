@@ -59,6 +59,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout() {
+    // 先清理前端状态
     isLoggedIn.value = false
     userInfo.value = null
     localStorage.removeItem('userInfo')
@@ -67,9 +68,15 @@ export const useUserStore = defineStore('user', () => {
     // ✅ 调用后端API清除HttpOnly Cookie
     try {
       await request.post('/api/auth/logout')
-    } catch (error) {
-      console.error('Logout API failed:', error)
-      // 即使API调用失败,也继续执行前端登出逻辑
+      console.log('Logout successful, Cookie cleared')
+    } catch (error: any) {
+      // 即使API调用失败,前端状态已清理,认为登出成功
+      console.warn('Logout API failed, but local state cleared:', error)
+
+      // 如果是403错误,可能是CSRF问题(虽然现在已修复)
+      if (error.response?.status === 403) {
+        console.error('CSRF validation failed for logout - this should not happen after fix')
+      }
     }
   }
 

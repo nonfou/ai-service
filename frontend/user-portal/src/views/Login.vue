@@ -117,7 +117,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Message, Lock } from '@element-plus/icons-vue'
@@ -125,7 +125,11 @@ import { authAPI } from '../api'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
+
+// 获取重定向目标
+const redirectPath = ref(route.query.redirect as string || '/dashboard')
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const countdown = ref(0)
@@ -218,7 +222,8 @@ const handleLogin = async () => {
       userStore.isLoggedIn = true
 
       ElMessage.success('登录成功')
-      router.push('/dashboard')
+      // 跳转到重定向目标或默认控制台
+      router.push(redirectPath.value)
     } catch (error: any) {
       // 提取后端错误信息
       // error.response.data 是后端返回的 Result 对象: { code, message, data }

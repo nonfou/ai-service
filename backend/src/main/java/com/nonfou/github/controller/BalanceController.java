@@ -5,7 +5,7 @@ import com.nonfou.github.common.Result;
 import com.nonfou.github.entity.BalanceLog;
 import com.nonfou.github.service.BalanceLogService;
 import com.nonfou.github.service.BalanceService;
-import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -28,15 +28,12 @@ public class BalanceController {
     @Autowired
     private BalanceLogService balanceLogService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     /**
      * 获取用户余额
      */
     @GetMapping
-    public Result<Map<String, Object>> getUserBalance(@RequestHeader("Authorization") String authorization) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<Map<String, Object>> getUserBalance() {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -54,10 +51,9 @@ public class BalanceController {
      */
     @GetMapping("/logs")
     public Result<Page<BalanceLog>> getBalanceLogs(
-            @RequestHeader("Authorization") String authorization,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -70,9 +66,8 @@ public class BalanceController {
      * 获取余额统计
      */
     @GetMapping("/statistics")
-    public Result<Map<String, BigDecimal>> getBalanceStatistics(
-            @RequestHeader("Authorization") String authorization) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<Map<String, BigDecimal>> getBalanceStatistics() {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -81,19 +76,4 @@ public class BalanceController {
         return Result.success(stats);
     }
 
-    private Long getUserIdFromToken(String authorization) {
-        if (authorization == null || authorization.isEmpty()) {
-            return null;
-        }
-
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-
-        if (!jwtUtil.validateToken(token)) {
-            return null;
-        }
-
-        return jwtUtil.getUserIdFromToken(token);
-    }
 }

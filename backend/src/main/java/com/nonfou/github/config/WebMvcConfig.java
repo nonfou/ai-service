@@ -30,6 +30,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/csrf-token",   // CSRF Token获取接口不需要验证
                         "/api/auth/status",       // 状态检查接口不需要验证(GET请求)
                         "/api/auth/test",         // 测试接口不需要验证
+                        "/api/auth/logout",       // 登出接口不需要CSRF Token(已通过Cookie验证身份)
                         "/api/admin/login"        // 管理后台登录接口不需要验证
                 );
 

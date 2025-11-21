@@ -33,7 +33,7 @@ spring:
     host: ${MAIL_HOST:smtp.exmail.qq.com}
     port: ${MAIL_PORT:465}
     username: ${MAIL_USERNAME:support@xcoder.plus}
-    password: ${MAIL_PASSWORD:}  # ⚠️ 请设置环境变量 MAIL_PASSWORD
+    password: ${MAIL_PASSWORD:od8vgwT878ny7ebn}  # ⚠️ 请设置环境变量 MAIL_PASSWORD
     properties:
       mail:
         smtp:

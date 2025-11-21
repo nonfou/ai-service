@@ -5,7 +5,7 @@ import com.nonfou.github.common.Result;
 import com.nonfou.github.entity.Ticket;
 import com.nonfou.github.entity.TicketMessage;
 import com.nonfou.github.service.TicketService;
-import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -25,17 +25,13 @@ public class TicketController {
     @Autowired
     private TicketService ticketService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     /**
      * 创建工单
      */
     @PostMapping
     public Result<Ticket> createTicket(
-            @RequestHeader("Authorization") String authorization,
             @RequestBody Map<String, String> body) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -62,10 +58,9 @@ public class TicketController {
      */
     @GetMapping
     public Result<Page<Ticket>> getTickets(
-            @RequestHeader("Authorization") String authorization,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -79,9 +74,8 @@ public class TicketController {
      */
     @GetMapping("/{ticketId}")
     public Result<Map<String, Object>> getTicketDetail(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long ticketId) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -105,10 +99,9 @@ public class TicketController {
      */
     @PostMapping("/{ticketId}/reply")
     public Result<TicketMessage> replyTicket(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long ticketId,
             @RequestBody Map<String, String> body) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -132,9 +125,8 @@ public class TicketController {
      */
     @PostMapping("/{ticketId}/close")
     public Result<Void> closeTicket(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long ticketId) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -148,19 +140,4 @@ public class TicketController {
         }
     }
 
-    private Long getUserIdFromToken(String authorization) {
-        if (authorization == null || authorization.isEmpty()) {
-            return null;
-        }
-
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-
-        if (!jwtUtil.validateToken(token)) {
-            return null;
-        }
-
-        return jwtUtil.getUserIdFromToken(token);
-    }
 }

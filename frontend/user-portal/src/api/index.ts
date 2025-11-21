@@ -154,7 +154,7 @@ export interface Model {
   icon?: string  // 模型图标URL
   contextLength?: number  // 上下文长度
   speed?: string  // 速度等级：fast, medium, slow
-  capabilities?: string[]  // 能力标签数组，如 ['vision', 'function-calling', 'streaming']
+  tags?: string[]  // 模型标签数组，如 ['推荐', '低价', '新品']
 }
 
 // ==================== 用户相关类型 ====================

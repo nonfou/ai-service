@@ -7,7 +7,7 @@ import com.nonfou.github.entity.RechargeOrder;
 import com.nonfou.github.service.AlipayService;
 import com.nonfou.github.service.RechargeOrderService;
 import com.nonfou.github.service.WechatPayService;
-import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -35,17 +35,13 @@ public class RechargeController {
     @Autowired(required = false)
     private WechatPayService wechatPayService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     /**
      * 创建充值订单并发起支付
      */
     @PostMapping("/create")
     public Result<PaymentResponse> createOrder(
-            @RequestHeader("Authorization") String authorization,
             @RequestBody Map<String, Object> body) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -197,9 +193,8 @@ public class RechargeController {
      */
     @GetMapping("/query/{orderId}")
     public Result<RechargeOrder> queryOrder(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long orderId) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -223,10 +218,9 @@ public class RechargeController {
      */
     @GetMapping("/orders")
     public Result<Page<RechargeOrder>> getUserOrders(
-            @RequestHeader("Authorization") String authorization,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -240,9 +234,8 @@ public class RechargeController {
      */
     @GetMapping("/orders/{orderId}")
     public Result<RechargeOrder> getOrderById(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long orderId) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -255,19 +248,4 @@ public class RechargeController {
         return Result.success(order);
     }
 
-    private Long getUserIdFromToken(String authorization) {
-        if (authorization == null || authorization.isEmpty()) {
-            return null;
-        }
-
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-
-        if (!jwtUtil.validateToken(token)) {
-            return null;
-        }
-
-        return jwtUtil.getUserIdFromToken(token);
-    }
 }

@@ -13,7 +13,7 @@ const router = createRouter({
           path: '',
           name: 'Home',
           component: () => import('../views/Home.vue'),
-          meta: { requiresAuth: true }
+          meta: { requiresAuth: false }  // 首页无需登录
         },
         {
           path: 'getting-started',
@@ -103,11 +103,16 @@ router.beforeEach(async (to, from, next) => {
 
   // ✅ 首次加载或刷新页面时,检查登录状态
   // from.name === undefined 表示是首次进入应用或刷新页面
+  // 但不阻塞导航,即使检查失败也允许访问公开页面
   if (from.name === undefined && !userStore.isLoggedIn) {
-    await userStore.checkLoginStatus()
+    try {
+      await userStore.checkLoginStatus()
+    } catch (error) {
+      console.warn('Login status check failed, continuing with public access:', error)
+    }
   }
 
-  // 已登录用户访问登录页,重定向到首页
+  // 已登录用户访问登录页,重定向到控制台
   if (to.path === '/login' && userStore.isLoggedIn) {
     next('/dashboard')
     return
@@ -115,7 +120,8 @@ router.beforeEach(async (to, from, next) => {
 
   // 需要认证的路由,检查登录状态
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {
-    next('/login')
+    // 保存原始目标路径,登录后可跳转回来
+    next(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
     return
   }
 

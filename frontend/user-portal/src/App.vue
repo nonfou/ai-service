@@ -12,12 +12,12 @@ import axios from 'axios'
  */
 onMounted(async () => {
   try {
-    const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
-    const res = await axios.get(`${baseURL}/auth/csrf-token`, {
+    const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+    const res = await axios.get(`${baseURL}/api/auth/csrf-token`, {
       withCredentials: true
     })
 
-    if (res.data && res.data.csrfToken) {
+    if (res.data && res.data.data && res.data.data.csrfToken) {
       // 将CSRF Token存储到meta标签中,供request拦截器使用
       let meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement
 
@@ -27,7 +27,7 @@ onMounted(async () => {
         document.head.appendChild(meta)
       }
 
-      meta.setAttribute('content', res.data.csrfToken)
+      meta.setAttribute('content', res.data.data.csrfToken)
       console.log('CSRF Token loaded successfully')
     }
   } catch (error) {

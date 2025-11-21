@@ -1,3 +1,26 @@
+<script setup lang="ts">
+import { useUserStore } from '../stores/user'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+const userStore = useUserStore()
+const router = useRouter()
+
+// 根据登录状态决定"立即开始"按钮的行为
+const handleGetStarted = () => {
+  if (userStore.isLoggedIn) {
+    router.push('/subscriptions')
+  } else {
+    router.push('/login?redirect=/subscriptions')
+  }
+}
+
+// 计算按钮文本
+const ctaButtonText = computed(() => {
+  return userStore.isLoggedIn ? '前往控制台' : '立即开始'
+})
+</script>
+
 <template>
   <div class="home-page">
     <!-- Hero -->
@@ -11,10 +34,10 @@
             专为开发者打造的 AI 能力平台。统一调度 GPT‑5、Claude、Gemini 等主流模型，无缝集成 IDE、终端与 CI/CD，让 AI 真正赋能开发全流程。
           </p>
           <div class="hero-actions">
-            <router-link to="/subscriptions" class="btn btn-primary">
-              立即开始
+            <button @click="handleGetStarted" class="btn btn-primary">
+              {{ ctaButtonText }}
               <span class="btn-icon">→</span>
-            </router-link>
+            </button>
           </div>
           <div class="hero-stats">
             <div class="stat-card">
@@ -157,7 +180,7 @@
         <h2>开启你的 AI 开发之旅</h2>
         <p>立即开始构建你的 AI 应用，体验强大的模型能力。</p>
         <div class="cta-actions">
-          <router-link to="/subscriptions" class="btn btn-contrast">立即试用</router-link>
+          <button @click="handleGetStarted" class="btn btn-contrast">{{ ctaButtonText }}</button>
         </div>
       </div>
     </section>
@@ -266,6 +289,10 @@
   font-weight: 600;
   letter-spacing: 0.01em;
   transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  text-decoration: none;
 }
 
 .btn-primary {

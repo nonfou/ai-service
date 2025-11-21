@@ -4,7 +4,7 @@ import com.nonfou.github.common.Result;
 import com.nonfou.github.dto.request.CreateApiKeyRequest;
 import com.nonfou.github.dto.response.ApiKeyResponse;
 import com.nonfou.github.service.ApiKeyService;
-import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -24,15 +24,12 @@ public class ApiKeyController {
     @Autowired
     private ApiKeyService apiKeyService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     /**
      * 获取用户所有API密钥
      */
     @GetMapping
-    public Result<List<ApiKeyResponse>> getUserApiKeys(@RequestHeader("Authorization") String authorization) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<List<ApiKeyResponse>> getUserApiKeys() {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -45,10 +42,8 @@ public class ApiKeyController {
      * 创建API密钥
      */
     @PostMapping
-    public Result<ApiKeyResponse> createApiKey(
-            @RequestHeader("Authorization") String authorization,
-            @Valid @RequestBody CreateApiKeyRequest request) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<ApiKeyResponse> createApiKey(@Valid @RequestBody CreateApiKeyRequest request) {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -67,10 +62,9 @@ public class ApiKeyController {
      */
     @PutMapping("/{keyId}")
     public Result<Void> updateApiKeyStatus(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long keyId,
             @RequestBody Map<String, Integer> body) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -93,10 +87,8 @@ public class ApiKeyController {
      * 删除API密钥
      */
     @DeleteMapping("/{keyId}")
-    public Result<Void> deleteApiKey(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable Long keyId) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<Void> deleteApiKey(@PathVariable Long keyId) {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -114,10 +106,8 @@ public class ApiKeyController {
      * 重新生成API密钥
      */
     @PostMapping("/{keyId}/regenerate")
-    public Result<ApiKeyResponse> regenerateApiKey(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable Long keyId) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<ApiKeyResponse> regenerateApiKey(@PathVariable Long keyId) {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -129,24 +119,5 @@ public class ApiKeyController {
             log.error("重新生成API密钥失败", e);
             return Result.error(e.getMessage());
         }
-    }
-
-    /**
-     * 从Authorization头提取用户ID
-     */
-    private Long getUserIdFromToken(String authorization) {
-        if (authorization == null || authorization.isEmpty()) {
-            return null;
-        }
-
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-
-        if (!jwtUtil.validateToken(token)) {
-            return null;
-        }
-
-        return jwtUtil.getUserIdFromToken(token);
     }
 }

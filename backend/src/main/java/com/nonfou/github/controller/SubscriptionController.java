@@ -5,7 +5,7 @@ import com.nonfou.github.common.Result;
 import com.nonfou.github.entity.Subscription;
 import com.nonfou.github.entity.SubscriptionPlan;
 import com.nonfou.github.service.SubscriptionService;
-import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -24,9 +24,6 @@ public class SubscriptionController {
     @Autowired
     private SubscriptionService subscriptionService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     /**
      * 获取所有可用套餐
      */
@@ -41,9 +38,8 @@ public class SubscriptionController {
      */
     @PostMapping("/subscribe")
     public Result<Subscription> subscribe(
-            @RequestHeader("Authorization") String authorization,
             @RequestBody Map<String, Long> body) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -67,10 +63,9 @@ public class SubscriptionController {
      */
     @GetMapping("/history")
     public Result<Page<Subscription>> getSubscriptionHistory(
-            @RequestHeader("Authorization") String authorization,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -84,9 +79,8 @@ public class SubscriptionController {
      */
     @PostMapping("/{subscriptionId}/cancel")
     public Result<Void> cancelSubscription(
-            @RequestHeader("Authorization") String authorization,
             @PathVariable Long subscriptionId) {
-        Long userId = getUserIdFromToken(authorization);
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -100,19 +94,4 @@ public class SubscriptionController {
         }
     }
 
-    private Long getUserIdFromToken(String authorization) {
-        if (authorization == null || authorization.isEmpty()) {
-            return null;
-        }
-
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-
-        if (!jwtUtil.validateToken(token)) {
-            return null;
-        }
-
-        return jwtUtil.getUserIdFromToken(token);
-    }
 }

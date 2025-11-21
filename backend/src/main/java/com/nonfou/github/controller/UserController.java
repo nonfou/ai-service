@@ -4,7 +4,7 @@ import com.nonfou.github.common.Result;
 import com.nonfou.github.entity.User;
 import com.nonfou.github.service.BalanceService;
 import com.nonfou.github.service.SubscriptionService;
-import com.nonfou.github.util.JwtUtil;
+import com.nonfou.github.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +21,6 @@ import java.util.Map;
 public class UserController {
 
     @Autowired
-    private JwtUtil jwtUtil;
-
-    @Autowired
     private BalanceService balanceService;
 
     @Autowired
@@ -33,8 +30,8 @@ public class UserController {
      * 获取用户信息
      */
     @GetMapping("/info")
-    public Result<Map<String, Object>> getUserInfo(@RequestHeader("Authorization") String authorization) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<Map<String, Object>> getUserInfo() {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -59,8 +56,8 @@ public class UserController {
      * 获取用户余额
      */
     @GetMapping("/balance")
-    public Result<Map<String, Object>> getUserBalance(@RequestHeader("Authorization") String authorization) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<Map<String, Object>> getUserBalance() {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -81,8 +78,8 @@ public class UserController {
      * 获取用户统计数据
      */
     @GetMapping("/stats")
-    public Result<Map<String, Object>> getUserStats(@RequestHeader("Authorization") String authorization) {
-        Long userId = getUserIdFromToken(authorization);
+    public Result<Map<String, Object>> getUserStats() {
+        Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
@@ -97,25 +94,6 @@ public class UserController {
         data.put("status", user.getStatus());
 
         return Result.success(data);
-    }
-
-    /**
-     * 从Authorization头提取用户ID
-     */
-    private Long getUserIdFromToken(String authorization) {
-        if (authorization == null || authorization.isEmpty()) {
-            return null;
-        }
-
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-
-        if (!jwtUtil.validateToken(token)) {
-            return null;
-        }
-
-        return jwtUtil.getUserIdFromToken(token);
     }
 
     /**

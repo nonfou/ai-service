@@ -8,18 +8,12 @@
 
       <!-- 导航链接 -->
       <nav class="nav-links">
-        <!-- 未登录时显示 -->
+        <!-- 未登录时不显示需要认证的菜单 -->
         <template v-if="!userStore.isLoggedIn">
-          <router-link to="/models" class="nav-link">模型</router-link>
-          <router-link to="/subscriptions" class="nav-link">订阅套餐</router-link>
-          <router-link to="/api-keys" class="nav-link">API密钥</router-link>
-          <router-link to="/tickets" class="nav-link">工单</router-link>
-          <router-link to="/dashboard" class="nav-link">控制台</router-link>
-          <router-link to="/wallet" class="nav-link">钱包</router-link>
-          <!-- <router-link to="/getting-started" class="nav-link">快速开始</router-link> -->
+          <!-- 未登录时暂不显示任何菜单项,或可以添加公开页面链接 -->
         </template>
 
-        <!-- 登录后显示 -->
+        <!-- 登录后显示完整菜单 -->
         <template v-else>
           <router-link to="/models" class="nav-link">模型</router-link>
           <router-link to="/subscriptions" class="nav-link">订阅套餐</router-link>
