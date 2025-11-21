@@ -65,6 +65,10 @@ auth:
   verify-code:
     hash-secret: ${VERIFY_CODE_SECRET:49lnyc8hm2CSgbpZgg1MJt7GVWBT3k4yzBwgetm+0P0=}  # ⚠️ 生产环境必须使用环境变量
 
+# 加密配置 - 开发环境
+encryption:
+  key: ${ENCRYPTION_KEY:4e7cd6ada76339cccba2d4e4e6874dd9f31e257d00b89c13bfec022a8f352362}  # 32字节(64位hex)AES-256密钥, ⚠️ 生产环境必须使用环境变量
+
 # 管理后台安全配置 - 开发环境
 admin:
   security:
