@@ -58,3 +58,15 @@ admin:
     # 开发环境可以禁用速率限制
     enable-rate-limit: ${ADMIN_ENABLE_RATE_LIMIT:false}
     enable-login-lock: ${ADMIN_ENABLE_LOGIN_LOCK:false}
+
+# Cookie 配置 - 开发环境
+app:
+  cookie:
+    secure: false  # 开发环境使用HTTP,设为false
+
+# Session Cookie 配置 - 开发环境
+spring:
+  servlet:
+    session:
+      cookie:
+        secure: false  # 开发环境使用HTTP,设为false

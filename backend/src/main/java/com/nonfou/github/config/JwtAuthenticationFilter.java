@@ -35,18 +35,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private JwtUtil jwtUtil;
 
+    private static final String AUTH_TOKEN_COOKIE_NAME = "auth_token";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 从请求头获取 Authorization
-        String authHeader = request.getHeader("Authorization");
         String requestUri = request.getRequestURI();
         String clientIp = getClientIp(request);
+        String token = null;
 
-        // 检查是否是 Bearer Token
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7); // 去掉 "Bearer " 前缀
+        // 优先从Cookie中获取Token (HttpOnly Cookie方式)
+        token = extractTokenFromCookie(request);
+
+        // 如果Cookie中没有,再从Authorization header中获取 (向后兼容)
+        if (token == null) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7); // 去掉 "Bearer " 前缀
+            }
+        }
+
+        // 如果找到Token,进行验证
+        if (token != null) {
 
             try {
                 // 验证 Token 是否有效
@@ -121,6 +132,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 继续过滤器链
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 从Cookie中提取Token
+     */
+    private String extractTokenFromCookie(HttpServletRequest request) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (jakarta.servlet.http.Cookie cookie : cookies) {
+                if (AUTH_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 
     /**

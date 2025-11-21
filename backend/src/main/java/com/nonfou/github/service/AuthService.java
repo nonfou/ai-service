@@ -99,7 +99,7 @@ public class AuthService {
     /**
      * 根据邮箱查询用户
      */
-    private User getUserByEmail(String email) {
+    public User getUserByEmail(String email) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getEmail, email);
         return userMapper.selectOne(wrapper);

@@ -54,9 +54,11 @@ public class SecurityConfig {
                 .anyRequest().hasAnyRole("USER", "ADMIN")
             )
 
-            // 禁用 Session(使用 JWT 无状态认证)
+            // Session管理策略
+            // ✅ 改为IF_REQUIRED以支持CSRF Token存储到Session
+            // JWT认证本身仍然是无状态的,Session仅用于CSRF防护
             .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
             )
 
             // 禁用默认登录页面

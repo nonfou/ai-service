@@ -24,12 +24,15 @@ public class WebConfig {
 
     /**
      * 跨域配置
+     *
+     * ✅ setAllowCredentials(true): 允许携带Cookie和认证信息
+     *    这对于HttpOnly Cookie认证是必需的
      */
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOriginPattern("*");
-        config.setAllowCredentials(true);
+        config.setAllowCredentials(true);  // ✅ 允许携带Cookie(HttpOnly Cookie必需)
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         config.setMaxAge(3600L);
