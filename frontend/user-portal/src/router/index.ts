@@ -11,42 +11,50 @@ const router = createRouter({
         {
           path: '',
           name: 'Home',
-          component: () => import('../views/Home.vue')
+          component: () => import('../views/Home.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'getting-started',
           name: 'GettingStarted',
-          component: () => import('../views/GettingStarted.vue')
+          component: () => import('../views/GettingStarted.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'models',
           name: 'Models',
-          component: () => import('../views/Models.vue')
+          component: () => import('../views/Models.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'subscriptions',
           name: 'Subscriptions',
-          component: () => import('../views/Subscriptions.vue')
+          component: () => import('../views/Subscriptions.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'tickets',
           name: 'Tickets',
-          component: () => import('../views/Tickets.vue')
+          component: () => import('../views/Tickets.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'api-keys',
           name: 'ApiKeys',
-          component: () => import('../views/ApiKeys.vue')
+          component: () => import('../views/ApiKeys.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'wallet',
           name: 'Wallet',
-          component: () => import('../views/Wallet.vue')
+          component: () => import('../views/Wallet.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: 'dashboard',
           name: 'Dashboard',
           component: () => import('../views/Dashboard.vue'),
+          meta: { requiresAuth: true },
           children: [
             {
               path: '',
@@ -55,22 +63,26 @@ const router = createRouter({
             {
               path: 'overview',
               name: 'Overview',
-              component: () => import('../views/dashboard/Overview.vue')
+              component: () => import('../views/dashboard/Overview.vue'),
+              meta: { requiresAuth: true }
             },
             {
               path: 'api-key',
               name: 'ApiKey',
-              component: () => import('../views/dashboard/ApiKey.vue')
+              component: () => import('../views/dashboard/ApiKey.vue'),
+              meta: { requiresAuth: true }
             },
             {
               path: 'usage',
               name: 'Usage',
-              component: () => import('../views/dashboard/Usage.vue')
+              component: () => import('../views/dashboard/Usage.vue'),
+              meta: { requiresAuth: true }
             },
             {
               path: 'logs',
               name: 'Logs',
-              component: () => import('../views/dashboard/Logs.vue')
+              component: () => import('../views/dashboard/Logs.vue'),
+              meta: { requiresAuth: true }
             }
           ]
         }
@@ -84,19 +96,18 @@ const router = createRouter({
   ]
 })
 
-// 路由守卫（兼容 token 或 本地缓存的 userInfo）
+// 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  const userInfo = localStorage.getItem('userInfo')
 
-  // 如果已登录（token 或 userInfo 存在），访问 /login 时重定向到 dashboard
-  if (to.path === '/login' && (token || userInfo)) {
+  // 已登录用户访问登录页,重定向到首页
+  if (to.path === '/login' && token) {
     next('/dashboard')
     return
   }
 
-  // 需要鉴权的路由：要求 token 或 已存在 userInfo
-  if (to.meta.requiresAuth && !(token || userInfo)) {
+  // 需要认证的路由,检查token是否存在
+  if (to.meta.requiresAuth && !token) {
     next('/login')
     return
   }
