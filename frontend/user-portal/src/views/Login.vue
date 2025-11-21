@@ -196,12 +196,15 @@ const handleLogin = async () => {
       const data = res.data
 
       // 验证必需字段
-      if (!data.token || !data.userId || !data.email) {
+      // ❌ 删除: if (!data.token || ...) - token不再在响应中返回
+      if (!data.userId || !data.email) {
         console.error('登录响应数据:', data)
         throw new Error('登录响应数据不完整')
       }
 
-      userStore.setToken(data.token)
+      // ❌ 删除: userStore.setToken(data.token)
+      // ✅ 后端通过 Set-Cookie 设置 HttpOnly Cookie
+
       // 设置用户信息,包含所有后端返回的字段
       userStore.setUserInfo({
         userId: data.userId,
@@ -210,6 +213,9 @@ const handleLogin = async () => {
         // apiKey: data.apiKey,  // ❌ 已删除 - 不再在前端存储API密钥
         balance: data.balance
       })
+
+      // ✅ 更新登录状态
+      userStore.isLoggedIn = true
 
       ElMessage.success('登录成功')
       router.push('/dashboard')

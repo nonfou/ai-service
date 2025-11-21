@@ -4,16 +4,40 @@ import router from '../router'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 15000
+  timeout: 15000,
+  withCredentials: true  // ✅ 允许携带Cookie (HttpOnly)
 })
+
+/**
+ * 从 Cookie 中获取指定名称的值
+ * @param name Cookie名称
+ * @returns Cookie值,如果不存在返回null
+ */
+function getCookie(name: string): string | null {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift() || null
+  }
+  return null
+}
 
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    // ✅ Token现在通过HttpOnly Cookie自动携带,无需手动添加
+    // ❌ 删除: const token = localStorage.getItem('token')
+    // ❌ 删除: config.headers.Authorization = `Bearer ${token}`
+
+    // ✅ 添加CSRF Token保护
+    const csrfToken =
+      document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+      getCookie('XSRF-TOKEN')
+
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken
     }
+
     return config
   },
   (error) => {
@@ -35,7 +59,8 @@ request.interceptors.response.use(
       switch (status) {
         case 401:
           ElMessage.error('登录已过期,请重新登录')
-          localStorage.removeItem('token')
+          // ❌ 删除: localStorage.removeItem('token')
+          // ✅ Cookie会被后端自动清除
           router.push('/login')
           break
         case 403:

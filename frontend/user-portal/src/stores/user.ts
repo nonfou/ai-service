@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserInfo } from '../api'
- 
+import request from '../utils/request'
+
 // 从 localStorage 读取 userInfo 的辅助函数
 function loadUserInfo(): UserInfo | null {
   try {
@@ -11,20 +12,43 @@ function loadUserInfo(): UserInfo | null {
     return null
   }
 }
- 
+
 export const useUserStore = defineStore('user', () => {
-  const token = ref<string>(localStorage.getItem('token') || '')
+  // ❌ 删除: const token = ref<string>(localStorage.getItem('token') || '')
+  // ✅ Token现在存储在HttpOnly Cookie中,前端无法访问
+
+  // ✅ 改为直接使用 ref,初始值为 false
+  const isLoggedIn = ref<boolean>(false)
   const userInfo = ref<UserInfo | null>(loadUserInfo())
+
   // 兼容部分组件使用的名称：user
   const user = computed(() => userInfo.value)
- 
-  const isLoggedIn = computed(() => !!token.value)
- 
-  function setToken(newToken: string) {
-    token.value = newToken
-    localStorage.setItem('token', newToken)
+
+  // ❌ 删除 setToken 函数,不再需要
+  // function setToken(newToken: string) { ... }
+
+  /**
+   * 检查当前登录状态
+   * 通过调用后端API,验证HttpOnly Cookie中的token是否有效
+   */
+  async function checkLoginStatus() {
+    try {
+      const res = await request.get<any, { data: { isLoggedIn: boolean, userInfo?: UserInfo } }>('/api/auth/status')
+      isLoggedIn.value = res.data.isLoggedIn || false
+
+      if (res.data.userInfo) {
+        setUserInfo(res.data.userInfo)
+      } else if (!res.data.isLoggedIn) {
+        userInfo.value = null
+        localStorage.removeItem('userInfo')
+      }
+    } catch (error) {
+      console.error('Failed to check login status:', error)
+      isLoggedIn.value = false
+      userInfo.value = null
+    }
   }
- 
+
   function setUserInfo(info: UserInfo) {
     userInfo.value = info
     try {
@@ -33,20 +57,29 @@ export const useUserStore = defineStore('user', () => {
       // ignore
     }
   }
- 
-  function logout() {
-    token.value = ''
+
+  async function logout() {
+    isLoggedIn.value = false
     userInfo.value = null
-    localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
+    // ❌ 删除: localStorage.removeItem('token')
+
+    // ✅ 调用后端API清除HttpOnly Cookie
+    try {
+      await request.post('/api/auth/logout')
+    } catch (error) {
+      console.error('Logout API failed:', error)
+      // 即使API调用失败,也继续执行前端登出逻辑
+    }
   }
- 
+
   return {
-    token,
+    // ❌ 删除: token
+    isLoggedIn,
     userInfo,
     user,
-    isLoggedIn,
-    setToken,
+    // ❌ 删除: setToken
+    checkLoginStatus,
     setUserInfo,
     logout
   }

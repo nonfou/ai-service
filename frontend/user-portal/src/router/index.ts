@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '../components/MainLayout.vue'
+import { useUserStore } from '../stores/user'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -96,18 +97,24 @@ const router = createRouter({
   ]
 })
 
-// 路由守卫
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+// 路由守卫 - 改为异步守卫
+router.beforeEach(async (to, from, next) => {
+  const userStore = useUserStore()
+
+  // ✅ 首次加载或刷新页面时,检查登录状态
+  // from.name === undefined 表示是首次进入应用或刷新页面
+  if (from.name === undefined && !userStore.isLoggedIn) {
+    await userStore.checkLoginStatus()
+  }
 
   // 已登录用户访问登录页,重定向到首页
-  if (to.path === '/login' && token) {
+  if (to.path === '/login' && userStore.isLoggedIn) {
     next('/dashboard')
     return
   }
 
-  // 需要认证的路由,检查token是否存在
-  if (to.meta.requiresAuth && !token) {
+  // 需要认证的路由,检查登录状态
+  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
     next('/login')
     return
   }
