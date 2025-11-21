@@ -45,12 +45,25 @@ spring:
           starttls:
             enable: false
             required: false
+  servlet:
+    session:
+          cookie:
+            secure: false  # 开发环境使用HTTP,设为false
 
 # MyBatis Plus 开发环境配置
 mybatis-plus:
   configuration:
     # 开发环境输出 SQL 到控制台
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# JWT 配置 - 开发环境
+jwt:
+  secret: ${JWT_SECRET:yswionRCkQglQbB3AlYOwrJ+eo+pR0FciMC5lWVtxWI=}  # ⚠️ 生产环境必须使用环境变量
+
+# 验证码配置 - 开发环境
+auth:
+  verify-code:
+    hash-secret: ${VERIFY_CODE_SECRET:49lnyc8hm2CSgbpZgg1MJt7GVWBT3k4yzBwgetm+0P0=}  # ⚠️ 生产环境必须使用环境变量
 
 # 管理后台安全配置 - 开发环境
 admin:
@@ -65,8 +78,3 @@ app:
     secure: false  # 开发环境使用HTTP,设为false
 
 # Session Cookie 配置 - 开发环境
-spring:
-  servlet:
-    session:
-      cookie:
-        secure: false  # 开发环境使用HTTP,设为false
