@@ -176,13 +176,28 @@
                         language="json"
                       />
 
-                      <div v-if="!apiKey" class="api-key-reminder">
-                        <el-icon><Warning /></el-icon>
-                        <span>登录后可自动获取 API Key</span>
-                        <el-button type="primary" size="small" @click="$router.push('/login')">
-                          立即登录
-                        </el-button>
-                      </div>
+                      <!-- ✅ 添加 API 密钥获取提示 -->
+                      <el-alert
+                        type="info"
+                        :closable="false"
+                        style="margin-top: 16px;"
+                      >
+                        <template #title>
+                          如何获取API密钥
+                        </template>
+                        <p style="margin-bottom: 8px;">
+                          请前往
+                          <el-button
+                            text
+                            type="primary"
+                            @click="$router.push('/api-keys')"
+                            style="padding: 0 4px; vertical-align: baseline;"
+                          >
+                            API密钥管理
+                          </el-button>
+                          页面创建并复制您的密钥,然后替换配置中的 <code>your-api-key-here</code>
+                        </p>
+                      </el-alert>
                     </div>
                   </div>
                 </div>
@@ -465,13 +480,15 @@ const setActiveSection = (section: 'claude-code' | 'codex') => {
 
 // 获取环境变量命令
 const getEnvCommand = (platform: 'unix' | 'windows'): string => {
-  const key = apiKey.value || 'your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'your-api-key-here'
   return ENV_COMMANDS[platform](key)
 }
 
 // 获取 Claude Code 配置
 const getClaudeCodeConfig = (): string => {
-  const key = apiKey.value || 'your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'your-api-key-here'
   return JSON.stringify({
     "api": {
       "baseURL": API_BASE_URL,
@@ -482,7 +499,8 @@ const getClaudeCodeConfig = (): string => {
 
 // 获取 Continue 配置
 const getContinueConfig = (): string => {
-  const key = apiKey.value || 'your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'your-api-key-here'
   return JSON.stringify({
     "title": "Claude (自定义)",
     "provider": "anthropic",
@@ -494,7 +512,8 @@ const getContinueConfig = (): string => {
 
 // 获取 Cursor 配置
 const getCursorConfig = (): string => {
-  const key = apiKey.value || 'your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'your-api-key-here'
   return JSON.stringify({
     "model": "claude-3-5-sonnet-20241022",
     "apiKey": key,
@@ -504,7 +523,8 @@ const getCursorConfig = (): string => {
 
 // 获取 Claude Desktop 配置
 const getClaudeDesktopConfig = (): string => {
-  const key = apiKey.value || 'your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'your-api-key-here'
   return JSON.stringify({
     "apiKey": key,
     "apiUrl": API_BASE_URL
@@ -513,7 +533,8 @@ const getClaudeDesktopConfig = (): string => {
 
 // 获取 Codex 环境变量命令
 const getCodexEnvCommand = (permanent: boolean): string => {
-  const key = apiKey.value || 'sk-your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'sk-your-api-key-here'
   return `export OPENAI_API_KEY="${key}"`
 }
 
@@ -531,7 +552,8 @@ wire_api = "chat"`
 
 // 获取 Codex auth.json 配置 (备选方案)
 const getCodexAuthJson = (): string => {
-  const key = apiKey.value || 'sk-your-api-key-here'
+  // ✅ 固定使用占位符,不使用真实密钥
+  const key = 'sk-your-api-key-here'
   return JSON.stringify({
     "OPENAI_API_KEY": key
   }, null, 2)
@@ -539,20 +561,9 @@ const getCodexAuthJson = (): string => {
 
 // 获取 API Key
 const fetchApiKey = async () => {
-  try {
-    const token = localStorage.getItem('token')
-    if (!token) return
-
-    const response = await axios.get('/api/user/api-key', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (response.data && response.data.apiKey) {
-      apiKey.value = response.data.apiKey
-    }
-  } catch (error) {
-    console.error('Failed to fetch API key:', error)
-  }
+  // ✅ 不再获取真实API密钥
+  // 改为显示占位符,提示用户从API密钥管理页面获取
+  apiKey.value = ''
 }
 
 onMounted(() => {

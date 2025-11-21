@@ -207,7 +207,7 @@ const handleLogin = async () => {
         userId: data.userId,
         email: data.email,
         username: data.username || data.email,
-        apiKey: data.apiKey,
+        // apiKey: data.apiKey,  // ❌ 已删除 - 不再在前端存储API密钥
         balance: data.balance
       })
 

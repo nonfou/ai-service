@@ -14,7 +14,7 @@ export interface LoginResponse {
   token: string
   userId: number
   email: string
-  apiKey: string
+  // apiKey: string  // ❌ 已删除 - 不再在前端存储API密钥
   balance: number
   username?: string  // 可选字段,如果后端不返回则使用email
 }
@@ -162,7 +162,7 @@ export interface UserInfo {
   userId: number
   email: string
   username?: string
-  apiKey?: string
+  // apiKey?: string  // ❌ 已删除 - 不再在前端存储API密钥
   balance: number
   status?: number
   createdAt?: string
