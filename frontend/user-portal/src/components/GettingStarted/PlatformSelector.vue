@@ -47,7 +47,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { Monitor } from '@element-plus/icons-vue'
 import { usePlatformDetect, type Platform } from '@/composables/usePlatformDetect'
 
@@ -71,7 +70,7 @@ interface Props {
   autoDetect?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   title: '选择您的操作系统',
   platforms: () => ['macos', 'linux', 'windows'],
   autoDetect: true
@@ -82,14 +81,6 @@ const emit = defineEmits<{
 }>()
 
 const { detectedPlatform } = usePlatformDetect()
-
-// 如果启用自动检测且检测到平台，则自动选择
-const currentPlatform = computed(() => {
-  if (props.autoDetect && detectedPlatform.value && !props.modelValue) {
-    return detectedPlatform.value
-  }
-  return props.modelValue
-})
 
 const handleSelect = (platform: Platform) => {
   emit('update:modelValue', platform)

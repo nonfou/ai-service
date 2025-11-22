@@ -132,8 +132,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
 import { adminAPI, type AdminUser, type UserQuota, type UpdateUserQuotaRequest } from '../../api'
+import message from '../../utils/message'
 
 interface UserWithQuota extends AdminUser {
   quota?: UserQuota
@@ -206,7 +207,7 @@ const loadUsers = async () => {
 
     users.value = usersWithQuota
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '加载用户列表失败')
+    message.error(error.response?.data?.message || '加载用户列表失败')
   } finally {
     loading.value = false
   }
@@ -260,11 +261,11 @@ const handleSubmit = async () => {
     submitting.value = true
     try {
       await adminAPI.updateUserQuota(currentUser.value!.id, quotaForm)
-      ElMessage.success('配额设置成功')
+      message.success('配额设置成功')
       dialogVisible.value = false
       loadUsers()
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.message || '设置失败')
+      message.error(error.response?.data?.message || '设置失败')
     } finally {
       submitting.value = false
     }

@@ -60,7 +60,6 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { Download, FolderOpened } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
 
 interface ConfigType {
   type: string
@@ -80,8 +79,6 @@ const props = withDefaults(defineProps<Props>(), {
   apiKey: '',
   baseURL: 'https://api.xcoder.plus'
 })
-
-const router = useRouter()
 
 const configs: ConfigType[] = [
   {

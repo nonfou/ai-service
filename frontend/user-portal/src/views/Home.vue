@@ -15,10 +15,8 @@ const handleGetStarted = () => {
   }
 }
 
-// 计算按钮文本
-const ctaButtonText = computed(() => {
-  return userStore.isLoggedIn ? '前往控制台' : '立即开始'
-})
+// 固定 CTA 文案
+const ctaButtonText = computed(() => '选择订阅方案')
 </script>
 
 <template>
@@ -41,8 +39,8 @@ const ctaButtonText = computed(() => {
           </div>
           <div class="hero-stats">
             <div class="stat-card">
-              <div class="stat-value">12K+</div>
-              <div class="stat-label">活跃开发者</div>
+              <div class="stat-value">5+</div>
+              <div class="stat-label">模型支持</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">99.9%</div>

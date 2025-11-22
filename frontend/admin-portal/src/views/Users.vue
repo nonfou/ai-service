@@ -339,10 +339,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Search, RefreshLeft, View } from '@element-plus/icons-vue'
 import { adminAPI, type User, type UserTokenStatsResponse, type ModelStatsResponse, type RechargeOrder, type ApiCall, type BalanceLog } from '../api'
 import * as echarts from 'echarts'
+import message from '../utils/message'
 
 const loading = ref(false)
 const adjusting = ref(false)
@@ -426,7 +427,7 @@ const fetchUsers = async () => {
     users.value = res.data.records
     pagination.value.total = res.data.total
   } catch (error: any) {
-    ElMessage.error('获取用户列表失败')
+    message.error('获取用户列表失败')
   } finally {
     loading.value = false
   }
@@ -485,7 +486,7 @@ const loadUserOrders = async () => {
     userOrders.value = res.data.records
     ordersPagination.value.total = res.data.total
   } catch (error) {
-    ElMessage.error('获取订单记录失败')
+    message.error('获取订单记录失败')
   } finally {
     ordersLoading.value = false
   }
@@ -505,7 +506,7 @@ const loadTokenStats = async () => {
     await nextTick()
     renderTokenTrendChart(trendRes.data)
   } catch (error) {
-    ElMessage.error('获取Token统计失败')
+    message.error('获取Token统计失败')
   }
 }
 
@@ -520,7 +521,7 @@ const loadModelStats = async () => {
     await nextTick()
     renderModelPieChart(res.data)
   } catch (error) {
-    ElMessage.error('获取模型统计失败')
+    message.error('获取模型统计失败')
   } finally {
     modelStatsLoading.value = false
   }
@@ -538,7 +539,7 @@ const loadApiCallLogs = async () => {
     apiCallLogs.value = res.data.records
     logsPagination.value.total = res.data.total
   } catch (error) {
-    ElMessage.error('获取API调用日志失败')
+    message.error('获取API调用日志失败')
   } finally {
     logsLoading.value = false
   }
@@ -556,7 +557,7 @@ const loadBalanceLogs = async () => {
     balanceLogs.value = res.data.records
     balanceLogsPagination.value.total = res.data.total
   } catch (error) {
-    ElMessage.error('获取余额日志失败')
+    message.error('获取余额日志失败')
   } finally {
     balanceLogsLoading.value = false
   }
@@ -697,12 +698,12 @@ const handleAdjustBalance = async () => {
   if (!currentUser.value) return
 
   if (!balanceForm.value.amount || balanceForm.value.amount <= 0) {
-    ElMessage.warning('请输入有效的调整金额')
+    message.warning('请输入有效的调整金额')
     return
   }
 
   if (!balanceForm.value.reason.trim()) {
-    ElMessage.warning('请输入调整原因')
+    message.warning('请输入调整原因')
     return
   }
 
@@ -723,12 +724,12 @@ const handleAdjustBalance = async () => {
       amount: finalAmount,
       remark: balanceForm.value.reason
     })
-    ElMessage.success('余额调整成功')
+    message.success('余额调整成功')
     balanceDialogVisible.value = false
     await fetchUsers()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '调整失败')
+      message.error(error.response?.data?.message || '调整失败')
     }
   } finally {
     adjusting.value = false
@@ -748,11 +749,11 @@ const toggleUserStatus = async (row: User) => {
     )
 
     await adminAPI.updateUserStatus(row.id, row.status === 1 ? 0 : 1)
-    ElMessage.success(`${row.status === 1 ? '禁用' : '启用'}成功`)
+    message.success(`${row.status === 1 ? '禁用' : '启用'}成功`)
     await fetchUsers()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || `${row.status === 1 ? '禁用' : '启用'}失败`)
+      message.error(error.response?.data?.message || `${row.status === 1 ? '禁用' : '启用'}失败`)
     }
   }
 }

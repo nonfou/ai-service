@@ -111,8 +111,7 @@ import {
   DataLine,
   Coin,
   Calendar,
-  ShoppingCart,
-  Bell
+  ShoppingCart
 } from '@element-plus/icons-vue'
 import { userAPI } from '../../api'
 import { useUserStore } from '../../stores/user'
@@ -131,10 +130,6 @@ const stats = ref({
   activeSubscriptions: 0,
   modelUsage: [] as Array<{ name: string; count: number }>
 })
-
-const announcements = ref([
-  // { id: 1, title: '系统维护通知' }
-])
 
 const quotaPercentage = computed(() => {
   if (!stats.value.totalQuota) return 100
@@ -189,7 +184,7 @@ const formatResetTime = () => {
 
 const loadStats = async () => {
   try {
-    const res = await userAPI.getUserStats()
+    const res = await userAPI.getStats()
     if (res.data) {
       stats.value = { ...stats.value, ...res.data }
     }

@@ -123,4 +123,12 @@ public class JwtUtil {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
+
+    /**
+     * 获取 Token 的签发时间
+     */
+    public Date getIssuedAt(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims != null ? claims.getIssuedAt() : null;
+    }
 }

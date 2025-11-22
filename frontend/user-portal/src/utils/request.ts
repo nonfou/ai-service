@@ -1,19 +1,72 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import router from '../router'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 15000,
-  withCredentials: true  // ✅ 允许携带Cookie (HttpOnly)
+  withCredentials: true
 })
+
+const redirectToLogin = async () => {
+  try {
+    const { useUserStore } = await import('../stores/user')
+    const userStore = useUserStore()
+    userStore.clearLoginState()
+  } catch (error) {
+    console.error('清理用户登录状态失败:', error)
+  }
+
+  ElMessage.closeAll()
+
+  const currentRoute = router.currentRoute.value
+  const redirectParam =
+    currentRoute?.path && currentRoute.path !== '/login'
+      ? { redirect: currentRoute.fullPath }
+      : undefined
+
+  try {
+    await router.replace({ path: '/login', query: redirectParam })
+  } catch (err) {
+    console.error('路由跳转失败,尝试直接跳转:', err)
+    const resolved = router.resolve({ path: '/login', query: redirectParam })
+    window.location.assign(resolved.href)
+  }
+}
+
+let authPromptPromise: Promise<void> | null = null
+
+const promptReLogin = () => {
+  if (authPromptPromise) {
+    return authPromptPromise
+  }
+
+  authPromptPromise = ElMessageBox.confirm(
+    '登录信息已失效，是否立即前往登录页？',
+    '登录已过期',
+    {
+      confirmButtonText: '重新登录',
+      cancelButtonText: '暂不',
+      type: 'warning',
+      closeOnClickModal: false,
+      closeOnPressEscape: false
+    }
+  )
+    .then(() => redirectToLogin())
+    .catch(() => {
+      // 用户取消,保留当前页面
+    })
+    .finally(() => {
+      authPromptPromise = null
+    })
+
+  return authPromptPromise
+}
 
 /**
  * 从 Cookie 中获取指定名称的值
- * @param name Cookie名称
- * @returns Cookie值,如果不存在返回null
  */
-function getCookie(name: string): string | null {
+const getCookie = (name: string): string | null => {
   const value = `; ${document.cookie}`
   const parts = value.split(`; ${name}=`)
   if (parts.length === 2) {
@@ -25,11 +78,6 @@ function getCookie(name: string): string | null {
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // ✅ Token现在通过HttpOnly Cookie自动携带,无需手动添加
-    // ❌ 删除: const token = localStorage.getItem('token')
-    // ❌ 删除: config.headers.Authorization = `Bearer ${token}`
-
-    // ✅ 添加CSRF Token保护
     const csrfToken =
       document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
       getCookie('XSRF-TOKEN')
@@ -47,33 +95,39 @@ request.interceptors.request.use(
 
 // 响应拦截器
 request.interceptors.response.use(
-  (response) => {
-    return response.data
-  },
-  (error) => {
-    if (error.response) {
-      const { status, data } = error.response
+  async (response) => {
+    const res = response.data
 
-      // 对于业务错误(200状态但code不是200),不在拦截器显示错误
-      // 让具体页面自己处理
+    if (res && typeof res === 'object' && 'code' in res && res.code === 401) {
+      const prompt = promptReLogin()
+      if (prompt) {
+        await prompt.catch(() => {})
+      }
+      return Promise.reject(res)
+    }
+
+    return res
+  },
+  async (error) => {
+    if (error.response) {
+      const { status } = error.response
       switch (status) {
         case 401:
-          ElMessage.error('登录已过期,请重新登录')
-          // ❌ 删除: localStorage.removeItem('token')
-          // ✅ Cookie会被后端自动清除
-          router.push('/login')
+        case 403: {
+          const prompt = promptReLogin()
+          if (prompt) {
+            await prompt.catch(() => {})
+          }
           break
-        case 403:
-          ElMessage.error('没有权限访问')
-          break
+        }
         case 404:
           ElMessage.error('请求的资源不存在')
           break
         case 500:
-          // 不在拦截器显示错误,让页面自己处理
+          // 交由业务页面自行处理
           break
         default:
-          // 不在拦截器显示错误,让页面自己处理
+          // 交由业务页面自行处理
           break
       }
     } else if (error.request) {

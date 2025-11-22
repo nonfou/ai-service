@@ -266,7 +266,8 @@ const loadTickets = async () => {
     }
   } catch (error: any) {
     console.error('加载工单列表失败:', error)
-    ElMessage.error(error.message || '加载工单列表失败')
+    // ✅ 认证错误由响应拦截器统一处理,这里不显示通用错误
+    // 避免与拦截器重复提示
   } finally {
     loading.value = false
   }
@@ -302,7 +303,11 @@ const confirmCreate = async () => {
         await loadTickets()
       } catch (error: any) {
         console.error('创建工单失败:', error)
-        ElMessage.error(error.message || '创建工单失败')
+        // ✅ 认证错误由响应拦截器统一处理
+        // 其他业务错误可以显示
+        if (error.response?.status && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 401 && error.response.status !== 403) {
+          ElMessage.error(error.response.data?.message || '创建工单失败')
+        }
       } finally {
         loading.value = false
       }
@@ -331,7 +336,12 @@ const viewTicket = async (ticket: DisplayTicket) => {
     }
   } catch (error: any) {
     console.error('加载工单详情失败:', error)
-    ElMessage.error(error.message || '加载工单详情失败')
+    // ✅ 认证错误由响应拦截器统一处理(401/403),这里不再显示通用错误
+    // 只在特定情况下显示错误(如404等业务错误)
+    if (error.response?.status === 404) {
+      ElMessage.error('工单不存在')
+    }
+    // 其他错误不显示,避免与拦截器重复提示
   } finally {
     detailLoading.value = false
   }
@@ -357,7 +367,11 @@ const submitReply = async () => {
       await viewTicket(currentTicket.value)
     } catch (error: any) {
       console.error('回复工单失败:', error)
-      ElMessage.error(error.message || '回复工单失败')
+      // ✅ 认证错误由响应拦截器统一处理
+      // 其他业务错误可以显示
+      if (error.response?.status && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 401 && error.response.status !== 403) {
+        ElMessage.error(error.response.data?.message || '回复工单失败')
+      }
     }
   }
 }

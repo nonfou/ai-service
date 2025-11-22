@@ -171,9 +171,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Search, RefreshLeft, View } from '@element-plus/icons-vue'
 import { adminAPI, type Ticket, type TicketDetail } from '../api'
+import message from '../utils/message'
 
 const loading = ref(false)
 const replying = ref(false)
@@ -246,7 +247,8 @@ const fetchTickets = async () => {
     tickets.value = res.data.records
     pagination.value.total = res.data.total
   } catch (error: any) {
-    ElMessage.error('获取工单列表失败')
+    // ✅ 认证错误由响应拦截器统一处理,这里不显示通用错误
+    // 避免与拦截器重复提示
   } finally {
     loading.value = false
   }
@@ -272,7 +274,13 @@ const viewTicket = async (row: Ticket) => {
     detailDialogVisible.value = true
     replyContent.value = ''
   } catch (error: any) {
-    ElMessage.error('获取工单详情失败')
+    // ✅ 认证错误(401/403)已由响应拦截器统一处理并跳转登录页
+    // 这里不再显示通用错误,避免与拦截器重复提示
+    // 只在特定情况下显示错误(如404等业务错误)
+    if (error.response?.status === 404) {
+      message.error('工单不存在')
+    }
+    // 其他错误不显示,避免重复提示
   }
 }
 
@@ -285,18 +293,22 @@ const closeTicket = async (row: Ticket) => {
     })
 
     await adminAPI.closeTicket(row.id)
-    ElMessage.success('工单已关闭')
+    message.success('工单已关闭')
     await fetchTickets()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '关闭失败')
+      // ✅ 认证错误由响应拦截器统一处理
+      // 只显示非401/403的业务错误
+      if (error.response?.status && error.response.status !== 401 && error.response.status !== 403) {
+        message.error(error.response?.data?.message || '关闭失败')
+      }
     }
   }
 }
 
 const submitReply = async () => {
   if (!ticketDetail.value || !replyContent.value.trim()) {
-    ElMessage.warning('请输入回复内容')
+    message.warning('请输入回复内容')
     return
   }
 
@@ -306,14 +318,18 @@ const submitReply = async () => {
       message: replyContent.value
     })
 
-    ElMessage.success('回复成功')
+    message.success('回复成功')
     replyContent.value = ''
 
     // 重新获取工单详情
     const res = await adminAPI.getTicketDetail(ticketDetail.value.ticket.id)
     ticketDetail.value = res.data
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '回复失败')
+    // ✅ 认证错误由响应拦截器统一处理
+    // 只显示非401/403的业务错误
+    if (error.response?.status && error.response.status !== 401 && error.response.status !== 403) {
+      message.error(error.response?.data?.message || '回复失败')
+    }
   } finally {
     replying.value = false
   }

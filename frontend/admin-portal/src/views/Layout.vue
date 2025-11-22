@@ -84,7 +84,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import {
   DataAnalysis,
   User,
@@ -97,6 +97,7 @@ import {
   SwitchButton
 } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin'
+import message from '../utils/message'
 
 const router = useRouter()
 const route = useRoute()
@@ -126,7 +127,7 @@ const handleCommand = async (command: string) => {
       })
 
       adminStore.logout()
-      ElMessage.success('已退出登录')
+      message.success('已退出登录')
       router.push('/login')
     } catch {
       // 用户取消

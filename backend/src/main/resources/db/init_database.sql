@@ -374,50 +374,38 @@ GROUP BY u.id, u.email, u.balance, u.status, u.created_at;
 -- ============================================
 INSERT INTO models (model_name, display_name, provider, price_multiplier, input_token_price, output_token_price, status, description, tags, sort_order) VALUES
 -- GPT 系列
-('gpt-4o', 'GPT-4o', 'copilot', 1.00, 10.00, 30.00, 1, 'OpenAI GPT-4o 模型 - 最新旗舰模型', JSON_ARRAY('推荐', '最新'), 10),
-('gpt-4o-mini', 'GPT-4o Mini', 'copilot', 0.30, 2.50, 10.00, 1, 'OpenAI GPT-4o Mini - 经济高效', JSON_ARRAY('推荐', '低价'), 20),
-('gpt-4-turbo', 'GPT-4 Turbo', 'copilot', 0.90, 15.00, 60.00, 1, 'OpenAI GPT-4 Turbo 模型', JSON_ARRAY('推荐'), 30),
-('gpt-4', 'GPT-4', 'copilot', 1.20, 30.00, 60.00, 1, 'OpenAI GPT-4 模型', JSON_ARRAY(), 40),
-('gpt-3.5-turbo', 'GPT-3.5 Turbo', 'copilot', 0.20, 0.50, 1.50, 1, 'OpenAI GPT-3.5 Turbo - 快速经济', JSON_ARRAY('低价'), 50),
+('claude-4.5-sonnet', 'Claude 4.5 Sonnet', 'Anthropic', 1.20, 10.00, 30.00, 1, 'Anthropic Claude 4.5 Sonnet 最强编程模型', JSON_ARRAY(), 90),
+('claude-4.5-haiku', 'Claude 4.5 Haiku', 'Anthropic', 0.30, 3, 10, 1, 'Anthropic Claude 4.5 Haiku - 快速轻量', JSON_ARRAY('低价'), 110),
+('gpt-5.1-codex', 'GPT-5.1 Codex', 'Open AI', 0.90, 10, 25.00, 1, 'OpenAI GPT-5.1 Codex 最新编程模型', JSON_ARRAY('推荐'), 30),
+('gpt-5.1', 'GPT-5.1', 'Open AI', 1.00, 8.00, 25.00, 1, 'OpenAI GPT-5.1 模型 - 最新旗舰模型', JSON_ARRAY('推荐', '最新'), 10),
+('gpt-5.1-codex-mini', 'GPT-5.1 Codex Mini', 'Open AI', 0.30, 5, 20.00, 1, 'OpenAI GPT-5.1 Codex Mini - 经济高效', JSON_ARRAY('推荐', '低价'), 20),
 
--- O1 系列
-('o1-preview', 'O1 Preview', 'copilot', 1.50, 15.00, 60.00, 1, 'OpenAI O1 Preview - 推理增强', JSON_ARRAY('新品'), 60),
-('o1-mini', 'O1 Mini', 'copilot', 0.80, 15.00, 60.00, 1, 'OpenAI O1 Mini - 紧凑推理', JSON_ARRAY('新品'), 70),
-
+('gemini-2.5-pro', 'Gemini 2.5 Pro', 'Google', 0.3, 7.00, 21.00, 1, 'Google gemini 模型', JSON_ARRAY(), 40),
+('gemini-3-pro', 'Gemini 3.0 Pro', 'Google', 0.8, 10, 30.0, 1, 'Google gemini 最强编程模型 - 快速经济', JSON_ARRAY('推荐'), 50)
 -- Claude 系列
-('claude-3-5-sonnet-20241022', 'Claude 3.5 Sonnet', 'copilot', 1.20, 3.00, 15.00, 1, 'Anthropic Claude 3.5 Sonnet - 最新版本', JSON_ARRAY('推荐', '最新'), 80),
-('claude-3.5-sonnet', 'Claude 3.5 Sonnet (旧版)', 'copilot', 1.20, 3.00, 15.00, 1, 'Anthropic Claude 3.5 Sonnet 旧版本', JSON_ARRAY(), 90),
-('claude-3-opus', 'Claude 3 Opus', 'copilot', 1.50, 15.00, 75.00, 1, 'Anthropic Claude 3 Opus - 最强大模型', JSON_ARRAY(), 100),
-('claude-3-haiku', 'Claude 3 Haiku', 'copilot', 0.30, 0.25, 1.25, 1, 'Anthropic Claude 3 Haiku - 快速轻量', JSON_ARRAY('低价'), 110)
+
 ON DUPLICATE KEY UPDATE
-    display_name = VALUES(display_name),
-    provider = VALUES(provider),
-    input_token_price = VALUES(input_token_price),
-    output_token_price = VALUES(output_token_price),
-    tags = VALUES(tags);
+                     display_name = VALUES(display_name),
+                     provider = VALUES(provider),
+                     input_token_price = VALUES(input_token_price),
+                     output_token_price = VALUES(output_token_price),
+                     tags = VALUES(tags);
 
 -- ============================================
 -- 19. 插入默认数据 - 订阅套餐
 -- ============================================
 INSERT INTO subscription_plans (plan_name, display_name, description, original_price, price, quota_amount, features, color_theme, badge_text, sort_order) VALUES
-('trial_card', '体验卡', '适合新用户体验', 9.90, 4.90, 10.00,
- JSON_ARRAY('7天有效期', '10元额度', '支持所有模型', '基础技术支持'),
- 'green', '新用户专享', 1),
+                                                                                                                                                              ('trial_card', '体验卡', '适合新用户体验', 9.90, 4.90, 10.00,
+                                                                                                                                                               JSON_ARRAY('1天有效期', '10元额度', '支持所有模型', '基础技术支持'),
+                                                                                                                                                               'green', '新用户专享', 1),
 
-('max_100', 'Max 100', '适合轻度使用', 188.00, 98.00, 120.00,
- JSON_ARRAY('30天有效期', '120元额度', '支持所有模型', '优先技术支持', 'API使用统计'),
- 'blue', '推荐套餐', 2),
+                                                                                                                                                              ('max_100', 'Max 100', '适合轻度使用', 188.00, 98.00, 150.00,
+                                                                                                                                                               JSON_ARRAY('30天有效期', '150元额度', '支持所有模型', '优先技术支持', 'API使用统计'),
+                                                                                                                                                               'blue', '推荐套餐', 2),
 
-('max_200', 'Max 200', '适合中度使用', 368.00, 188.00, 250.00,
- JSON_ARRAY('30天有效期', '250元额度', '支持所有模型', '优先技术支持', 'API使用统计', '专属客服'),
- 'pink', '高级套餐', 3)
-ON DUPLICATE KEY UPDATE
-    display_name = VALUES(display_name),
-    description = VALUES(description),
-    price = VALUES(price),
-    quota_amount = VALUES(quota_amount),
-    color_theme = VALUES(color_theme),
-    badge_text = VALUES(badge_text);
+                                                                                                                                                              ('max_200', 'Max 200', '适合中度使用', 700.00, 360.00, 600.00,
+                                                                                                                                                               JSON_ARRAY('30天有效期', '600元额度', '支持所有模型', '优先技术支持', 'API使用统计', '专属客服'),
+                                                                                                                                                               'pink', '高级套餐', 3);
 
 -- ============================================
 -- 20. 插入默认数据 - 系统配置
@@ -439,7 +427,7 @@ ON DUPLICATE KEY UPDATE
 -- ============================================
 -- 密码: admin123 (使用 BCrypt 加密)
 INSERT INTO admins (username, password, role, status) VALUES
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EHs', 'super_admin', 1)
+('admin', '$2b$10$89wowyqpCvaZI74KBGHFSOkXAT8BEDyHBMEvUn0BM6hIly7rvzlUq', 'super_admin', 1)
 ON DUPLICATE KEY UPDATE
     role = VALUES(role),
     status = VALUES(status);

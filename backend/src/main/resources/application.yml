@@ -128,6 +128,11 @@ auth:
     # ⚠️ [安全要求] VERIFY_CODE_SECRET 必须通过环境变量设置
     hash-secret: ${VERIFY_CODE_SECRET}  # ✅ 移除默认值
 
+ticket:
+  notify:
+    enabled: ${TICKET_NOTIFY_ENABLED:true}
+    admin-email: ${TICKET_ADMIN_EMAIL:}
+
 # 系统配置缓存
 system-config:
   cache-ttl-seconds: ${SYSTEM_CONFIG_CACHE_TTL:60}

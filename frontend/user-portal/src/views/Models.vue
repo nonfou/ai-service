@@ -169,154 +169,6 @@ import { modelsAPI, type Model } from '../api'
 
 const models = ref<Model[]>([])
 
-// Mock 数据（用于演示效果）
-const mockModels: Model[] = [
-  {
-    id: 1,
-    modelName: 'gpt-4-turbo',
-    displayName: 'GPT-4 Turbo',
-    provider: 'OpenAI',
-    priceMultiplier: 1.5,
-    status: 1,
-    description: '最新的GPT-4模型，更快的响应速度，128K上下文窗口，支持视觉理解和函数调用',
-    contextLength: 128000,
-    speed: 'fast',
-    tags: ['推荐', '视觉理解', '函数调用']
-  },
-  {
-    id: 2,
-    modelName: 'gpt-4',
-    displayName: 'GPT-4',
-    provider: 'OpenAI',
-    priceMultiplier: 2.0,
-    status: 1,
-    description: 'OpenAI最强大的模型，适合复杂推理和创作任务',
-    contextLength: 8192,
-    speed: 'medium',
-    tags: ['强大', '复杂推理']
-  },
-  {
-    id: 3,
-    modelName: 'gpt-3.5-turbo',
-    displayName: 'GPT-3.5 Turbo',
-    provider: 'OpenAI',
-    priceMultiplier: 0.5,
-    status: 1,
-    description: '性价比极高的模型，适合大多数日常应用场景',
-    contextLength: 16385,
-    speed: 'fast',
-    tags: ['低价', '高性价比']
-  },
-  {
-    id: 4,
-    modelName: 'claude-3-opus-20240229',
-    displayName: 'Claude 3 Opus',
-    provider: 'Anthropic',
-    priceMultiplier: 2.5,
-    status: 1,
-    description: 'Anthropic最强大的模型，擅长复杂分析和创意写作，200K上下文',
-    contextLength: 200000,
-    speed: 'medium',
-    tags: ['长上下文', '视觉理解', '多语言']
-  },
-  {
-    id: 5,
-    modelName: 'claude-3-sonnet-20240229',
-    displayName: 'Claude 3 Sonnet',
-    provider: 'Anthropic',
-    priceMultiplier: 1.2,
-    status: 1,
-    description: '平衡性能和成本的优秀选择，适合企业级应用',
-    contextLength: 200000,
-    speed: 'fast',
-    tags: ['长上下文', '视觉理解', '多语言']
-  },
-  {
-    id: 6,
-    modelName: 'claude-3-haiku-20240307',
-    displayName: 'Claude 3 Haiku',
-    provider: 'Anthropic',
-    priceMultiplier: 0.4,
-    status: 1,
-    description: '最快速的Claude模型，适合高并发场景',
-    contextLength: 200000,
-    speed: 'fast',
-    tags: ['低价', '快速', '高并发']
-  },
-  {
-    id: 7,
-    modelName: 'gemini-pro',
-    displayName: 'Gemini Pro',
-    provider: 'Google',
-    priceMultiplier: 1.0,
-    status: 1,
-    description: 'Google先进的多模态AI模型，支持文本和图像理解',
-    contextLength: 32768,
-    speed: 'fast',
-    tags: ['视觉理解', '代码生成', '多语言']
-  },
-  {
-    id: 8,
-    modelName: 'gemini-pro-vision',
-    displayName: 'Gemini Pro Vision',
-    provider: 'Google',
-    priceMultiplier: 1.3,
-    status: 1,
-    description: '专为视觉理解优化的Gemini模型',
-    contextLength: 16384,
-    speed: 'medium',
-    tags: ['视觉理解', '图像分析']
-  },
-  {
-    id: 9,
-    modelName: 'llama-3-70b',
-    displayName: 'Llama 3 70B',
-    provider: 'Meta',
-    priceMultiplier: 0.8,
-    status: 1,
-    description: 'Meta开源的大语言模型，性能强劲且成本低廉',
-    contextLength: 8192,
-    speed: 'fast',
-    tags: ['开源', '代码生成', '多语言']
-  },
-  {
-    id: 10,
-    modelName: 'llama-3-8b',
-    displayName: 'Llama 3 8B',
-    provider: 'Meta',
-    priceMultiplier: 0.3,
-    status: 1,
-    description: '轻量级的Llama模型，适合资源受限场景',
-    contextLength: 8192,
-    speed: 'fast',
-    tags: ['低价', '轻量级']
-  },
-  {
-    id: 11,
-    modelName: 'mistral-large',
-    displayName: 'Mistral Large',
-    provider: 'Mistral AI',
-    priceMultiplier: 1.5,
-    status: 1,
-    description: 'Mistral AI的旗舰模型，多语言能力出色',
-    contextLength: 32768,
-    speed: 'fast',
-    tags: ['多语言', '代码生成', '函数调用']
-  },
-  {
-    id: 12,
-    modelName: 'mistral-medium',
-    displayName: 'Mistral Medium',
-    provider: 'Mistral AI',
-    priceMultiplier: 0.9,
-    status: 1,
-    description: '性价比优秀的中等规模模型',
-    contextLength: 32768,
-    speed: 'fast',
-    tags: ['性价比', '多语言']
-  }
-]
-
 // 加载模型列表
 const loadModels = async () => {
   try {
@@ -325,6 +177,7 @@ const loadModels = async () => {
   } catch (error: any) {
     console.error('加载模型列表失败', error)
     ElMessage.error('加载模型列表失败')
+    models.value = []
   }
 }
 
@@ -346,7 +199,7 @@ const groupedModels = computed(() => {
     if (!acc[model.provider]) {
       acc[model.provider] = []
     }
-    acc[model.provider].push(model)
+    acc[model.provider]!.push(model)
     return acc
   }, {} as Record<string, Model[]>)
 

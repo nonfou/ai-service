@@ -2,14 +2,18 @@ package com.nonfou.github.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nonfou.github.config.TicketNotificationProperties;
 import com.nonfou.github.entity.Ticket;
 import com.nonfou.github.entity.TicketMessage;
+import com.nonfou.github.entity.User;
 import com.nonfou.github.mapper.TicketMapper;
 import com.nonfou.github.mapper.TicketMessageMapper;
+import com.nonfou.github.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +30,15 @@ public class TicketService {
 
     @Autowired
     private TicketMessageMapper messageMapper;
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private TicketNotificationProperties ticketNotificationProperties;
 
     /**
      * 创建工单
@@ -53,6 +66,8 @@ public class TicketService {
         messageMapper.insert(message);
 
         log.info("工单创建成功: userId={}, ticketId={}, subject={}", userId, ticket.getId(), subject);
+
+        notifyAdminForTicket(ticket, content, "新工单提交");
 
         return ticket;
     }
@@ -124,6 +139,8 @@ public class TicketService {
 
         log.info("工单回复成功: userId={}, ticketId={}", userId, ticketId);
 
+        notifyAdminForTicket(ticket, message, "用户回复");
+
         return ticketMessage;
     }
 
@@ -173,5 +190,32 @@ public class TicketService {
         ticketMapper.updateById(ticket);
 
         log.info("工单已关闭: userId={}, ticketId={}", userId, ticketId);
+    }
+
+    /**
+     * 向管理员发送工单通知.
+     */
+    private void notifyAdminForTicket(Ticket ticket, String messageContent, String eventLabel) {
+        if (!ticketNotificationProperties.isEnabled()) {
+            return;
+        }
+        String adminEmail = ticketNotificationProperties.getAdminEmail();
+        if (!StringUtils.hasText(adminEmail)) {
+            log.warn("工单邮件通知已启用但未配置管理员邮箱");
+            return;
+        }
+
+        User user = userMapper.selectById(ticket.getUserId());
+        String userEmail = user != null ? user.getEmail() : "未知邮箱";
+        String subject = String.format("【xCoder】%s - 工单 #%d", eventLabel, ticket.getId());
+        StringBuilder body = new StringBuilder()
+                .append("用户: ").append(userEmail).append("\n")
+                .append("工单ID: ").append(ticket.getId()).append("\n")
+                .append("主题: ").append(ticket.getSubject()).append("\n")
+                .append("优先级: ").append(ticket.getPriority()).append("\n\n")
+                .append("消息内容:\n")
+                .append(messageContent);
+
+        emailService.sendNotification(adminEmail, subject, body.toString());
     }
 }

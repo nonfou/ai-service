@@ -2,14 +2,18 @@ package com.nonfou.github.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nonfou.github.config.TicketNotificationProperties;
 import com.nonfou.github.entity.Ticket;
 import com.nonfou.github.entity.TicketMessage;
+import com.nonfou.github.entity.User;
 import com.nonfou.github.mapper.TicketMapper;
 import com.nonfou.github.mapper.TicketMessageMapper;
+import com.nonfou.github.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -28,6 +32,15 @@ public class AdminTicketService {
 
     @Autowired
     private TicketMessageMapper ticketMessageMapper;
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private TicketNotificationProperties ticketNotificationProperties;
 
     /**
      * 获取工单列表
@@ -83,7 +96,7 @@ public class AdminTicketService {
         // 创建消息
         TicketMessage ticketMessage = new TicketMessage();
         ticketMessage.setTicketId(ticketId);
-        ticketMessage.setUserId(adminId);
+        ticketMessage.setAdminId(adminId);
         ticketMessage.setIsStaff(1);
         ticketMessage.setMessage(message);
         ticketMessage.setCreatedAt(LocalDateTime.now());
@@ -98,6 +111,8 @@ public class AdminTicketService {
         }
 
         log.info("管理员回复工单: adminId={}, ticketId={}", adminId, ticketId);
+
+        notifyUserTicketReply(ticket, message);
 
         return ticketMessage;
     }
@@ -171,5 +186,27 @@ public class AdminTicketService {
         stats.put("todayTickets", todayTickets);
 
         return stats;
+    }
+
+    private void notifyUserTicketReply(Ticket ticket, String replyMessage) {
+        if (!ticketNotificationProperties.isEnabled()) {
+            return;
+        }
+        User user = userMapper.selectById(ticket.getUserId());
+        if (user == null || !StringUtils.hasText(user.getEmail())) {
+            log.warn("无法发送工单邮件通知，用户邮箱不存在: ticketId={}", ticket.getId());
+            return;
+        }
+
+        String subject = String.format("【xCoder】工单回复 #%d", ticket.getId());
+        StringBuilder body = new StringBuilder()
+                .append("您的工单已收到客服回复。\n\n")
+                .append("工单ID: ").append(ticket.getId()).append("\n")
+                .append("主题: ").append(ticket.getSubject()).append("\n\n")
+                .append("回复内容:\n")
+                .append(replyMessage)
+                .append("\n\n请登录控制台查看详情。");
+
+        emailService.sendNotification(user.getEmail(), subject, body.toString());
     }
 }

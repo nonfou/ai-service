@@ -168,7 +168,7 @@
                     <div class="config-file-section">
                       <div class="file-path-display">
                         <el-icon><Setting /></el-icon>
-                        <span>配置文件位置: <code>~/.claude/config.json</code></span>
+                        <span>配置文件位置: <code>~/.claude/settings.json</code></span>
                       </div>
 
                       <CodeBlock
@@ -222,6 +222,7 @@
                 </div>
               </div>
             </div>
+
           </div>
 
           <!-- Codex 内容 -->
@@ -268,72 +269,9 @@
               </h2>
 
               <div class="steps-timeline">
-                <!-- 步骤 1: 安装 Node.js 和 npm -->
+                <!-- 步骤 1: 安装 Codex CLI -->
                 <div class="timeline-item">
                   <div class="timeline-marker">1</div>
-                  <div class="timeline-content">
-                    <h3>安装 Node.js 和 npm</h3>
-                    <p>Codex CLI 通过 npm 安装,首先需要安装 Node.js 环境</p>
-
-                    <el-tabs v-model="codexInstallTab" class="tech-tabs">
-                      <el-tab-pane label="Ubuntu/Debian" name="ubuntu">
-                        <div class="install-method">
-                          <h4 class="method-title">更新系统包</h4>
-                          <CodeBlock
-                            code="sudo apt update && sudo apt upgrade -y"
-                            language="bash"
-                          />
-
-                          <h4 class="method-title">添加 NodeSource 仓库</h4>
-                          <CodeBlock
-                            code="curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -"
-                            language="bash"
-                          />
-
-                          <h4 class="method-title">安装 Node.js 和 npm</h4>
-                          <CodeBlock
-                            code="sudo apt install nodejs -y"
-                            language="bash"
-                          />
-
-                          <h4 class="method-title">验证安装</h4>
-                          <CodeBlock
-                            code="node --version  # 应显示 v22.x.x\nnpm --version   # 应显示 10.x.x 或更高"
-                            language="bash"
-                          />
-                        </div>
-                      </el-tab-pane>
-
-                      <el-tab-pane label="macOS" name="macos">
-                        <div class="install-method">
-                          <h4 class="method-title">使用 Homebrew 安装</h4>
-                          <CodeBlock
-                            code="brew install node"
-                            language="bash"
-                          />
-
-                          <h4 class="method-title">验证安装</h4>
-                          <CodeBlock
-                            code="node --version\nnpm --version"
-                            language="bash"
-                          />
-                        </div>
-                      </el-tab-pane>
-
-                      <el-tab-pane label="Windows (WSL)" name="windows">
-                        <div class="install-method">
-                          <el-alert type="warning" :closable="false" class="method-tip">
-                            Windows 用户强烈推荐使用 WSL (Windows Subsystem for Linux),然后按照 Ubuntu 的步骤安装
-                          </el-alert>
-                        </div>
-                      </el-tab-pane>
-                    </el-tabs>
-                  </div>
-                </div>
-
-                <!-- 步骤 2: 安装 Codex CLI -->
-                <div class="timeline-item">
-                  <div class="timeline-marker">2</div>
                   <div class="timeline-content">
                     <h3>安装 Codex CLI</h3>
                     <p>通过 npm 全局安装 Codex CLI</p>
@@ -341,6 +279,12 @@
                     <CodeBlock
                       code="sudo npm install -g @openai/codex@latest"
                       language="bash"
+                    />
+
+                    <h4 class="method-title">Windows PowerShell</h4>
+                    <CodeBlock
+                      code="npm install -g @openai/codex@latest"
+                      language="powershell"
                     />
 
                     <h4 class="method-title">验证安装</h4>
@@ -351,40 +295,36 @@
                   </div>
                 </div>
 
-                <!-- 步骤 3: 配置 API Key -->
+                <!-- 步骤 2: 配置 API Key -->
                 <div class="timeline-item">
-                  <div class="timeline-marker">3</div>
+                  <div class="timeline-marker">2</div>
                   <div class="timeline-content">
                     <h3>配置 API Key</h3>
-                    <p>将 API Key 写入环境变量</p>
+                    <p>创建 <code>~/.codex/auth.json</code>, 填入以下内容并替换为自己的 token:</p>
 
-                    <h4 class="method-title">临时保存 (当前会话)</h4>
-                    <CodeBlock
-                      :code="getCodexEnvCommand(false)"
-                      language="bash"
-                    />
-
-                    <h4 class="method-title">永久保存 (推荐)</h4>
-                    <p class="config-hint">编辑 <code>~/.bashrc</code> 或 <code>~/.zshrc</code> 文件,添加:</p>
-                    <CodeBlock
-                      :code="getCodexEnvCommand(false)"
-                      language="bash"
-                    />
-                    <p class="config-hint">然后运行 <code>source ~/.bashrc</code> 或 <code>source ~/.zshrc</code> 使其生效</p>
-
-                    <div v-if="!apiKey" class="api-key-reminder">
-                      <el-icon><Warning /></el-icon>
-                      <span>登录后可自动获取 API Key</span>
-                      <el-button type="primary" size="small" @click="$router.push('/login')">
-                        立即登录
-                      </el-button>
+                    <div class="config-file-section">
+                      <div class="file-path-display">
+                        <el-icon><Setting /></el-icon>
+                        <span>配置文件: <code>~/.codex/auth.json</code></span>
+                      </div>
+                      <CodeBlock
+                        :code="CODEX_AUTH_CONTENT"
+                        language="json"
+                      />
+                      <p class="config-hint">
+                        若希望 Codex 自动读取密钥, 可直接创建该文件并将 token 替换成您自己的值。
+                        <el-button text type="primary" style="padding: 0 4px; vertical-align: baseline;" @click="$router.push('/api-keys')">
+                          前往 API 密钥管理
+                        </el-button>
+                        获取密钥后再粘贴到此处。
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                <!-- 步骤 4: 配置 config.toml -->
+                <!-- 步骤 3: 配置 config.toml -->
                 <div class="timeline-item">
-                  <div class="timeline-marker">4</div>
+                  <div class="timeline-marker">3</div>
                   <div class="timeline-content">
                     <h3>配置 config.toml</h3>
                     <p>在 Codex 配置文件中设置模型和 API 提供商</p>
@@ -399,15 +339,11 @@
                         :code="getCodexConfigToml()"
                         language="toml"
                       />
-
-                      <el-alert type="info" :closable="false" class="method-tip">
-                        你可以将 model 改成其他支持的模型,如 <code>gpt-5-codex</code>、<code>claude-3-5-sonnet-20241022</code> 等
-                      </el-alert>
                     </div>
                   </div>
                 </div>
 
-                <!-- 步骤 5: 开始使用 -->
+                <!-- 步骤 4: 开始使用 -->
                 <div class="timeline-item">
                   <div class="timeline-marker">
                     <el-icon><CircleCheck /></el-icon>
@@ -418,7 +354,7 @@
 
                     <h4 class="method-title">启动 Codex</h4>
                     <CodeBlock
-                      code="cd /path/to/your/project\ncodex"
+                      code="cd /path/to/your/project && codex"
                       language="bash"
                     />
 
@@ -446,12 +382,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { ref } from 'vue'
 import {
-  Star, Download, Setting, Promotion, Key, Lightning,
-  CircleCheck, InfoFilled, Warning, SuccessFilled, List
+  Star, Setting, Promotion,
+  CircleCheck, InfoFilled, SuccessFilled, List
 } from '@element-plus/icons-vue'
 
 // 导入组件
@@ -459,116 +393,65 @@ import CodeBlock from '@/components/GettingStarted/CodeBlock.vue'
 
 // 导入常量
 import {
-  API_BASE_URL,
-  INSTALLATION_COMMANDS,
-  ENV_COMMANDS
+  INSTALLATION_COMMANDS
 } from '@/constants/installation'
-
-const router = useRouter()
 
 // 状态管理
 const activeSection = ref<'claude-code' | 'codex'>('claude-code')
 const installTab = ref('macos')
-const envTab = ref('unix')
-const codexInstallTab = ref('ubuntu')
-const apiKey = ref('')
 
 // 切换激活部分
 const setActiveSection = (section: 'claude-code' | 'codex') => {
   activeSection.value = section
 }
 
-// 获取环境变量命令
-const getEnvCommand = (platform: 'unix' | 'windows'): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'your-api-key-here'
-  return ENV_COMMANDS[platform](key)
-}
+const CODEX_ENV_KEY = 'OPENAI_API_KEY'
+
+const CODEX_AUTH_CONTENT = JSON.stringify({
+  [CODEX_ENV_KEY]: '<YOUR_OPENAI_API_KEY>'
+}, null, 2)
+
+const CODEX_CONFIG_TOML = `model = "gpt-5.1-codex"
+model_provider = "xcoder"
+model_reasoning_effort = "medium"
+windows_wsl_setup_acknowledged = true
+
+[model_providers.xcoder]
+name = "xcoder"
+base_url = "http://api.xcoder.plus"
+env_key = "${CODEX_ENV_KEY}"
+wire_api = "responses"
+request_max_retries = 3
+stream_max_retries = 0
+stream_idle_timeout_ms = 300000`
+
+const CLAUDE_CODE_CONFIG = JSON.stringify({
+  env: {
+    ANTHROPIC_BASE_URL: 'http://api.xcoder.plus',
+    ANTHROPIC_AUTH_TOKEN: '<YOUR_ANTHROPIC_AUTH_TOKEN>',
+    ANTHROPIC_MODEL: 'claude-sonnet-4.5',
+    ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-4.5',
+    ANTHROPIC_SMALL_FAST_MODEL: 'claude-haiku-4.5',
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-4.5',
+    DISABLE_NON_ESSENTIAL_MODEL_CALLS: '1',
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    CLAUDE_CODE_MAX_OUTPUT_TOKENS: '64000'
+  },
+  permissions: {},
+  alwaysThinkingEnabled: true
+}, null, 2)
 
 // 获取 Claude Code 配置
 const getClaudeCodeConfig = (): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'your-api-key-here'
-  return JSON.stringify({
-    "api": {
-      "baseURL": API_BASE_URL,
-      "key": key
-    }
-  }, null, 2)
-}
-
-// 获取 Continue 配置
-const getContinueConfig = (): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'your-api-key-here'
-  return JSON.stringify({
-    "title": "Claude (自定义)",
-    "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20241022",
-    "apiKey": key,
-    "apiBase": API_BASE_URL
-  }, null, 2)
-}
-
-// 获取 Cursor 配置
-const getCursorConfig = (): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'your-api-key-here'
-  return JSON.stringify({
-    "model": "claude-3-5-sonnet-20241022",
-    "apiKey": key,
-    "baseURL": API_BASE_URL
-  }, null, 2)
-}
-
-// 获取 Claude Desktop 配置
-const getClaudeDesktopConfig = (): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'your-api-key-here'
-  return JSON.stringify({
-    "apiKey": key,
-    "apiUrl": API_BASE_URL
-  }, null, 2)
-}
-
-// 获取 Codex 环境变量命令
-const getCodexEnvCommand = (permanent: boolean): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'sk-your-api-key-here'
-  return `export OPENAI_API_KEY="${key}"`
+  return CLAUDE_CODE_CONFIG
 }
 
 // 获取 Codex config.toml 配置
 const getCodexConfigToml = (): string => {
-  return `model = "gpt-4o"
-model_provider = "bianxieai"
-
-[model_providers.bianxieai]
-name = "bianxieai"
-base_url = "${API_BASE_URL}/v1"
-env_key = "OPENAI_API_KEY"
-wire_api = "chat"`
+  return CODEX_CONFIG_TOML
 }
 
-// 获取 Codex auth.json 配置 (备选方案)
-const getCodexAuthJson = (): string => {
-  // ✅ 固定使用占位符,不使用真实密钥
-  const key = 'sk-your-api-key-here'
-  return JSON.stringify({
-    "OPENAI_API_KEY": key
-  }, null, 2)
-}
-
-// 获取 API Key
-const fetchApiKey = async () => {
-  // ✅ 不再获取真实API密钥
-  // 改为显示占位符,提示用户从API密钥管理页面获取
-  apiKey.value = ''
-}
-
-onMounted(() => {
-  fetchApiKey()
-})
+// 页面示例仅供参考, API Key 请在 API 密钥管理页面创建并替换占位符
 </script>
 
 <style scoped>
@@ -1051,7 +934,6 @@ onMounted(() => {
 .quick-install,
 .config-section,
 .start-section,
-.download-section,
 .steps-section {
   margin-bottom: 3rem;
   padding: 2rem;
@@ -1073,10 +955,6 @@ onMounted(() => {
 }
 
 .start-section,
-.download-section {
-  animation-delay: 0.3s;
-}
-
 .steps-section {
   animation-delay: 0.4s;
 }
@@ -1095,7 +973,6 @@ onMounted(() => {
 .quick-install:hover,
 .config-section:hover,
 .start-section:hover,
-.download-section:hover,
 .steps-section:hover {
   border-color: rgba(99, 102, 241, 0.2);
   box-shadow: 0 8px 32px rgba(99, 102, 241, 0.12);
@@ -1526,6 +1403,7 @@ onMounted(() => {
     height: 36px;
     font-size: 0.95rem;
   }
+
 }
 
 /* ========== 工具类 ========== */

@@ -186,9 +186,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Search, RefreshLeft, View } from '@element-plus/icons-vue'
 import { adminAPI, type RechargeOrder } from '../api'
+import message from '../utils/message'
 
 const loading = ref(false)
 const completing = ref(false)
@@ -247,7 +248,7 @@ const fetchOrders = async () => {
     orders.value = res.data.records
     pagination.value.total = res.data.total
   } catch (error: any) {
-    ElMessage.error('获取订单列表失败')
+    message.error('获取订单列表失败')
   } finally {
     loading.value = false
   }
@@ -288,12 +289,12 @@ const handleComplete = async () => {
 
     completing.value = true
     await adminAPI.completeOrder(currentOrder.value.id, completeForm.value)
-    ElMessage.success('订单已完成')
+    message.success('订单已完成')
     completeDialogVisible.value = false
     await fetchOrders()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '操作失败')
+      message.error(error.response?.data?.message || '操作失败')
     }
   } finally {
     completing.value = false
@@ -318,12 +319,12 @@ const handleRefund = async () => {
 
     refunding.value = true
     await adminAPI.refundOrder(currentOrder.value.id, refundForm.value)
-    ElMessage.success('退款成功')
+    message.success('退款成功')
     refundDialogVisible.value = false
     await fetchOrders()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '退款失败')
+      message.error(error.response?.data?.message || '退款失败')
     }
   } finally {
     refunding.value = false

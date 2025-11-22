@@ -58,11 +58,19 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  async function logout() {
-    // 先清理前端状态
+  /**
+   * 清除本地登录状态
+   * 用于Token失效时快速清除前端状态,不调用后端API
+   */
+  function clearLoginState() {
     isLoggedIn.value = false
     userInfo.value = null
     localStorage.removeItem('userInfo')
+  }
+
+  async function logout() {
+    // 先清理前端状态
+    clearLoginState()
     // ❌ 删除: localStorage.removeItem('token')
 
     // ✅ 调用后端API清除HttpOnly Cookie
@@ -88,6 +96,7 @@ export const useUserStore = defineStore('user', () => {
     // ❌ 删除: setToken
     checkLoginStatus,
     setUserInfo,
+    clearLoginState,
     logout
   }
 })

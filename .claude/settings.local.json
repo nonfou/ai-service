@@ -9,7 +9,9 @@
       "mcp__playwright__browser_close",
       "Bash(tree:*)",
       "Bash(NUL:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(mvn:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

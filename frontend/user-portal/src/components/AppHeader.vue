@@ -20,7 +20,7 @@
           <router-link to="/api-keys" class="nav-link">API密钥</router-link>
           <router-link to="/tickets" class="nav-link">工单</router-link>
           <router-link to="/dashboard" class="nav-link">控制台</router-link>
-          <router-link to="/wallet" class="nav-link">钱包</router-link>
+          <!-- <router-link to="/wallet" class="nav-link">钱包</router-link> -->
         </template>
       </nav>
 

@@ -138,9 +138,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { adminAPI, type BackendAccount, type CreateBackendAccountRequest, type UpdateBackendAccountRequest } from '../../api'
+import message from '../../utils/message'
 
 const loading = ref(false)
 const accounts = ref<BackendAccount[]>([])
@@ -192,7 +193,7 @@ const loadAccounts = async () => {
     const res = await adminAPI.getBackendAccounts()
     accounts.value = res.data
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '加载账户列表失败')
+    message.error(error.response?.data?.message || '加载账户列表失败')
   } finally {
     loading.value = false
   }
@@ -255,16 +256,16 @@ const handleSubmit = async () => {
           updateData.accessToken = accountForm.accessToken
         }
         await adminAPI.updateBackendAccount(currentAccountId.value, updateData)
-        ElMessage.success('更新成功')
+        message.success('更新成功')
       } else {
         // 创建账户
         await adminAPI.createBackendAccount(accountForm as CreateBackendAccountRequest)
-        ElMessage.success('创建成功')
+        message.success('创建成功')
       }
       dialogVisible.value = false
       loadAccounts()
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.message || '操作失败')
+      message.error(error.response?.data?.message || '操作失败')
     } finally {
       submitting.value = false
     }
@@ -276,10 +277,10 @@ const handleToggleStatus = async (row: BackendAccount) => {
   const enabled = row.status !== 'active'
   try {
     await adminAPI.toggleBackendAccount(row.id, enabled)
-    ElMessage.success(enabled ? '已启用' : '已禁用')
+    message.success(enabled ? '已启用' : '已禁用')
     loadAccounts()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    message.error(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -289,13 +290,13 @@ const handleHealthCheck = async (row: BackendAccount) => {
   try {
     const res = await adminAPI.healthCheckBackendAccount(row.id)
     if (res.data.healthy) {
-      ElMessage.success('健康检查通过')
+      message.success('健康检查通过')
     } else {
-      ElMessage.warning('健康检查失败')
+      message.warning('健康检查失败')
     }
     loadAccounts()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '健康检查失败')
+    message.error(error.response?.data?.message || '健康检查失败')
   } finally {
     healthCheckLoading.value[row.id] = false
   }
@@ -315,10 +316,10 @@ const handleDelete = async (row: BackendAccount) => {
 
   try {
     await adminAPI.deleteBackendAccount(row.id)
-    ElMessage.success('删除成功')
+    message.success('删除成功')
     loadAccounts()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '删除失败')
+    message.error(error.response?.data?.message || '删除失败')
   }
 }
 

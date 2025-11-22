@@ -64,8 +64,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { adminAPI, type Model } from '../../api'
+import message from '../../utils/message'
 
 const loading = ref(false)
 const models = ref<Model[]>([])
@@ -86,7 +86,7 @@ const loadModels = async () => {
     const res = await adminAPI.getModels()
     models.value = res.data
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '加载模型列表失败')
+    message.error(error.response?.data?.message || '加载模型列表失败')
   } finally {
     loading.value = false
   }
@@ -101,21 +101,21 @@ const handleEdit = (row: Model) => {
 const handleSubmit = async () => {
   try {
     await adminAPI.updateModel(currentModelId.value, modelForm)
-    ElMessage.success('更新成功')
+    message.success('更新成功')
     dialogVisible.value = false
     loadModels()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '更新失败')
+    message.error(error.response?.data?.message || '更新失败')
   }
 }
 
 const handleToggleStatus = async (row: Model) => {
   try {
     await adminAPI.updateModelStatus(row.id, row.status === 1 ? 0 : 1)
-    ElMessage.success('状态更新成功')
+    message.success('状态更新成功')
     loadModels()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    message.error(error.response?.data?.message || '操作失败')
   }
 }
 

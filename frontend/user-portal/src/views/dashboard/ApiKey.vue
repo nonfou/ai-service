@@ -241,8 +241,8 @@ const handleCreate = async () => {
     const res = await apiKeyAPI.createApiKey({ keyName: form.keyName })
     dialogVisible.value = false
 
-    // Show the newly created key
-    newlyCreatedKey.value = res.data.apiKey || res.data
+    // 展示新生成的密钥
+    newlyCreatedKey.value = res.data?.apiKey ?? ''
     newKeyDialogVisible.value = true
 
     form.keyName = ''

@@ -56,11 +56,11 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { adminAPI } from '../api'
 import { useAdminStore } from '../stores/admin'
+import message from '../utils/message'
 
 const router = useRouter()
 const adminStore = useAdminStore()
@@ -104,10 +104,10 @@ const handleLogin = async () => {
         role: data.role
       })
 
-      ElMessage.success('Login successful')
+      message.success('Login successful')
       router.push('/')
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.message || 'Login failed')
+      message.error(error.response?.data?.message || 'Login failed')
     } finally {
       loading.value = false
     }

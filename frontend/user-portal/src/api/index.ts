@@ -1,5 +1,19 @@
 import request from '../utils/request'
 
+export interface ApiResponse<T = any> {
+  code: number
+  message: string
+  data: T
+}
+
+export interface PageResult<T> {
+  records: T[]
+  total: number
+  size: number
+  current: number
+  pages: number
+}
+
 // ==================== 认证相关类型 ====================
 export interface SendCodeRequest {
   email: string
@@ -175,11 +189,13 @@ export interface UserStats {
 }
 
 // ==================== 订阅相关类型 ====================
-// 支付类型枚举
-export enum PaymentType {
-  MONTHLY = 1,    // 按月支付
-  PAY_AS_GO = 2   // 按量支付
-}
+// 支付类型
+export const PaymentTypeEnum = {
+  MONTHLY: 1,
+  PAY_AS_GO: 2
+} as const
+
+export type PaymentType = (typeof PaymentTypeEnum)[keyof typeof PaymentTypeEnum]
 
 export interface SubscriptionPlan {
   id: number
@@ -189,24 +205,27 @@ export interface SubscriptionPlan {
   originalPrice: number
   price: number
   quotaAmount: number
-  features: string[]
+  features?: string[]
+  colorTheme?: string
+  badgeText?: string
   status: number  // 0-禁用, 1-启用
   sortOrder: number
-  paymentType: PaymentType  // 支付类型
-  badge?: string  // 标签文字,如"推荐"、"热门"
-  featured?: boolean  // 是否为推荐套餐
-  createdAt: string
-  updatedAt: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Subscription {
   id: number
+  userId: number
   planId: number
   planName: string
+  amount: number
+  quotaAmount: number
   startDate: string
   endDate: string
-  status: number  // 0-已取消, 1-活跃, 2-已过期
+  status: string  // active/expired/cancelled
   createdAt: string
+  updatedAt: string
 }
 
 export interface SubscribeRequest {
@@ -217,12 +236,12 @@ export interface SubscribeRequest {
 export const authAPI = {
   // 发送验证码
   sendCode: (data: SendCodeRequest) => {
-    return request.post('/api/auth/send-code', data)
+    return request.post<any, ApiResponse<null>>('/api/auth/send-code', data)
   },
 
   // 登录/注册
   login: (data: LoginRequest) => {
-    return request.post<any, { data: LoginResponse }>('/api/auth/login', data)
+    return request.post<any, ApiResponse<LoginResponse>>('/api/auth/login', data)
   },
 
   // 测试接口
@@ -379,24 +398,24 @@ export const subscriptionAPI = {
     const url = paymentType
       ? `/api/subscriptions/plans?paymentType=${paymentType}`
       : '/api/subscriptions/plans'
-    return request.get<any, { data: SubscriptionPlan[] }>(url)
+    return request.get<any, ApiResponse<SubscriptionPlan[]>>(url)
   },
 
   // 订阅套餐
   subscribe: (data: SubscribeRequest) => {
-    return request.post<any, { data: Subscription }>('/api/subscriptions/subscribe', data)
+    return request.post<any, ApiResponse<Subscription>>('/api/subscriptions/subscribe', data)
   },
 
   // 获取订阅历史
   getHistory: (pageNum: number = 1, pageSize: number = 10) => {
-    return request.get<any, { data: { list: Subscription[], total: number } }>(
+    return request.get<any, ApiResponse<PageResult<Subscription>>>(
       `/api/subscriptions/history?pageNum=${pageNum}&pageSize=${pageSize}`
     )
   },
 
   // 取消订阅
   cancel: (subscriptionId: number) => {
-    return request.post<any, { data: null }>(`/api/subscriptions/${subscriptionId}/cancel`)
+    return request.post<any, ApiResponse<null>>(`/api/subscriptions/${subscriptionId}/cancel`)
   }
 }
 
@@ -841,4 +860,3 @@ export const getRechargeHistoryAPI = async () => {
   const res = await request.get('/api/recharge/orders')
   return res.data.data
 }
-

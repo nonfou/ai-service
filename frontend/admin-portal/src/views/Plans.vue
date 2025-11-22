@@ -95,8 +95,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { adminAPI, type SubscriptionPlan } from '../api'
+import message from '../utils/message'
 
 const loading = ref(false)
 const plans = ref<SubscriptionPlan[]>([])
@@ -122,7 +123,7 @@ const loadPlans = async () => {
     const res = await adminAPI.getPlans()
     plans.value = res.data
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '加载套餐列表失败')
+    message.error(error.response?.data?.message || '加载套餐列表失败')
   } finally {
     loading.value = false
   }
@@ -162,15 +163,15 @@ const handleSubmit = async () => {
     }
     if (editMode.value) {
       await adminAPI.updatePlan(currentPlanId.value, submitData)
-      ElMessage.success('更新成功')
+      message.success('更新成功')
     } else {
       await adminAPI.createPlan(submitData as SubscriptionPlan)
-      ElMessage.success('创建成功')
+      message.success('创建成功')
     }
     dialogVisible.value = false
     loadPlans()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    message.error(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -188,10 +189,10 @@ const removeFeature = (index: number) => {
 const handleToggleStatus = async (row: SubscriptionPlan) => {
   try {
     await adminAPI.updatePlanStatus(row.id, { status: row.status === 1 ? 0 : 1 })
-    ElMessage.success('状态更新成功')
+    message.success('状态更新成功')
     loadPlans()
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    message.error(error.response?.data?.message || '操作失败')
   }
 }
 
@@ -203,10 +204,10 @@ const handleDelete = (row: SubscriptionPlan) => {
   }).then(async () => {
     try {
       await adminAPI.deletePlan(row.id)
-      ElMessage.success('删除成功')
+      message.success('删除成功')
       loadPlans()
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+      message.error(error.response?.data?.message || '删除失败')
     }
   })
 }
