@@ -168,15 +168,66 @@ curl -X POST http://localhost:8080/api/user/api-keys \
   -H "Content-Type: application/json" \
   -d '{"keyName":"生产环境密钥"}'
 
-# 3. 调用 AI 接口
-curl -X POST http://localhost:8080/api/chat \
+# 3. 调用 AI 接口 (支持多种格式)
+
+## 方式一: 使用统一接口
+curl -X POST http://localhost:8080/api-chat \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
     "messages": [{"role": "user", "content": "你好"}]
   }'
+
+## 方式二: 使用 OpenAI 兼容接口
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": false
+  }'
+
+## 方式三: 使用 Claude 兼容接口
+curl -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-3-5-sonnet-20241022",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'
 ```
+
+### API 兼容性
+
+本服务作为**通用 AI API 代理服务器**,兼容多种主流 AI API 格式:
+
+#### OpenAI 兼容端点
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/chat/completions` | POST | 创建聊天完成响应 |
+| `/v1/models` | GET | 列出可用模型 |
+
+#### Anthropic Claude 兼容端点
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/messages` | POST | 创建消息响应 |
+
+#### 统一端点
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api-chat` | POST | 统一聊天接口 |
+| `/api/models` | GET | 获取模型列表 |
+
+**特性支持**:
+- ✅ 流式响应 (SSE)
+- ✅ 非流式响应
+- ✅ OpenAI SDK 直接接入
+- ✅ Anthropic SDK 直接接入
+- ✅ 自定义 API Key 认证
+- ✅ 多后端账户池管理
+- ✅ 智能调度与负载均衡
 
 ## 项目结构
 

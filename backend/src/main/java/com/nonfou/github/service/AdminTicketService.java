@@ -2,21 +2,19 @@ package com.nonfou.github.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.nonfou.github.config.TicketNotificationProperties;
+import com.nonfou.github.dto.response.ticket.TicketDetailResponse;
+import com.nonfou.github.dto.response.ticket.TicketMessageResponse;
 import com.nonfou.github.entity.Ticket;
 import com.nonfou.github.entity.TicketMessage;
-import com.nonfou.github.entity.User;
+import com.nonfou.github.enums.TicketStatus;
 import com.nonfou.github.mapper.TicketMapper;
 import com.nonfou.github.mapper.TicketMessageMapper;
-import com.nonfou.github.mapper.UserMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,62 +23,62 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AdminTicketService {
 
-    @Autowired
-    private TicketMapper ticketMapper;
-
-    @Autowired
-    private TicketMessageMapper ticketMessageMapper;
-
-    @Autowired
-    private UserMapper userMapper;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private TicketNotificationProperties ticketNotificationProperties;
+    private final TicketMapper ticketMapper;
+    private final TicketMessageMapper ticketMessageMapper;
+    private final TicketNotificationService ticketNotificationService;
 
     /**
      * 获取工单列表
      */
-    public Page<Ticket> getTicketList(int pageNum, int pageSize, String status, String priority) {
+    public Page<Ticket> getTicketList(int pageNum, int pageSize, String status, String priority, Long ticketId) {
         Page<Ticket> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Ticket> wrapper = new LambdaQueryWrapper<>();
 
         if (status != null && !status.isEmpty()) {
-            wrapper.eq(Ticket::getStatus, status);
+            wrapper.eq(Ticket::getStatus, TicketStatus.normalize(status));
         }
 
         if (priority != null && !priority.isEmpty()) {
             wrapper.eq(Ticket::getPriority, priority);
         }
 
+        if (ticketId != null) {
+            wrapper.eq(Ticket::getId, ticketId);
+        }
+
         wrapper.orderByDesc(Ticket::getCreatedAt);
 
-        return ticketMapper.selectPage(page, wrapper);
+        Page<Ticket> result = ticketMapper.selectPage(page, wrapper);
+        result.getRecords().forEach(this::normalizeTicketStatus);
+        return result;
     }
 
     /**
      * 获取工单详情及消息列表
      */
-    public Map<String, Object> getTicketDetail(Long ticketId) {
+    public TicketDetailResponse getTicketDetail(Long ticketId) {
         Ticket ticket = ticketMapper.selectById(ticketId);
         if (ticket == null) {
             throw new RuntimeException("工单不存在");
         }
+        normalizeTicketStatus(ticket);
 
         LambdaQueryWrapper<TicketMessage> messageWrapper = new LambdaQueryWrapper<>();
         messageWrapper.eq(TicketMessage::getTicketId, ticketId)
                 .orderByAsc(TicketMessage::getCreatedAt);
         List<TicketMessage> messages = ticketMessageMapper.selectList(messageWrapper);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("ticket", ticket);
-        result.put("messages", messages);
+        List<TicketMessageResponse> responses = messages.stream()
+                .map(TicketMessageResponse::fromEntity)
+                .toList();
 
-        return result;
+        return TicketDetailResponse.builder()
+                .ticket(ticket)
+                .messages(responses)
+                .build();
     }
 
     /**
@@ -104,15 +102,16 @@ public class AdminTicketService {
         ticketMessageMapper.insert(ticketMessage);
 
         // 更新工单状态为处理中
-        if ("pending".equals(ticket.getStatus())) {
-            ticket.setStatus("processing");
+        if (!TicketStatus.CLOSED.getValue().equals(ticket.getStatus())) {
+            ticket.setStatus(TicketStatus.PROCESSING.getValue());
             ticket.setUpdatedAt(LocalDateTime.now());
             ticketMapper.updateById(ticket);
         }
+        normalizeTicketStatus(ticket);
 
         log.info("管理员回复工单: adminId={}, ticketId={}", adminId, ticketId);
 
-        notifyUserTicketReply(ticket, message);
+        ticketNotificationService.notifyUserForReply(ticket, message);
 
         return ticketMessage;
     }
@@ -127,9 +126,10 @@ public class AdminTicketService {
             throw new RuntimeException("工单不存在");
         }
 
-        ticket.setStatus(status);
+        ticket.setStatus(TicketStatus.validateOrThrow(status));
         ticket.setUpdatedAt(LocalDateTime.now());
         ticketMapper.updateById(ticket);
+        normalizeTicketStatus(ticket);
 
         log.info("工单状态更新: ticketId={}, status={}", ticketId, status);
     }
@@ -178,35 +178,19 @@ public class AdminTicketService {
         todayWrapper.ge(Ticket::getCreatedAt, LocalDateTime.now().toLocalDate().atStartOfDay());
         Long todayTickets = ticketMapper.selectCount(todayWrapper);
 
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalTickets", totalTickets);
-        stats.put("pendingTickets", pendingTickets);
-        stats.put("processingTickets", processingTickets);
-        stats.put("closedTickets", closedTickets);
-        stats.put("todayTickets", todayTickets);
-
-        return stats;
+        return Map.of(
+                "totalTickets", totalTickets,
+                "pendingTickets", pendingTickets,
+                "processingTickets", processingTickets,
+                "closedTickets", closedTickets,
+                "todayTickets", todayTickets
+        );
     }
 
-    private void notifyUserTicketReply(Ticket ticket, String replyMessage) {
-        if (!ticketNotificationProperties.isEnabled()) {
+    private void normalizeTicketStatus(Ticket ticket) {
+        if (ticket == null) {
             return;
         }
-        User user = userMapper.selectById(ticket.getUserId());
-        if (user == null || !StringUtils.hasText(user.getEmail())) {
-            log.warn("无法发送工单邮件通知，用户邮箱不存在: ticketId={}", ticket.getId());
-            return;
-        }
-
-        String subject = String.format("【xCoder】工单回复 #%d", ticket.getId());
-        StringBuilder body = new StringBuilder()
-                .append("您的工单已收到客服回复。\n\n")
-                .append("工单ID: ").append(ticket.getId()).append("\n")
-                .append("主题: ").append(ticket.getSubject()).append("\n\n")
-                .append("回复内容:\n")
-                .append(replyMessage)
-                .append("\n\n请登录控制台查看详情。");
-
-        emailService.sendNotification(user.getEmail(), subject, body.toString());
+        ticket.setStatus(TicketStatus.normalize(ticket.getStatus()));
     }
 }

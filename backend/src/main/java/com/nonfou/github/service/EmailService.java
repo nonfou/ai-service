@@ -1,14 +1,20 @@
 package com.nonfou.github.service;
 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 邮件服务
@@ -19,6 +25,9 @@ public class EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
+
+    @Autowired
+    private TemplateEngine templateEngine;
 
     @Value("${spring.mail.username}")
     private String from;
@@ -39,13 +48,18 @@ public class EmailService {
     @Async
     public void sendVerifyCode(String to, String code) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("xCoder <" + from + ">");
-            message.setTo(to);
-            message.setSubject("【xCoder】邮箱验证码");
-            message.setText(buildVerifyCodeText(code));
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("code", code);
+            variables.put("expiryMinutes", "5");
 
-            mailSender.send(message);
+            sendHtmlEmail(
+                to,
+                "【xCoder】邮箱验证码",
+                "email/verify-code",
+                variables,
+                "xCoder <" + from + ">"
+            );
+
             log.info("验证码邮件发送成功: {}", to);
         } catch (Exception e) {
             log.error("验证码邮件发送失败: {}", to, e);
@@ -54,37 +68,101 @@ public class EmailService {
     }
 
     /**
-     * 构建验证码邮件内容
-     */
-    private String buildVerifyCodeText(String code) {
-        return String.format(
-            "【xCoder 邮箱验证】\n\n" +
-            "您的验证码是：%s\n\n" +
-            "验证码有效期为 5 分钟，请勿泄露给他人。\n\n" +
-            "如果这不是您的操作，请忽略此邮件。\n\n" +
-            "---\n" +
-            "xCoder - AI 编程助手平台\n" +
-            "https://xcoder.plus",
-            code
-        );
-    }
-
-    /**
-     * 发送通知邮件
+     * 发送通知邮件（使用HTML模板）
+     *
+     * @param to 收件人
+     * @param subject 邮件主题
+     * @param content 邮件内容
      */
     @Async
     public void sendNotification(String to, String subject, String content) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(from);
-            message.setTo(to);
-            message.setSubject(subject);
-            message.setText(content);
+        sendNotification(to, subject, content, null, null, null);
+    }
 
-            mailSender.send(message);
+    /**
+     * 发送通知邮件（完整版本，支持更多参数）
+     *
+     * @param to 收件人
+     * @param subject 邮件主题
+     * @param content 邮件内容
+     * @param ticketId 工单ID（可选）
+     * @param status 状态（可选）
+     * @param actionUrl 操作链接（可选）
+     */
+    @Async
+    public void sendNotification(String to, String subject, String content,
+                                 String ticketId, String status, String actionUrl) {
+        try {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("subject", subject);
+            variables.put("content", content);
+
+            if (ticketId != null) {
+                variables.put("ticketId", ticketId);
+            }
+            if (status != null) {
+                variables.put("status", status);
+            }
+            if (actionUrl != null) {
+                variables.put("actionUrl", actionUrl);
+                variables.put("actionText", "查看详情");
+            }
+
+            sendHtmlEmail(
+                to,
+                subject,
+                "email/ticket-notification",
+                variables,
+                "xCoder <" + from + ">"
+            );
+
             log.info("通知邮件发送成功: {}", to);
         } catch (Exception e) {
             log.error("通知邮件发送失败: {}", to, e);
+        }
+    }
+
+    /**
+     * 发送HTML邮件的通用方法
+     *
+     * @param to 收件人
+     * @param subject 邮件主题
+     * @param contentTemplate 内容模板名称（不含.html后缀）
+     * @param variables 模板变量
+     * @param fromAddress 发件人地址
+     */
+    private void sendHtmlEmail(String to, String subject, String contentTemplate,
+                              Map<String, Object> variables, String fromAddress) {
+        try {
+            // 创建 MimeMessage
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+            // 设置邮件基本信息
+            helper.setFrom(fromAddress != null ? fromAddress : from);
+            helper.setTo(to);
+            helper.setSubject(subject);
+
+            // 准备模板上下文
+            Context context = new Context();
+            context.setVariable("title", subject);
+            context.setVariable("contentTemplate", contentTemplate);
+
+            // 添加内容变量
+            if (variables != null) {
+                variables.forEach(context::setVariable);
+            }
+
+            // 渲染HTML内容
+            String htmlContent = templateEngine.process("email/base-email", context);
+            helper.setText(htmlContent, true);
+
+            // 发送邮件
+            mailSender.send(mimeMessage);
+
+        } catch (MessagingException e) {
+            log.error("HTML邮件发送失败: {}", to, e);
+            throw new RuntimeException("邮件发送失败: " + e.getMessage(), e);
         }
     }
 }

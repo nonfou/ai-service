@@ -5,6 +5,8 @@ import com.nonfou.github.entity.ApiCall;
 import com.nonfou.github.entity.BalanceLog;
 import com.nonfou.github.entity.Model;
 import com.nonfou.github.entity.User;
+import com.nonfou.github.exception.BusinessException;
+import com.nonfou.github.exception.ApiErrorCodes;
 import com.nonfou.github.mapper.ApiCallMapper;
 import com.nonfou.github.mapper.BalanceLogMapper;
 import com.nonfou.github.mapper.ModelMapper;
@@ -105,7 +107,7 @@ public class BalanceService {
 
         // 检查余额
         if (user.getBalance().compareTo(cost) < 0) {
-            throw new RuntimeException("余额不足，请先充值");
+            throw new BusinessException(ApiErrorCodes.PAYMENT_REQUIRED, "余额不足，请先充值");
         }
 
         // 扣除余额
@@ -221,7 +223,7 @@ public class BalanceService {
 
         // 检查余额
         if (user.getBalance().compareTo(amount) < 0) {
-            throw new RuntimeException("余额不足");
+            throw new BusinessException(ApiErrorCodes.PAYMENT_REQUIRED, "余额不足，请先充值");
         }
 
         // 扣除余额

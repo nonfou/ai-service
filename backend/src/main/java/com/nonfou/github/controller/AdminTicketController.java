@@ -3,13 +3,15 @@ package com.nonfou.github.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nonfou.github.annotation.RequireAdmin;
 import com.nonfou.github.common.Result;
+import com.nonfou.github.dto.request.ticket.AdminTicketReplyRequest;
+import com.nonfou.github.dto.response.ticket.TicketDetailResponse;
+import com.nonfou.github.dto.response.ticket.TicketMessageResponse;
 import com.nonfou.github.entity.Ticket;
-import com.nonfou.github.entity.TicketMessage;
 import com.nonfou.github.service.AdminTicketService;
-import com.nonfou.github.util.JwtUtil;
-import jakarta.servlet.http.HttpServletRequest;
+import com.nonfou.github.util.SecurityUtil;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -21,13 +23,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/tickets")
 @RequireAdmin
+@RequiredArgsConstructor
 public class AdminTicketController {
 
-    @Autowired
-    private AdminTicketService adminTicketService;
-
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final AdminTicketService adminTicketService;
 
     /**
      * 获取工单列表
@@ -37,9 +36,10 @@ public class AdminTicketController {
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String priority) {
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) Long ticketId) {
 
-        Page<Ticket> page = adminTicketService.getTicketList(pageNum, pageSize, status, priority);
+        Page<Ticket> page = adminTicketService.getTicketList(pageNum, pageSize, status, priority, ticketId);
         return Result.success(page);
     }
 
@@ -47,9 +47,9 @@ public class AdminTicketController {
      * 获取工单详情
      */
     @GetMapping("/{ticketId}")
-    public Result<Map<String, Object>> getTicketDetail(@PathVariable Long ticketId) {
+    public Result<TicketDetailResponse> getTicketDetail(@PathVariable Long ticketId) {
         try {
-            Map<String, Object> result = adminTicketService.getTicketDetail(ticketId);
+            TicketDetailResponse result = adminTicketService.getTicketDetail(ticketId);
             return Result.success(result);
         } catch (Exception e) {
             log.error("获取工单详情失败", e);
@@ -61,22 +61,18 @@ public class AdminTicketController {
      * 管理员回复工单
      */
     @PostMapping("/{ticketId}/reply")
-    public Result<TicketMessage> replyTicket(
-            HttpServletRequest request,
+    public Result<TicketMessageResponse> replyTicket(
             @PathVariable Long ticketId,
-            @RequestBody Map<String, String> body) {
+            @Valid @RequestBody AdminTicketReplyRequest requestBody) {
 
         try {
-            String message = body.get("message");
-            if (message == null || message.trim().isEmpty()) {
-                return Result.error("消息内容不能为空");
+            Long adminId = SecurityUtil.getCurrentUserId();
+            if (adminId == null) {
+                return Result.error(401, "未授权");
             }
 
-            // 从token获取管理员ID
-            Long adminId = getAdminIdFromRequest(request);
-
-            TicketMessage ticketMessage = adminTicketService.replyTicket(adminId, ticketId, message);
-            return Result.success(ticketMessage);
+            var ticketMessage = adminTicketService.replyTicket(adminId, ticketId, requestBody.getMessage());
+            return Result.success(TicketMessageResponse.fromEntity(ticketMessage));
         } catch (Exception e) {
             log.error("回复工单失败", e);
             return Result.error(e.getMessage());
@@ -134,16 +130,5 @@ public class AdminTicketController {
     public Result<Map<String, Object>> getTicketStatistics() {
         Map<String, Object> stats = adminTicketService.getTicketStatistics();
         return Result.success(stats);
-    }
-
-    /**
-     * 从请求中获取管理员ID
-     */
-    private Long getAdminIdFromRequest(HttpServletRequest request) {
-        String authorization = request.getHeader("Authorization");
-        String token = authorization.startsWith("Bearer ")
-                ? authorization.substring(7)
-                : authorization;
-        return jwtUtil.getUserIdFromToken(token);
     }
 }

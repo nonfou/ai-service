@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
         String ip = getClientIp(request);
         log.warn("⚠️ 认证失败: uri={}, ip={}, error={}",
             request.getRequestURI(), ip, e.getMessage());
-        return Result.error(401, "认证失败，请重新登录");
+        return Result.error(ApiErrorCodes.UNAUTHORIZED, "认证失败，请重新登录");
     }
 
     /**
@@ -57,7 +57,17 @@ public class GlobalExceptionHandler {
         Long userId = getCurrentUserId();
         log.warn("⚠️ 权限不足: uri={}, ip={}, userId={}",
             request.getRequestURI(), ip, userId);
-        return Result.error(403, "权限不足");
+        return Result.error(ApiErrorCodes.FORBIDDEN, "权限不足");
+    }
+
+    /**
+     * 处理上游模型返回的业务异常
+     */
+    @ExceptionHandler(ChatUpstreamException.class)
+    public Result<Void> handleChatUpstreamException(ChatUpstreamException e, HttpServletRequest request) {
+        log.warn("上游模型异常: uri={}, code={}, message={}",
+                request.getRequestURI(), e.getStatusCode(), e.getMessage());
+        return Result.error(e.getStatusCode(), e.getMessage());
     }
 
     /**
@@ -113,7 +123,7 @@ public class GlobalExceptionHandler {
         String ip = getClientIp(request);
         log.error("❌ 未处理的运行时异常: uri={}, ip={}, error={}",
             request.getRequestURI(), ip, e.getMessage(), e);
-        return Result.error("系统错误，请联系管理员");
+        return Result.error(ApiErrorCodes.INTERNAL_ERROR, "系统错误，请联系管理员");
     }
 
     /**

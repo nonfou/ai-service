@@ -2,12 +2,17 @@ package com.nonfou.github.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nonfou.github.common.Result;
+import com.nonfou.github.dto.request.ticket.TicketCreateRequest;
+import com.nonfou.github.dto.request.ticket.TicketReplyRequest;
+import com.nonfou.github.dto.response.ticket.TicketDetailResponse;
+import com.nonfou.github.dto.response.ticket.TicketMessageResponse;
 import com.nonfou.github.entity.Ticket;
 import com.nonfou.github.entity.TicketMessage;
 import com.nonfou.github.service.TicketService;
 import com.nonfou.github.util.SecurityUtil;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -20,32 +25,24 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/tickets")
+@RequiredArgsConstructor
 public class TicketController {
 
-    @Autowired
-    private TicketService ticketService;
+    private final TicketService ticketService;
 
     /**
      * 创建工单
      */
     @PostMapping
     public Result<Ticket> createTicket(
-            @RequestBody Map<String, String> body) {
+            @Valid @RequestBody TicketCreateRequest request) {
         Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
 
         try {
-            String subject = body.get("subject");
-            String content = body.get("content");
-            String priority = body.getOrDefault("priority", "normal");
-
-            if (subject == null || content == null) {
-                return Result.error("主题和内容不能为空");
-            }
-
-            Ticket ticket = ticketService.createTicket(userId, subject, content, priority);
+            Ticket ticket = ticketService.createTicket(userId, request);
             return Result.success(ticket);
         } catch (Exception e) {
             log.error("创建工单失败", e);
@@ -73,7 +70,7 @@ public class TicketController {
      * 获取工单详情
      */
     @GetMapping("/{ticketId}")
-    public Result<Map<String, Object>> getTicketDetail(
+    public Result<TicketDetailResponse> getTicketDetail(
             @PathVariable Long ticketId) {
         Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
@@ -85,35 +82,31 @@ public class TicketController {
             return Result.error("工单不存在");
         }
 
-        List<TicketMessage> messages = ticketService.getTicketMessages(ticketId);
+        List<TicketMessageResponse> messages = ticketService.getTicketMessages(ticketId).stream()
+                .map(TicketMessageResponse::fromEntity)
+                .toList();
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("ticket", ticket);
-        data.put("messages", messages);
-
-        return Result.success(data);
+        return Result.success(TicketDetailResponse.builder()
+                .ticket(ticket)
+                .messages(messages)
+                .build());
     }
 
     /**
      * 回复工单
      */
     @PostMapping("/{ticketId}/reply")
-    public Result<TicketMessage> replyTicket(
+    public Result<TicketMessageResponse> replyTicket(
             @PathVariable Long ticketId,
-            @RequestBody Map<String, String> body) {
+            @Valid @RequestBody TicketReplyRequest request) {
         Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
             return Result.error(401, "未授权");
         }
 
         try {
-            String message = body.get("message");
-            if (message == null || message.trim().isEmpty()) {
-                return Result.error("消息内容不能为空");
-            }
-
-            TicketMessage ticketMessage = ticketService.replyTicket(userId, ticketId, message);
-            return Result.success(ticketMessage);
+            TicketMessage ticketMessage = ticketService.replyTicket(userId, ticketId, request);
+            return Result.success(TicketMessageResponse.fromEntity(ticketMessage));
         } catch (Exception e) {
             log.error("回复工单失败", e);
             return Result.error(e.getMessage());

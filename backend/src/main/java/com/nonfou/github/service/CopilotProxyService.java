@@ -1,454 +1,390 @@
 package com.nonfou.github.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nonfou.github.config.CopilotProxyProperties;
 import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.response.ChatResponse;
 import com.nonfou.github.entity.ApiKey;
-import com.nonfou.github.entity.BackendAccount;
-import com.nonfou.github.entity.Model;
-import com.nonfou.github.mapper.ModelMapper;
-import com.nonfou.github.service.CostCalculatorService.CostResult;
-import com.nonfou.github.service.CostCalculatorService.TokenUsage;
+import com.nonfou.github.exception.ChatAuthorizationException;
+import com.nonfou.github.exception.ChatProcessingException;
+import com.nonfou.github.exception.ChatUpstreamException;
 import com.nonfou.github.service.proxy.ModelProxy;
-import com.nonfou.github.util.SessionUtil;
-import com.nonfou.github.util.TokenEstimator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.task.TaskExecutor;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.math.BigDecimal;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Locale;
 
 /**
- * Copilot 浠ｇ悊鏈嶅姟 - 澶氳处鎴峰寮虹増
+ * Copilot 代理服务：负责将请求转发到外部 Copilot Relay（Node 服务），并兼容 OpenAI/Claude 协议。
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class CopilotProxyService implements ModelProxy {
 
-    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+    private static final String CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
 
-    @Autowired
-    private RestTemplate restTemplate;
-
-    @Autowired
-    private AccountSchedulerService accountScheduler;
-
-    @Autowired
-    private SessionStickinessService sessionStickinessService;
-
-    @Autowired
-    private QuotaService quotaService;
-
-    @Autowired
-    private CostCalculatorService costCalculatorService;
-
-    @Autowired
-    private BackendAccountService backendAccountService;
-
-    @Autowired
-    private ModelMapper modelMapper;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private TokenEstimator tokenEstimator;
-
-    @Autowired
+    private final RestTemplate restTemplate;
+    private final CopilotProxyProperties proxyProperties;
+    private final ObjectMapper objectMapper;
     @Qualifier("streamTaskExecutor")
-    private TaskExecutor streamTaskExecutor;
-
-    @Value("${backend.copilot.base-url:https://api.githubcopilot.com}")
-    private String copilotBaseUrl;
-
-    @Value("${backend.streaming.timeout-ms:300000}")
-    private long streamTimeoutMs;
+    private final TaskExecutor streamTaskExecutor;
 
     @Override
     public String getProvider() {
+        // 与 ChatWorkflowService.determineProvider 保持一致，继续使用 copilot 作为 provider 标识
         return "copilot";
     }
 
     /**
-     * 闈炴祦寮忚亰澶?
+     * 非流式聊天请求，转发给 Copilot Relay 并返回统一的 ChatResponse。
      */
     @Override
     public ChatResponse chat(ChatRequest request, ApiKey apiKey) {
-        // 1. 鐢熸垚浼氳瘽鍝堝笇锛堢敤浜庝細璇濈矘鎬э級
-        String sessionHash = SessionUtil.generateSessionHash(
-            apiKey.getApiKey(),
-            request.getModel(),
-            request.getMessages()
-        );
-
-        // 2. 閫夋嫨鍚庣璐︽埛
-        BackendAccount account = accountScheduler.selectAccount(apiKey, request.getModel(), sessionHash);
-        if (account == null) {
-            throw new RuntimeException("No available Copilot account");
-        }
-
-        // 3. 妫€鏌ラ厤棰?
-        quotaService.checkAndEnforceQuota(apiKey.getUserId());
-
-        // 4. 鏋勫缓璇锋眰
-        String endpoint = copilotBaseUrl + "/v1/chat/completions";
-        HttpHeaders headers = buildHeaders(account);
-
-        // 纭繚闈炴祦寮?
-        ChatRequest modifiedRequest = new ChatRequest();
-        modifiedRequest.setModel(request.getModel());
-        modifiedRequest.setMessages(request.getMessages());
-        modifiedRequest.setMaxTokens(request.getMaxTokens());
-        modifiedRequest.setTemperature(request.getTemperature());
-        modifiedRequest.setStream(false);
-
-        HttpEntity<ChatRequest> entity = new HttpEntity<>(modifiedRequest, headers);
+        validateApiKey(apiKey);
+        Map<String, Object> payload = buildPayload(request, false);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders());
 
         try {
-            // 5. 鍙戦€佽姹?
-            log.info("璋冪敤 Copilot API: account={}, model={}, messages={}",
-                    account.getAccountName(), request.getModel(), request.getMessages().size());
+            ResponseEntity<ChatResponse> response = restTemplate.exchange(
+                    baseUrl() + CHAT_COMPLETIONS_PATH,
+                    HttpMethod.POST,
+                    entity,
+                    ChatResponse.class
+            );
 
-            ResponseEntity<ChatResponse> response = restTemplate.postForEntity(endpoint, entity, ChatResponse.class);
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                ChatResponse chatResponse = response.getBody();
-
-                // 6. 璁＄畻鎴愭湰
-                if (chatResponse.getUsage() != null) {
-                    TokenUsage usage = TokenUsage.builder()
-                            .inputTokens(chatResponse.getUsage().getPromptTokens())
-                            .outputTokens(chatResponse.getUsage().getCompletionTokens())
-                            .cacheReadTokens(0)
-                            .cacheWriteTokens(0)
-                            .build();
-
-                    CostResult costResult = costCalculatorService.calculate(
-                            usage, request.getModel(), account.getId(), apiKey.getUserId());
-
-                    // 7. 鎵ｉ櫎閰嶉
-                    quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
-
-                    log.info("Copilot API 鍝嶅簲鎴愬姛: account={}, tokens={}, cost=${}",
-                            account.getAccountName(),
-                            chatResponse.getUsage().getTotalTokens(),
-                            costResult.getTotalCost());
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                if (log.isDebugEnabled()) {
+                    try {
+                        log.debug("Copilot Proxy 响应: {}", objectMapper.writeValueAsString(response.getBody()));
+                    } catch (Exception ignored) {
+                    }
                 }
-
-                // 8. 鏇存柊璐︽埛浣跨敤缁熻
-                backendAccountService.recordSuccess(account.getId());
-
-                // 9. 淇濆瓨浼氳瘽绮樻€?
-                sessionStickinessService.saveMapping(sessionHash, account.getId());
-
-                return chatResponse;
-            } else {
-                // 10. 璁板綍澶辫触
-                backendAccountService.recordError(account.getId(), "HTTP " + response.getStatusCode());
-                throw new RuntimeException("Copilot API 鍝嶅簲寮傚父: " + response.getStatusCode());
+                return response.getBody();
             }
-        } catch (Exception e) {
-            // 11. 璁板綍澶辫触
-            backendAccountService.recordError(account.getId(), e.getMessage());
-            log.error("璋冪敤 Copilot API 澶辫触: account={}", account.getAccountName(), e);
-            throw new RuntimeException("AI 鏈嶅姟鏆傛椂涓嶅彲鐢? " + e.getMessage());
+
+            throw new ChatProcessingException("上游模型服务调用失败，HTTP " + response.getStatusCode());
+        } catch (HttpStatusCodeException ex) {
+            throw translateException(ex);
+        } catch (ChatAuthorizationException | ChatProcessingException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Copilot Relay 调用异常", ex);
+            throw new ChatProcessingException("聊天服务暂时不可用，请稍后重试", ex);
         }
     }
 
     /**
-     * 娴佸紡鑱婂ぉ
+     * 流式聊天请求，透传 Copilot Relay 的 SSE。
      */
     @Override
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey) {
-        SseEmitter emitter = new SseEmitter(streamTimeoutMs);
-
-        String sessionHash = SessionUtil.generateSessionHash(
-                apiKey.getApiKey(),
-                request.getModel(),
-                request.getMessages()
-        );
-
-        BackendAccount account = accountScheduler.selectAccount(apiKey, request.getModel(), sessionHash);
-        if (account == null) {
-            emitter.completeWithError(new RuntimeException("No available Copilot account"));
-            return emitter;
-        }
-
-        try {
-            quotaService.checkAndEnforceQuota(apiKey.getUserId());
-        } catch (Exception e) {
-            emitter.completeWithError(e);
-            return emitter;
-        }
-
-        StreamingResources resources = new StreamingResources();
-        registerEmitterCallbacks(emitter, resources);
-
-        streamTaskExecutor.execute(() -> {
-            AtomicReference<TokenUsage> usageRef = new AtomicReference<>();
-            StringBuilder fullContent = new StringBuilder();
-
-            try {
-                HttpURLConnection connection = buildStreamingConnection(account);
-                resources.connection = connection;
-
-                ChatRequest modifiedRequest = new ChatRequest();
-                modifiedRequest.setModel(request.getModel());
-                modifiedRequest.setMessages(request.getMessages());
-                modifiedRequest.setMaxTokens(request.getMaxTokens());
-                modifiedRequest.setTemperature(request.getTemperature());
-                modifiedRequest.setStream(true);
-
-                String requestBody = objectMapper.writeValueAsString(modifiedRequest);
-                connection.getOutputStream().write(requestBody.getBytes(StandardCharsets.UTF_8));
-
-                log.info("娴佸紡璋冪敤 Copilot API: account={}, model={}",
-                        account.getAccountName(), request.getModel());
-
-                resources.reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-                String line;
-
-                while ((line = resources.reader.readLine()) != null) {
-                    if (!line.startsWith("data: ")) {
-                        continue;
-                    }
-
-                    String data = line.substring(6);
-                    if ("[DONE]".equals(data.trim())) {
-                        emitter.send(SseEmitter.event().data("[DONE]"));
-                        break;
-                    }
-
-                    emitter.send(SseEmitter.event().data(data));
-                    handleStreamChunk(data, fullContent, usageRef);
-                }
-
-                finalizeStreamingCost(request, apiKey, account, sessionHash, fullContent.toString(), usageRef.get());
-                emitter.complete();
-            } catch (Exception e) {
-                log.error("娴佸紡璋冪敤 Copilot API 澶辫触: account={}", account.getAccountName(), e);
-                backendAccountService.recordError(account.getId(), e.getMessage());
-                emitter.completeWithError(e);
-            } finally {
-                closeResources(resources);
-            }
-        });
-
+        validateApiKey(apiKey);
+        SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
+        streamTaskExecutor.execute(() -> executeStream(request, emitter));
         return emitter;
     }
 
-    /**
-     * 娴嬭瘯杩炴帴锛堜娇鐢ㄨ皟搴﹀櫒閫夋嫨鐨勮处鎴凤級
-     */
-    public boolean testConnection(ApiKey apiKey) {
+    private void executeStream(ChatRequest request, SseEmitter emitter) {
+        HttpURLConnection connection = null;
+        BufferedReader reader = null;
+        AtomicBoolean completed = new AtomicBoolean(false);
+
         try {
-            BackendAccount account = accountScheduler.selectAccount(apiKey, "gpt-4", null);
-            if (account == null) {
-                return false;
+            connection = openStreamingConnection();
+            Map<String, Object> payload = buildPayload(request, true);
+            writeRequestBody(connection, payload);
+
+            int status = connection.getResponseCode();
+            if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
+                log.warn("Copilot Proxy 流式鉴权失败: HTTP {}", status);
+                sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
+                return;
             }
 
-            String endpoint = copilotBaseUrl + "/v1/models";
-            HttpHeaders headers = buildHeaders(account);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    endpoint, HttpMethod.GET, entity, String.class);
-
-            boolean success = response.getStatusCode() == HttpStatus.OK;
-            if (success) {
-                backendAccountService.recordSuccess(account.getId());
-            } else {
-                backendAccountService.recordError(account.getId(), "Connection test failed");
+            if (status < 200 || status >= 300) {
+                String errorBody = readErrorBody(connection);
+                log.error("Copilot Proxy 流式调用失败: HTTP {}, body={}", status, errorBody);
+                String friendly = extractFriendlyMessage(errorBody);
+                sendStreamError(emitter, status,
+                        friendly != null ? friendly : buildFriendlyMessage(status),
+                        "processing_error");
+                return;
             }
 
-            return success;
-        } catch (Exception e) {
-            log.error("Copilot API 杩炴帴娴嬭瘯澶辫触", e);
-            return false;
+            reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("data: ")) {
+                    continue;
+                }
+                String data = line.substring(6);
+                emitter.send(SseEmitter.event().data(data));
+
+                if ("[DONE]".equals(data.trim())) {
+                    completed.set(true);
+                    break;
+                }
+            }
+
+            if (!completed.get()) {
+                emitter.send(SseEmitter.event().data("[DONE]"));
+            }
+            emitter.complete();
+        } catch (Exception ex) {
+            log.error("Copilot Proxy 流式调用异常", ex);
+            sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "上游模型服务流式接口异常", "processing_error");
+        } finally {
+            closeResources(reader, connection);
         }
     }
 
-    /**
-     * 鑾峰彇鍙敤妯″瀷鍒楄〃锛堜娇鐢ㄧ涓€涓彲鐢ㄨ处鎴凤級
-     */
-    public String getModels(ApiKey apiKey) {
-        try {
-            BackendAccount account = accountScheduler.selectAccount(apiKey, "gpt-4", null);
-            if (account == null) {
-                throw new RuntimeException("No available Copilot account");
-            }
+    private Map<String, Object> buildPayload(ChatRequest request, boolean stream) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", request.getModel());
+        payload.put("messages", request.getMessages());
+        payload.put("stream", stream);
 
-            String endpoint = copilotBaseUrl + "/v1/models";
-            HttpHeaders headers = buildHeaders(account);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    endpoint, HttpMethod.GET, entity, String.class);
-
-            return response.getBody();
-        } catch (Exception e) {
-            log.error("鑾峰彇 Copilot 妯″瀷鍒楄〃澶辫触", e);
-            throw new RuntimeException("Failed to get models: " + e.getMessage());
+        if (request.getMaxTokens() != null) {
+            payload.put("max_tokens", request.getMaxTokens());
         }
+        if (request.getTemperature() != null) {
+            payload.put("temperature", request.getTemperature());
+        }
+        if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
+            payload.putAll(request.getAdditionalParams());
+        }
+
+        return payload;
     }
 
-    /**
-     * 鍋ュ悍妫€鏌ユ寚瀹氳处鎴?
-     */
-    public boolean healthCheck(Long accountId) {
-        try {
-            BackendAccount account = backendAccountService.getById(accountId);
-            if (account == null || !"copilot".equals(account.getProvider())) {
-                return false;
-            }
-
-            String endpoint = copilotBaseUrl + "/v1/models";
-            HttpHeaders headers = buildHeaders(account);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    endpoint, HttpMethod.GET, entity, String.class);
-
-            boolean healthy = response.getStatusCode() == HttpStatus.OK;
-
-            if (healthy) {
-                backendAccountService.updateHealth(accountId, "active", "鍋ュ悍妫€鏌ラ€氳繃");
-            } else {
-                backendAccountService.updateHealth(accountId, "error", "鍋ュ悍妫€鏌ュけ璐? HTTP " + response.getStatusCode());
-            }
-
-            return healthy;
-        } catch (Exception e) {
-            log.error("Copilot 璐︽埛鍋ュ悍妫€鏌ュけ璐? accountId={}", accountId, e);
-            backendAccountService.updateHealth(accountId, "error", "鍋ュ悍妫€鏌ュ紓甯? " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 鏋勫缓璇锋眰澶?
-     */
-    private HttpHeaders buildHeaders(BackendAccount account) {
+    private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        String decryptedToken = backendAccountService.decryptToken(account.getAccessToken());
-        headers.set("Authorization", "Bearer " + decryptedToken);
+        if (StringUtils.hasText(proxyProperties.getApiKey())) {
+            headers.set(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+        }
+
+        if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
+            proxyProperties.getExtraHeaders().forEach(headers::set);
+        }
 
         return headers;
     }
 
-    private HttpURLConnection buildStreamingConnection(BackendAccount account) throws Exception {
-        String endpoint = copilotBaseUrl + "/v1/chat/completions";
-        URL url = new URL(endpoint);
+    private HttpURLConnection openStreamingConnection() throws Exception {
+        URL url = new URL(baseUrl() + CHAT_COMPLETIONS_PATH);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
-        connection.setRequestProperty("Content-Type", "application/json");
-        connection.setRequestProperty("Authorization", "Bearer " + backendAccountService.decryptToken(account.getAccessToken()));
-        connection.setConnectTimeout(10_000);
-        connection.setReadTimeout((int) streamTimeoutMs);
+        connection.setDoInput(true);
+        connection.setConnectTimeout(proxyProperties.getConnectTimeoutMs());
+        connection.setReadTimeout(proxyProperties.getReadTimeoutMs());
+        connection.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+        if (StringUtils.hasText(proxyProperties.getApiKey())) {
+            connection.setRequestProperty(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+        }
+        if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
+            proxyProperties.getExtraHeaders().forEach(connection::setRequestProperty);
+        }
+
         return connection;
     }
 
-    private void handleStreamChunk(String data,
-                                   StringBuilder fullContent,
-                                   AtomicReference<TokenUsage> usageRef) {
-        try {
-            JsonNode node = objectMapper.readTree(data);
-
-            if (node.has("usage")) {
-                Map<String, Object> usageMap = objectMapper.convertValue(node.get("usage"), MAP_TYPE);
-                usageRef.set(TokenUsage.from(usageMap));
-            }
-
-            JsonNode choices = node.get("choices");
-            if (choices != null && choices.isArray()) {
-                for (JsonNode choice : choices) {
-                    JsonNode delta = choice.get("delta");
-                    if (delta != null) {
-                        JsonNode contentNode = delta.get("content");
-                        if (contentNode != null && !contentNode.isNull()) {
-                            fullContent.append(contentNode.asText(""));
-                        }
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            log.debug("蹇界暐鏃犳硶瑙ｆ瀽鐨?Copilot 娴佸紡鐗囨: {}", data);
+    private void writeRequestBody(HttpURLConnection connection, Map<String, Object> payload) throws Exception {
+        String body = objectMapper.writeValueAsString(payload);
+        try (OutputStream outputStream = connection.getOutputStream()) {
+            outputStream.write(body.getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
         }
     }
 
-    private void finalizeStreamingCost(ChatRequest request,
-                                       ApiKey apiKey,
-                                       BackendAccount account,
-                                       String sessionHash,
-                                       String fullContent,
-                                       TokenUsage usage) {
-        try {
-            TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, fullContent);
-            if (finalUsage == null) {
-                log.warn("Copilot 娴佸紡鍝嶅簲缂哄皯 usage 淇℃伅锛岃烦杩囪璐? account={}, model={}",
-                        account.getAccountName(), request.getModel());
-            } else {
-                CostResult costResult = costCalculatorService.calculate(
-                        finalUsage, request.getModel(), account.getId(), apiKey.getUserId());
-                quotaService.deductQuota(apiKey.getUserId(), costResult.getTotalCost());
-                log.info("Copilot 娴佸紡鍝嶅簲瀹屾垚: account={}, tokens(in/out)={}/{}, cost=${}",
-                        account.getAccountName(),
-                        finalUsage.getInputTokens(),
-                        finalUsage.getOutputTokens(),
-                        costResult.getTotalCost());
-            }
+    private RuntimeException translateException(HttpStatusCodeException ex) {
+        int statusCode = ex.getStatusCode().value();
+        String body = ex.getResponseBodyAsString();
+        log.warn("Copilot Proxy 请求失败: status={}, body={}", statusCode, body);
 
-            backendAccountService.recordSuccess(account.getId());
-            sessionStickinessService.saveMapping(sessionHash, account.getId());
-        } catch (Exception e) {
-            log.error("Copilot 娴佸紡璁¤垂澶辫触: account={}", account.getAccountName(), e);
-            throw new RuntimeException("Copilot 璁¤垂澶辫触: " + e.getMessage(), e);
+        if (statusCode == HttpStatus.UNAUTHORIZED.value() || statusCode == HttpStatus.FORBIDDEN.value()) {
+            return new ChatAuthorizationException(statusCode, "上游模型服务鉴权失败");
         }
+
+        String friendly = extractFriendlyMessage(body);
+        if (ex.getStatusCode().is4xxClientError()) {
+            return new ChatUpstreamException(statusCode,
+                    friendly != null ? friendly : "请求参数不被上游接受，请检查模型或参数设置", ex);
+        }
+
+        if (statusCode == HttpStatus.TOO_MANY_REQUESTS.value()) {
+            return new ChatProcessingException("上游模型服务请求过于频繁，请稍后再试", ex);
+        }
+
+            return new ChatProcessingException(
+                    friendly != null ? friendly : buildFriendlyMessage(statusCode), ex);
     }
 
-    private void registerEmitterCallbacks(SseEmitter emitter, StreamingResources resources) {
-        emitter.onCompletion(() -> closeResources(resources));
-        emitter.onTimeout(() -> closeResources(resources));
-        emitter.onError(error -> closeResources(resources));
+    private String formatBearer(String value) {
+        return value.startsWith("Bearer ") ? value : "Bearer " + value;
     }
 
-    private void closeResources(StreamingResources resources) {
-        if (resources == null) {
-            return;
-        }
+    private void closeResources(BufferedReader reader, HttpURLConnection connection) {
         try {
-            if (resources.reader != null) {
-                resources.reader.close();
+            if (reader != null) {
+                reader.close();
             }
         } catch (Exception ignored) {
         }
-
-        if (resources.connection != null) {
-            resources.connection.disconnect();
+        if (connection != null) {
+            connection.disconnect();
         }
     }
 
-    private static class StreamingResources {
-        private volatile BufferedReader reader;
-        private volatile HttpURLConnection connection;
+    private void sendStreamError(SseEmitter emitter, int statusCode, String message, String type) {
+        Map<String, Object> payload = new HashMap<>();
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", statusCode);
+        error.put("message", message);
+        error.put("type", type);
+        payload.put("error", error);
+
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(objectMapper.writeValueAsString(payload)));
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+        } catch (Exception exception) {
+            emitter.completeWithError(exception);
+        }
+    }
+
+    private String readErrorBody(HttpURLConnection connection) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            return builder.length() > 0 ? builder.toString() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String extractFriendlyMessage(String responseBody) {
+        if (!StringUtils.hasText(responseBody)) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode errorNode = root.path("error");
+            String code = safeText(errorNode.get("code"));
+            String message = safeText(errorNode.get("message"));
+
+            if (StringUtils.hasText(message) && message.trim().startsWith("{")) {
+                try {
+                    JsonNode nested = objectMapper.readTree(message);
+                    JsonNode nestedError = nested.path("error");
+                    if (!nestedError.isMissingNode()) {
+                        if (!StringUtils.hasText(code)) {
+                            code = safeText(nestedError.get("code"));
+                        }
+                        message = safeText(nestedError.get("message"));
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            if (!errorNode.isMissingNode() && !StringUtils.hasText(message)) {
+                message = responseBody;
+            }
+
+            if (!errorNode.isMissingNode()) {
+                return translateFriendlyMessage(message, code);
+            }
+
+            if (root.has("message")) {
+                return translateFriendlyMessage(safeText(root.get("message")), null);
+            }
+
+            return translateFriendlyMessage(responseBody, null);
+        } catch (Exception e) {
+            return translateFriendlyMessage(responseBody, null);
+        }
+    }
+
+    private String translateFriendlyMessage(String rawMessage, String code) {
+        String fallback = "上游模型服务暂不可用，请稍后重试";
+        if (StringUtils.hasText(code) && "model_not_supported".equalsIgnoreCase(code)) {
+            return "该模型暂未开放，请在控制台更换其他模型";
+        }
+        if (StringUtils.hasText(rawMessage)) {
+            String text = rawMessage.trim();
+            String lower = text.toLowerCase(Locale.ROOT);
+            if (lower.contains("model") && lower.contains("not supported")) {
+                return "该模型暂未开放，请在控制台更换其他模型";
+            }
+            return text;
+        }
+        return fallback;
+    }
+
+    private String buildFriendlyMessage(int status) {
+        return "上游模型服务调用失败，HTTP " + status;
+    }
+
+    private String safeText(JsonNode node) {
+        return node != null && !node.isNull() ? node.asText() : null;
+    }
+
+    private void validateApiKey(ApiKey apiKey) {
+        if (apiKey == null) {
+            throw new ChatAuthorizationException(HttpStatus.UNAUTHORIZED.value(), "API Key 无效");
+        }
+        if (apiKey.getStatus() != null && apiKey.getStatus() == 0) {
+            throw new ChatAuthorizationException(HttpStatus.FORBIDDEN.value(), "API Key 已被禁用");
+        }
+    }
+
+    private String baseUrl() {
+        String base = proxyProperties.getBaseUrl();
+        if (!StringUtils.hasText(base)) {
+            throw new ChatProcessingException("代理服务基础地址未配置");
+        }
+        String normalized = base.trim();
+        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+            normalized = "https://" + normalized;
+        }
+        if (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 }

@@ -97,6 +97,14 @@ spring:
           timeout: 5000
           connectionTimeout: 5000
 
+  # Thymeleaf 配置 (用于邮件模板)
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: ${THYMELEAF_CACHE:true}  # 生产环境启用缓存，开发环境可设为false
+
 # MyBatis Plus 配置
 mybatis-plus:
   mapper-locations: classpath:mapper/**/*.xml
@@ -132,6 +140,8 @@ ticket:
   notify:
     enabled: ${TICKET_NOTIFY_ENABLED:true}
     admin-email: ${TICKET_ADMIN_EMAIL:}
+    admin-console-url: ${TICKET_ADMIN_CONSOLE_URL:}
+    user-portal-url: ${TICKET_USER_PORTAL_URL:}
 
 # 系统配置缓存
 system-config:
@@ -185,6 +195,25 @@ encryption:
 
 # 后端账户调度配置
 backend:
+  client:
+    models:
+      enabled: ${CLIENT_MODEL_ALIAS_ENABLED:true}
+      aliases:
+        claude-sonnet-4-5: claude-sonnet-4.5
+        claude-sonnet-4.5: claude-sonnet-4.5
+        claude-sonnect-4-5: claude-sonnet-4.5
+        claude-sonnect-4.5: claude-sonnet-4.5
+        claude-4.5-sonnet: claude-sonnet-4.5
+        claude-haiku-4-5: claude-haiku-4.5
+        claude-haiku-4.5: claude-haiku-4.5
+        claude-4.5-haiku: claude-haiku-4.5
+        gpt-5-1: gpt-5.1
+        gpt5.1: gpt-5.1
+        gpt-5-1-codex: gpt-5.1-codex
+        gpt-5-1-codex-mini: gpt-5.1-codex-mini
+        gemini-2-5-pro: gemini-2.5-pro
+        gemini-3-0-pro: gemini-3-pro
+
   streaming:
     timeout-ms: ${BACKEND_STREAM_TIMEOUT_MS:300000}
     core-pool-size: ${BACKEND_STREAM_CORE_POOL:4}
@@ -197,9 +226,14 @@ backend:
     # 默认提供商: copilot 或 openrouter
     default-provider: ${BACKEND_DEFAULT_PROVIDER:copilot}
 
-  # Copilot 配置
+  # Copilot 配置（直连 & Relay）
   copilot:
-    base-url: ${COPILOT_BASE_URL:https://api.githubcopilot.com}
+    proxy:
+      base-url: ${COPILOT_PROXY_BASE_URL:http://67.209.176.51:2235}
+      api-key: ${COPILOT_PROXY_API_KEY:}
+      connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:60000}
+      stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:300000}
 
   # 调度策略
   scheduler:

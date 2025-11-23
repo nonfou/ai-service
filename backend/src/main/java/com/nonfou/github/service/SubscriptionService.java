@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nonfou.github.entity.Subscription;
 import com.nonfou.github.entity.SubscriptionPlan;
+import com.nonfou.github.exception.BusinessException;
+import com.nonfou.github.exception.ApiErrorCodes;
 import com.nonfou.github.mapper.SubscriptionMapper;
 import com.nonfou.github.mapper.SubscriptionPlanMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -64,7 +66,7 @@ public class SubscriptionService {
         // 检查用户余额
         BigDecimal userBalance = balanceService.getUserBalance(userId);
         if (userBalance.compareTo(plan.getPrice()) < 0) {
-            throw new RuntimeException("余额不足，请先充值");
+            throw new BusinessException(ApiErrorCodes.PAYMENT_REQUIRED, "余额不足，请先充值");
         }
 
         // 扣除费用

@@ -14,7 +14,7 @@ public class UnauthorizedException extends BusinessException {
      * @param message 错误信息
      */
     public UnauthorizedException(String message) {
-        super(401, message);
+        super(ApiErrorCodes.UNAUTHORIZED, message);
     }
 
     /**
@@ -24,6 +24,6 @@ public class UnauthorizedException extends BusinessException {
      * @param cause   异常原因
      */
     public UnauthorizedException(String message, Throwable cause) {
-        super(401, message, cause);
-    }
+        super(ApiErrorCodes.UNAUTHORIZED, message, cause);
+}
 }

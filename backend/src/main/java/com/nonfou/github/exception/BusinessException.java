@@ -22,8 +22,7 @@ public class BusinessException extends RuntimeException {
      * @param message 错误信息
      */
     public BusinessException(String message) {
-        super(message);
-        this.code = 400;
+        this(ApiErrorCodes.BAD_REQUEST, message);
     }
 
     /**

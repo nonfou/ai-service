@@ -48,6 +48,9 @@ public class ChatRequest {
     @Data
     public static class Message {
         private String role;
-        private String content;
+        /**
+         * 消息内容可为字符串或内容块列表（OpenAI/Anthropic 兼容格式）
+         */
+        private Object content;
     }
 }

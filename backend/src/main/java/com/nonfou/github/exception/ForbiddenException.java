@@ -14,7 +14,7 @@ public class ForbiddenException extends BusinessException {
      * @param message 错误信息
      */
     public ForbiddenException(String message) {
-        super(403, message);
+        super(ApiErrorCodes.FORBIDDEN, message);
     }
 
     /**
@@ -24,6 +24,6 @@ public class ForbiddenException extends BusinessException {
      * @param cause   异常原因
      */
     public ForbiddenException(String message, Throwable cause) {
-        super(403, message, cause);
-    }
+        super(ApiErrorCodes.FORBIDDEN, message, cause);
+}
 }

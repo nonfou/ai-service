@@ -42,18 +42,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String requestUri = request.getRequestURI();
+        boolean isAdminRequest = requestUri.startsWith("/api/admin");
         String clientIp = getClientIp(request);
         String token = null;
 
-        // 优先从Cookie中获取Token (HttpOnly Cookie方式)
-        token = extractTokenFromCookie(request);
+        // 先尝试从 Authorization Header 获取 Token (显式传递的凭证优先生效)
+        token = extractTokenFromAuthorizationHeader(request);
 
-        // 如果Cookie中没有,再从Authorization header中获取 (向后兼容)
-        if (token == null) {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                token = authHeader.substring(7); // 去掉 "Bearer " 前缀
-            }
+        // Admin Portal 与 User Portal 使用不同的凭证来源:
+        // - Admin: 仅接受 Authorization Header,避免被用户端 Cookie 影响
+        // - User : 仍然可以使用 HttpOnly Cookie
+        if (token == null && !isAdminRequest) {
+            token = extractTokenFromCookie(request);
         }
 
         // 如果找到Token,进行验证
@@ -145,6 +145,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return cookie.getValue();
                 }
             }
+        }
+        return null;
+    }
+
+    /**
+     * 从 Authorization Header 提取 Token
+     */
+    private String extractTokenFromAuthorizationHeader(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
         }
         return null;
     }

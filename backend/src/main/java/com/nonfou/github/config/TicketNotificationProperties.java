@@ -21,4 +21,14 @@ public class TicketNotificationProperties {
      * 管理员通知邮箱地址.
      */
     private String adminEmail;
+
+    /**
+     * 管理端控制台地址,用于构造工单链接(可选).
+     */
+    private String adminConsoleUrl;
+
+    /**
+     * 用户门户地址,用于在邮件中提供跳转链接(可选).
+     */
+    private String userPortalUrl;
 }

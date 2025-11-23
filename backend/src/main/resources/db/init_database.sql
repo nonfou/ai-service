@@ -208,7 +208,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     user_id BIGINT NOT NULL COMMENT '用户ID',
     subject VARCHAR(200) NOT NULL COMMENT '主题',
     content TEXT NOT NULL COMMENT '内容',
-    status VARCHAR(20) DEFAULT 'open' COMMENT '状态：open-待处理，in_progress-处理中，closed-已关闭',
+    status VARCHAR(20) DEFAULT 'pending' COMMENT '状态：pending-待处理，processing-处理中，resolved-已解决，closed-已关闭',
     priority VARCHAR(20) DEFAULT 'normal' COMMENT '优先级：low-低，normal-正常，high-高，urgent-紧急',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -374,8 +374,8 @@ GROUP BY u.id, u.email, u.balance, u.status, u.created_at;
 -- ============================================
 INSERT INTO models (model_name, display_name, provider, price_multiplier, input_token_price, output_token_price, status, description, tags, sort_order) VALUES
 -- GPT 系列
-('claude-4.5-sonnet', 'Claude 4.5 Sonnet', 'Anthropic', 1.20, 10.00, 30.00, 1, 'Anthropic Claude 4.5 Sonnet 最强编程模型', JSON_ARRAY(), 90),
-('claude-4.5-haiku', 'Claude 4.5 Haiku', 'Anthropic', 0.30, 3, 10, 1, 'Anthropic Claude 4.5 Haiku - 快速轻量', JSON_ARRAY('低价'), 110),
+('claude-sonnet-4.5', 'Claude Sonnet 4.5', 'Anthropic', 1.20, 10.00, 30.00, 1, 'Anthropic Claude Sonnet 4.5 最强编程模型', JSON_ARRAY(), 90),
+('claude-haiku-4.5', 'Claude Haiku 4.5', 'Anthropic', 0.30, 3, 10, 1, 'Anthropic Claude Haiku 4.5 - 快速轻量', JSON_ARRAY('低价'), 110),
 ('gpt-5.1-codex', 'GPT-5.1 Codex', 'Open AI', 0.90, 10, 25.00, 1, 'OpenAI GPT-5.1 Codex 最新编程模型', JSON_ARRAY('推荐'), 30),
 ('gpt-5.1', 'GPT-5.1', 'Open AI', 1.00, 8.00, 25.00, 1, 'OpenAI GPT-5.1 模型 - 最新旗舰模型', JSON_ARRAY('推荐', '最新'), 10),
 ('gpt-5.1-codex-mini', 'GPT-5.1 Codex Mini', 'Open AI', 0.30, 5, 20.00, 1, 'OpenAI GPT-5.1 Codex Mini - 经济高效', JSON_ARRAY('推荐', '低价'), 20),

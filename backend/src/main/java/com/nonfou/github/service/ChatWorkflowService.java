@@ -9,8 +9,10 @@ import com.nonfou.github.dto.response.ChatResponse.Usage;
 import com.nonfou.github.entity.ApiKey;
 import com.nonfou.github.entity.ApiCall;
 import com.nonfou.github.entity.User;
+import com.nonfou.github.exception.BusinessException;
 import com.nonfou.github.exception.ChatAuthorizationException;
 import com.nonfou.github.exception.ChatProcessingException;
+import com.nonfou.github.exception.ChatUpstreamException;
 import com.nonfou.github.service.proxy.ModelProxy;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import com.nonfou.github.util.SessionUtil;
@@ -69,6 +71,9 @@ public class ChatWorkflowService {
             recordSuccess(context, request, response, requestTime, proxy.getProvider());
             return response;
         } catch (ChatAuthorizationException ex) {
+            throw ex;
+        } catch (ChatUpstreamException | BusinessException ex) {
+            recordFailure(context, request, requestTime, ex, proxy.getProvider());
             throw ex;
         } catch (Exception ex) {
             recordFailure(context, request, requestTime, ex, proxy.getProvider());
@@ -246,7 +251,7 @@ public class ChatWorkflowService {
         if (response.getChoices() == null || response.getChoices().isEmpty()) {
             return "";
         }
-        Choice choice = response.getChoices().get(0);
+        Choice choice = response.getChoices().getFirst();
         Message message = choice != null ? choice.getMessage() : null;
         return message != null && message.getContent() != null ? message.getContent() : "";
     }
@@ -280,4 +285,5 @@ public class ChatWorkflowService {
             usageMetricsService.recordUsage(apiKeyId, apiCall);
         }
     }
+
 }

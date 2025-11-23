@@ -40,7 +40,8 @@ public class SecurityConfig {
                 // 公开接口:允许获取模型列表
                 .requestMatchers("/api/models").permitAll()
                 // 公开接口:允许聊天接口(通过 API Key 验证)
-                .requestMatchers("/api/chat", "/api/v1/chat/completions").permitAll()
+                // 支持多种 AI API 格式: /api-chat, /v1/chat/completions (OpenAI), /v1/messages (Claude)
+                .requestMatchers("/api-chat/**").permitAll()
                 // 公开接口:允许支付回调
                 .requestMatchers("/api/recharge/alipay/notify", "/api/recharge/alipay/return").permitAll()
                 .requestMatchers("/api/recharge/wechat/notify").permitAll()

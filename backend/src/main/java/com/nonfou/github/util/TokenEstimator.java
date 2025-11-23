@@ -4,6 +4,10 @@ import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.service.CostCalculatorService;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Array;
+import java.util.Collection;
+import java.util.Map;
+
 /**
  * 粗略的 token 估算器，用于流式响应缺少 usage 数据时的兜底统计。
  * 该实现根据字符类型（CJK/非 CJK）估算，用于保证计费和配额统计不会明显偏离。
@@ -23,7 +27,7 @@ public class TokenEstimator {
         if (request != null && request.getMessages() != null) {
             inputTokens = request.getMessages().stream()
                     .map(ChatRequest.Message::getContent)
-                    .mapToInt(this::estimateTextTokens)
+                    .mapToInt(this::estimateContentTokens)
                     .sum();
         }
 
@@ -69,5 +73,59 @@ public class TokenEstimator {
                 || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
                 || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
                 || block == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION;
+    }
+
+    /**
+     * 估算任意内容结构的 token 数，兼容字符串、分段内容、工具调用等格式。
+     */
+    private int estimateContentTokens(Object content) {
+        if (content == null) {
+            return 0;
+        }
+
+        if (content instanceof String text) {
+            return estimateTextTokens(text);
+        }
+
+        if (content instanceof Collection<?> collection) {
+            int total = 0;
+            for (Object part : collection) {
+                total += estimateContentTokens(part);
+            }
+            return total;
+        }
+
+        if (content.getClass().isArray()) {
+            int total = 0;
+            int length = Array.getLength(content);
+            for (int i = 0; i < length; i++) {
+                total += estimateContentTokens(Array.get(content, i));
+            }
+            return total;
+        }
+
+        if (content instanceof Map<?, ?> map) {
+            Object type = map.get("type");
+            if ("text".equals(type)) {
+                return estimateContentTokens(map.get("text"));
+            }
+            if ("image_url".equals(type)) {
+                Object image = map.get("image_url");
+                if (image instanceof Map<?, ?> imageMap) {
+                    Object url = imageMap.get("url");
+                    return url instanceof String ? estimateTextTokens((String) url) : 0;
+                }
+                return image instanceof String ? estimateTextTokens((String) image) : 0;
+            }
+            if (map.containsKey("content")) {
+                return estimateContentTokens(map.get("content"));
+            }
+            if (map.containsKey("text")) {
+                return estimateContentTokens(map.get("text"));
+            }
+            return estimateTextTokens(String.valueOf(content));
+        }
+
+        return estimateTextTokens(String.valueOf(content));
     }
 }

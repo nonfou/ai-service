@@ -254,7 +254,7 @@ export const authAPI = {
 export const chatAPI = {
   // 发送消息
   chat: (data: ChatRequest, apiKey: string) => {
-    return request.post<any, { data: ChatResponse }>('/api/chat', data, {
+    return request.post<any, { data: ChatResponse }>('/api-chat', data, {
       headers: {
         'Authorization': `Bearer ${apiKey}`
       }
