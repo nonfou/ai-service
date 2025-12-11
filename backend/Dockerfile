@@ -22,6 +22,9 @@ RUN apk add --no-cache curl
 # 创建非 root 用户
 RUN addgroup -S spring && adduser -S spring -G spring
 
+# 创建日志目录
+RUN mkdir -p /app/logs && chown -R spring:spring /app/logs
+
 # 复制 jar 文件
 COPY --from=builder /app/target/*.jar app.jar
 
