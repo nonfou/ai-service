@@ -37,7 +37,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api-chat")
+@RequestMapping("/api/v1")
 public class ChatController {
 
     private final ChatWorkflowService chatWorkflowService;
@@ -46,10 +46,10 @@ public class ChatController {
     private final ModelMappingProperties modelMappingProperties;
 
     /**
-     * OpenAI API 兼容接口: /v1/chat/completions
+     * OpenAI API 兼容接口: /chat/completions
      * 标准的 OpenAI Chat Completions API 格式
      */
-    @PostMapping("/v1/chat/completions")
+    @PostMapping("/chat/completions")
     public Object openaiChatCompletions(
             @RequestHeader("Authorization") String authorization,
             @RequestBody @Validated ChatRequest request) {
@@ -58,10 +58,10 @@ public class ChatController {
     }
 
     /**
-     * Claude API 兼容接口: /v1/messages
+     * Claude API 兼容接口: /messages
      * Anthropic Claude Messages API 格式
      */
-    @PostMapping("/v1/messages")
+    @PostMapping("/messages")
     public Object claudeMessages(
             @RequestHeader(value = "x-api-key", required = false) String xApiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization,
@@ -74,10 +74,10 @@ public class ChatController {
     }
 
     /**
-     * OpenAI 模型列表接口: /v1/models
+     * OpenAI 模型列表接口: /models
      * 返回可用的模型列表
      */
-    @RequestMapping("/v1/models")
+    @RequestMapping("/models")
     public Object listModels() {
         log.debug("OpenAI API 兼容接口调用: /v1/models");
         try {
@@ -98,10 +98,10 @@ public class ChatController {
     }
 
     /**
-     * OpenAI Embeddings 接口: /v1/embeddings
+     * OpenAI Embeddings 接口: /embeddings
      * 创建嵌入向量
      */
-    @PostMapping("/v1/embeddings")
+    @PostMapping("/embeddings")
     public Object embeddings(
             @RequestHeader("Authorization") String authorization,
             @RequestBody @Validated EmbeddingsRequest request) {
@@ -128,10 +128,10 @@ public class ChatController {
     // ============================================================
 
     /**
-     * Responses API 接口: /v1/responses
+     * Responses API 接口: /responses
      * 用于 Codex 系列模型（gpt-5.1-codex, gpt-5.1-codex-mini, gpt-5.1-codex-max）
      */
-    @PostMapping("/v1/responses")
+    @PostMapping("/responses")
     public Object responses(
             @RequestHeader("Authorization") String authorization,
             @RequestBody @Validated ResponsesRequest request) {
