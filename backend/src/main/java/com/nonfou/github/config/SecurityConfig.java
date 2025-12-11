@@ -35,8 +35,6 @@ public class SecurityConfig {
 
             // 配置请求授权
             .authorizeHttpRequests(auth -> auth
-                // 健康检查接口:允许 Docker/K8s 健康检查
-                .requestMatchers("/actuator/**").permitAll()
                 // 公开接口:允许所有认证相关的请求(登录、发送验证码等)
                 .requestMatchers("/api/auth/**").permitAll()
                 // 公开接口:允许获取模型列表

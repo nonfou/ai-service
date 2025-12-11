@@ -36,10 +36,6 @@ USER spring:spring
 # 暴露端口
 EXPOSE 8080
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
-
 # JVM 配置
 ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
