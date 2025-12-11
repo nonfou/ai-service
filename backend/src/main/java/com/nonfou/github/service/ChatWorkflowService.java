@@ -2,10 +2,14 @@ package com.nonfou.github.service;
 
 import com.nonfou.github.config.BackendRoutingProperties;
 import com.nonfou.github.dto.request.ChatRequest;
+import com.nonfou.github.dto.request.EmbeddingsRequest;
+import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.dto.response.ChatResponse;
 import com.nonfou.github.dto.response.ChatResponse.Choice;
 import com.nonfou.github.dto.response.ChatResponse.Message;
 import com.nonfou.github.dto.response.ChatResponse.Usage;
+import com.nonfou.github.dto.response.EmbeddingsResponse;
+import com.nonfou.github.dto.response.ResponsesResponse;
 import com.nonfou.github.entity.ApiKey;
 import com.nonfou.github.entity.ApiCall;
 import com.nonfou.github.entity.User;
@@ -86,6 +90,251 @@ public class ChatWorkflowService {
         request.setStream(true);
         ModelProxy proxy = selectProxy(request.getModel());
         return proxy.chatStream(request, context.apiKey());
+    }
+
+    // ============================================================
+    // Responses API 支持（用于 Codex 系列模型）
+    // ============================================================
+
+    /**
+     * 非流式 Responses 请求处理
+     */
+    public ResponsesResponse handleResponses(String authorization, ResponsesRequest request) {
+        ChatContext context = authenticate(authorization);
+        LocalDateTime requestTime = LocalDateTime.now();
+        request.setStream(false);
+
+        CopilotProxyService copilotProxy = getCopilotProxy();
+        try {
+            ResponsesResponse response = copilotProxy.responses(request, context.apiKey());
+            recordResponsesSuccess(context, request, response, requestTime);
+            return response;
+        } catch (ChatAuthorizationException ex) {
+            throw ex;
+        } catch (ChatUpstreamException | BusinessException ex) {
+            recordResponsesFailure(context, request, requestTime, ex);
+            throw ex;
+        } catch (Exception ex) {
+            recordResponsesFailure(context, request, requestTime, ex);
+            throw new ChatProcessingException("Responses 服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    /**
+     * 流式 Responses 请求处理
+     */
+    public SseEmitter handleResponsesStream(String authorization, ResponsesRequest request) {
+        ChatContext context = authenticate(authorization);
+        request.setStream(true);
+        CopilotProxyService copilotProxy = getCopilotProxy();
+        return copilotProxy.responsesStream(request, context.apiKey());
+    }
+
+    // ============================================================
+    // Embeddings API 支持
+    // ============================================================
+
+    /**
+     * Embeddings 请求处理
+     */
+    public EmbeddingsResponse handleEmbeddings(String authorization, EmbeddingsRequest request) {
+        ChatContext context = authenticate(authorization);
+        LocalDateTime requestTime = LocalDateTime.now();
+
+        CopilotProxyService copilotProxy = getCopilotProxy();
+        try {
+            EmbeddingsResponse response = copilotProxy.embeddings(request, context.apiKey());
+            recordEmbeddingsSuccess(context, request, response, requestTime);
+            return response;
+        } catch (ChatAuthorizationException ex) {
+            throw ex;
+        } catch (ChatUpstreamException | BusinessException ex) {
+            recordEmbeddingsFailure(context, request, requestTime, ex);
+            throw ex;
+        } catch (Exception ex) {
+            recordEmbeddingsFailure(context, request, requestTime, ex);
+            throw new ChatProcessingException("Embeddings 服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    private void recordEmbeddingsSuccess(ChatContext context,
+                                          EmbeddingsRequest request,
+                                          EmbeddingsResponse response,
+                                          LocalDateTime startTime) {
+        LocalDateTime endTime = LocalDateTime.now();
+        int promptTokens = 0;
+        int totalTokens = 0;
+
+        if (response.getUsage() != null) {
+            promptTokens = response.getUsage().getPromptTokens() != null ? response.getUsage().getPromptTokens() : 0;
+            totalTokens = response.getUsage().getTotalTokens() != null ? response.getUsage().getTotalTokens() : 0;
+        }
+
+        BigDecimal cost = balanceService.calculateCost(request.getModel(), promptTokens, 0);
+        int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
+
+        ApiCall apiCall = buildEmbeddingsApiCall(context, request, startTime, endTime, duration);
+        apiCall.setInputTokens(promptTokens);
+        apiCall.setOutputTokens(0);
+        apiCall.setCost(cost);
+        apiCall.setRawCost(cost);
+        apiCall.setMarkupRate(BigDecimal.ONE);
+        apiCall.setMarkupCost(BigDecimal.ZERO);
+        apiCall.setStatus(1);
+
+        Long apiCallId = balanceService.logApiCall(apiCall);
+        apiCall.setId(apiCallId);
+        balanceService.deductBalance(context.user().getId(), cost, apiCallId);
+        apiKeyService.updateLastUsedTime(context.apiKeyValue());
+
+        recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+        log.info("Embeddings API调用成功: userId={}, model={}, tokens={}, cost={}",
+                context.user().getId(),
+                request.getModel(),
+                totalTokens,
+                cost);
+    }
+
+    private void recordEmbeddingsFailure(ChatContext context,
+                                          EmbeddingsRequest request,
+                                          LocalDateTime startTime,
+                                          Exception ex) {
+        LocalDateTime endTime = LocalDateTime.now();
+        int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
+
+        ApiCall apiCall = buildEmbeddingsApiCall(context, request, startTime, endTime, duration);
+        apiCall.setInputTokens(0);
+        apiCall.setOutputTokens(0);
+        apiCall.setCost(BigDecimal.ZERO);
+        apiCall.setRawCost(BigDecimal.ZERO);
+        apiCall.setMarkupRate(BigDecimal.ONE);
+        apiCall.setMarkupCost(BigDecimal.ZERO);
+        apiCall.setStatus(0);
+        apiCall.setErrorMsg(ex.getMessage());
+
+        balanceService.logApiCall(apiCall);
+        log.warn("Embeddings API调用失败: userId={}, model={}, error={}",
+                context.user().getId(),
+                request.getModel(),
+                ex.getMessage());
+    }
+
+    private ApiCall buildEmbeddingsApiCall(ChatContext context,
+                                            EmbeddingsRequest request,
+                                            LocalDateTime startTime,
+                                            LocalDateTime endTime,
+                                            int duration) {
+        ApiCall apiCall = new ApiCall();
+        apiCall.setUserId(context.user().getId());
+        apiCall.setApiKey(context.apiKeyValue());
+        apiCall.setModel(request.getModel());
+        apiCall.setProvider("copilot");
+        apiCall.setCacheReadTokens(0);
+        apiCall.setCacheWriteTokens(0);
+        apiCall.setRequestTime(startTime);
+        apiCall.setResponseTime(endTime);
+        apiCall.setDuration(duration);
+        apiCall.setSessionHash(SessionUtil.generateSessionHash(
+                context.apiKeyValue(),
+                request.getModel(),
+                null
+        ));
+        return apiCall;
+    }
+
+    private CopilotProxyService getCopilotProxy() {
+        ModelProxy proxy = proxyLookup.get("copilot");
+        if (proxy == null || !(proxy instanceof CopilotProxyService)) {
+            throw new IllegalStateException("未配置 Copilot 代理服务");
+        }
+        return (CopilotProxyService) proxy;
+    }
+
+    private void recordResponsesSuccess(ChatContext context,
+                                         ResponsesRequest request,
+                                         ResponsesResponse response,
+                                         LocalDateTime startTime) {
+        LocalDateTime endTime = LocalDateTime.now();
+        int inputTokens = 0;
+        int outputTokens = 0;
+
+        if (response.getUsage() != null) {
+            inputTokens = response.getUsage().getInputTokens() != null ? response.getUsage().getInputTokens() : 0;
+            outputTokens = response.getUsage().getOutputTokens() != null ? response.getUsage().getOutputTokens() : 0;
+        }
+
+        BigDecimal cost = balanceService.calculateCost(request.getModel(), inputTokens, outputTokens);
+        int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
+
+        ApiCall apiCall = buildResponsesApiCall(context, request, startTime, endTime, duration);
+        apiCall.setInputTokens(inputTokens);
+        apiCall.setOutputTokens(outputTokens);
+        apiCall.setCost(cost);
+        apiCall.setRawCost(cost);
+        apiCall.setMarkupRate(BigDecimal.ONE);
+        apiCall.setMarkupCost(BigDecimal.ZERO);
+        apiCall.setStatus(1);
+
+        Long apiCallId = balanceService.logApiCall(apiCall);
+        apiCall.setId(apiCallId);
+        balanceService.deductBalance(context.user().getId(), cost, apiCallId);
+        apiKeyService.updateLastUsedTime(context.apiKeyValue());
+
+        recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+        log.info("Responses API调用成功: userId={}, model={}, tokens={}, cost={}",
+                context.user().getId(),
+                request.getModel(),
+                inputTokens + outputTokens,
+                cost);
+    }
+
+    private void recordResponsesFailure(ChatContext context,
+                                         ResponsesRequest request,
+                                         LocalDateTime startTime,
+                                         Exception exception) {
+        LocalDateTime endTime = LocalDateTime.now();
+        int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
+
+        ApiCall apiCall = buildResponsesApiCall(context, request, startTime, endTime, duration);
+        apiCall.setInputTokens(0);
+        apiCall.setOutputTokens(0);
+        apiCall.setCost(BigDecimal.ZERO);
+        apiCall.setRawCost(BigDecimal.ZERO);
+        apiCall.setMarkupRate(BigDecimal.ONE);
+        apiCall.setMarkupCost(BigDecimal.ZERO);
+        apiCall.setStatus(0);
+        apiCall.setErrorMsg(exception.getMessage());
+
+        Long apiCallId = balanceService.logApiCall(apiCall);
+        apiCall.setId(apiCallId);
+        recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+        log.error("Responses API调用失败: userId={}, error={}", context.user().getId(), exception.getMessage());
+    }
+
+    private ApiCall buildResponsesApiCall(ChatContext context,
+                                           ResponsesRequest request,
+                                           LocalDateTime startTime,
+                                           LocalDateTime endTime,
+                                           int duration) {
+        ApiCall apiCall = new ApiCall();
+        apiCall.setUserId(context.user().getId());
+        apiCall.setApiKey(context.apiKeyValue());
+        apiCall.setModel(request.getModel());
+        apiCall.setProvider("copilot");
+        apiCall.setCacheReadTokens(0);
+        apiCall.setCacheWriteTokens(0);
+        apiCall.setRequestTime(startTime);
+        apiCall.setResponseTime(endTime);
+        apiCall.setDuration(duration);
+        apiCall.setSessionHash(SessionUtil.generateSessionHash(
+                context.apiKeyValue(),
+                request.getModel(),
+                null
+        ));
+        return apiCall;
     }
 
     private void recordSuccess(ChatContext context,

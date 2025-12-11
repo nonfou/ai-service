@@ -4,7 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nonfou.github.config.CopilotProxyProperties;
 import com.nonfou.github.dto.request.ChatRequest;
+import com.nonfou.github.dto.request.EmbeddingsRequest;
+import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.dto.response.ChatResponse;
+import com.nonfou.github.dto.response.EmbeddingsResponse;
+import com.nonfou.github.dto.response.ModelsResponse;
+import com.nonfou.github.dto.response.ResponsesResponse;
 import com.nonfou.github.entity.ApiKey;
 import com.nonfou.github.exception.ChatAuthorizationException;
 import com.nonfou.github.exception.ChatProcessingException;
@@ -47,6 +52,9 @@ import java.util.Locale;
 public class CopilotProxyService implements ModelProxy {
 
     private static final String CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
+    private static final String RESPONSES_PATH = "/v1/responses";
+    private static final String MODELS_PATH = "/v1/models";
+    private static final String EMBEDDINGS_PATH = "/v1/embeddings";
 
     private final RestTemplate restTemplate;
     private final CopilotProxyProperties proxyProperties;
@@ -199,23 +207,7 @@ public class CopilotProxyService implements ModelProxy {
     }
 
     private HttpURLConnection openStreamingConnection() throws Exception {
-        URL url = new URL(baseUrl() + CHAT_COMPLETIONS_PATH);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setDoOutput(true);
-        connection.setDoInput(true);
-        connection.setConnectTimeout(proxyProperties.getConnectTimeoutMs());
-        connection.setReadTimeout(proxyProperties.getReadTimeoutMs());
-        connection.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-
-        if (StringUtils.hasText(proxyProperties.getApiKey())) {
-            connection.setRequestProperty(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
-        }
-        if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
-            proxyProperties.getExtraHeaders().forEach(connection::setRequestProperty);
-        }
-
-        return connection;
+        return openStreamingConnection(CHAT_COMPLETIONS_PATH);
     }
 
     private void writeRequestBody(HttpURLConnection connection, Map<String, Object> payload) throws Exception {
@@ -386,5 +378,260 @@ public class CopilotProxyService implements ModelProxy {
             normalized = normalized.substring(0, normalized.length() - 1);
         }
         return normalized;
+    }
+
+    // ============================================================
+    // Models API 支持
+    // ============================================================
+
+    /**
+     * 获取可用模型列表
+     */
+    public ModelsResponse getModels() {
+        HttpEntity<?> entity = new HttpEntity<>(buildHeaders());
+
+        try {
+            ResponseEntity<ModelsResponse> response = restTemplate.exchange(
+                    baseUrl() + MODELS_PATH,
+                    HttpMethod.GET,
+                    entity,
+                    ModelsResponse.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return response.getBody();
+            }
+
+            throw new ChatProcessingException("获取模型列表失败，HTTP " + response.getStatusCode());
+        } catch (HttpStatusCodeException ex) {
+            throw translateException(ex);
+        } catch (ChatAuthorizationException | ChatProcessingException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("获取模型列表异常", ex);
+            throw new ChatProcessingException("模型列表服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    // ============================================================
+    // Embeddings API 支持
+    // ============================================================
+
+    /**
+     * 创建嵌入向量
+     */
+    public EmbeddingsResponse embeddings(EmbeddingsRequest request, ApiKey apiKey) {
+        validateApiKey(apiKey);
+        Map<String, Object> payload = buildEmbeddingsPayload(request);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders());
+
+        try {
+            ResponseEntity<EmbeddingsResponse> response = restTemplate.exchange(
+                    baseUrl() + EMBEDDINGS_PATH,
+                    HttpMethod.POST,
+                    entity,
+                    EmbeddingsResponse.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                if (log.isDebugEnabled()) {
+                    try {
+                        log.debug("Copilot Proxy Embeddings 响应: {}", objectMapper.writeValueAsString(response.getBody()));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return response.getBody();
+            }
+
+            throw new ChatProcessingException("创建嵌入向量失败，HTTP " + response.getStatusCode());
+        } catch (HttpStatusCodeException ex) {
+            throw translateException(ex);
+        } catch (ChatAuthorizationException | ChatProcessingException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("创建嵌入向量异常", ex);
+            throw new ChatProcessingException("嵌入向量服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    private Map<String, Object> buildEmbeddingsPayload(EmbeddingsRequest request) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", request.getModel());
+        payload.put("input", request.getInput());
+
+        if (request.getEncodingFormat() != null) {
+            payload.put("encoding_format", request.getEncodingFormat());
+        }
+        if (request.getDimensions() != null) {
+            payload.put("dimensions", request.getDimensions());
+        }
+        if (request.getUser() != null) {
+            payload.put("user", request.getUser());
+        }
+        if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
+            payload.putAll(request.getAdditionalParams());
+        }
+
+        return payload;
+    }
+
+    // ============================================================
+    // Responses API 支持（用于 Codex 系列模型）
+    // ============================================================
+
+    /**
+     * 非流式 Responses 请求，转发给 Copilot Relay 并返回 ResponsesResponse。
+     */
+    public ResponsesResponse responses(ResponsesRequest request, ApiKey apiKey) {
+        validateApiKey(apiKey);
+        Map<String, Object> payload = buildResponsesPayload(request, false);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders());
+
+        try {
+            ResponseEntity<ResponsesResponse> response = restTemplate.exchange(
+                    baseUrl() + RESPONSES_PATH,
+                    HttpMethod.POST,
+                    entity,
+                    ResponsesResponse.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                if (log.isDebugEnabled()) {
+                    try {
+                        log.debug("Copilot Proxy Responses 响应: {}", objectMapper.writeValueAsString(response.getBody()));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return response.getBody();
+            }
+
+            throw new ChatProcessingException("上游模型服务调用失败，HTTP " + response.getStatusCode());
+        } catch (HttpStatusCodeException ex) {
+            throw translateException(ex);
+        } catch (ChatAuthorizationException | ChatProcessingException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Copilot Relay Responses 调用异常", ex);
+            throw new ChatProcessingException("Responses 服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    /**
+     * 流式 Responses 请求，透传 Copilot Relay 的 SSE。
+     */
+    public SseEmitter responsesStream(ResponsesRequest request, ApiKey apiKey) {
+        validateApiKey(apiKey);
+        SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
+        streamTaskExecutor.execute(() -> executeResponsesStream(request, emitter));
+        return emitter;
+    }
+
+    private void executeResponsesStream(ResponsesRequest request, SseEmitter emitter) {
+        HttpURLConnection connection = null;
+        BufferedReader reader = null;
+        AtomicBoolean completed = new AtomicBoolean(false);
+
+        try {
+            connection = openStreamingConnection(RESPONSES_PATH);
+            Map<String, Object> payload = buildResponsesPayload(request, true);
+            writeRequestBody(connection, payload);
+
+            int status = connection.getResponseCode();
+            if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
+                log.warn("Copilot Proxy Responses 流式鉴权失败: HTTP {}", status);
+                sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
+                return;
+            }
+
+            if (status < 200 || status >= 300) {
+                String errorBody = readErrorBody(connection);
+                log.error("Copilot Proxy Responses 流式调用失败: HTTP {}, body={}", status, errorBody);
+                String friendly = extractFriendlyMessage(errorBody);
+                sendStreamError(emitter, status,
+                        friendly != null ? friendly : buildFriendlyMessage(status),
+                        "processing_error");
+                return;
+            }
+
+            reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            String currentEvent = null;
+            while ((line = reader.readLine()) != null) {
+                // Responses API 使用 event: xxx 和 data: xxx 格式
+                if (line.startsWith("event: ")) {
+                    currentEvent = line.substring(7).trim();
+                    continue;
+                }
+                if (line.startsWith("data: ")) {
+                    String data = line.substring(6);
+                    // 透传事件和数据
+                    if (currentEvent != null) {
+                        emitter.send(SseEmitter.event().name(currentEvent).data(data));
+                    } else {
+                        emitter.send(SseEmitter.event().data(data));
+                    }
+
+                    // 检查是否完成
+                    if ("response.completed".equals(currentEvent) || "response.failed".equals(currentEvent)) {
+                        completed.set(true);
+                    }
+                    currentEvent = null;
+                }
+            }
+
+            if (!completed.get()) {
+                // 发送完成标记
+                emitter.send(SseEmitter.event().name("done").data("{}"));
+            }
+            emitter.complete();
+        } catch (Exception ex) {
+            log.error("Copilot Proxy Responses 流式调用异常", ex);
+            sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "上游模型服务流式接口异常", "processing_error");
+        } finally {
+            closeResources(reader, connection);
+        }
+    }
+
+    private Map<String, Object> buildResponsesPayload(ResponsesRequest request, boolean stream) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", request.getModel());
+        payload.put("input", request.getInput());
+        payload.put("stream", stream);
+
+        if (request.getInstructions() != null) {
+            payload.put("instructions", request.getInstructions());
+        }
+        if (request.getMaxOutputTokens() != null) {
+            payload.put("max_output_tokens", request.getMaxOutputTokens());
+        }
+        if (request.getTemperature() != null) {
+            payload.put("temperature", request.getTemperature());
+        }
+        if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
+            payload.putAll(request.getAdditionalParams());
+        }
+
+        return payload;
+    }
+
+    private HttpURLConnection openStreamingConnection(String path) throws Exception {
+        URL url = new URL(baseUrl() + path);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setDoInput(true);
+        connection.setConnectTimeout(proxyProperties.getConnectTimeoutMs());
+        connection.setReadTimeout(proxyProperties.getReadTimeoutMs());
+        connection.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+        if (StringUtils.hasText(proxyProperties.getApiKey())) {
+            connection.setRequestProperty(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+        }
+        if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
+            proxyProperties.getExtraHeaders().forEach(connection::setRequestProperty);
+        }
+
+        return connection;
     }
 }

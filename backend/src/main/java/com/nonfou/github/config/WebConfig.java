@@ -1,5 +1,6 @@
 package com.nonfou.github.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
@@ -17,10 +18,10 @@ import java.time.Duration;
  * Web 配置类
  */
 @Configuration
+@RequiredArgsConstructor
 public class WebConfig {
 
-    @Value("${copilot.failover.timeout:5000}")
-    private int copilotTimeout;
+    private final CopilotProxyProperties copilotProxyProperties;
 
     /**
      * 跨域配置
@@ -49,8 +50,8 @@ public class WebConfig {
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         return builder
-                .setConnectTimeout(Duration.ofMillis(copilotTimeout))
-                .setReadTimeout(Duration.ofMillis(copilotTimeout))
+                .setConnectTimeout(Duration.ofMillis(copilotProxyProperties.getConnectTimeoutMs()))
+                .setReadTimeout(Duration.ofMillis(copilotProxyProperties.getReadTimeoutMs()))
                 .build();
     }
 
