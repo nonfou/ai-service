@@ -77,4 +77,4 @@ frontend/**/dist/
 frontend/**/node_modules/
 frontend/**/yarn.lock
 
-.claude/
+.claude
