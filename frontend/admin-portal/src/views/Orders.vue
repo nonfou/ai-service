@@ -49,7 +49,7 @@
 
         <el-table-column prop="payMethod" label="支付方式" width="120">
           <template #default="{ row }">
-            {{ row.payMethod === 'alipay' ? '支付宝' : '微信支付' }}
+            {{ getPayMethodText(row.payMethod) }}
           </template>
         </el-table-column>
 
@@ -114,7 +114,7 @@
         <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="金额">¥{{ currentOrder.amount }}</el-descriptions-item>
         <el-descriptions-item label="支付方式">
-          {{ currentOrder.payMethod === 'alipay' ? '支付宝' : '微信支付' }}
+          {{ getPayMethodText(currentOrder.payMethod) }}
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentOrder.status)">
@@ -233,6 +233,16 @@ const getStatusText = (status: number) => {
     2: '已取消'
   }
   return textMap[status] || '未知'
+}
+
+const getPayMethodText = (payMethod: string) => {
+  const methodMap: Record<string, string> = {
+    'stripe': 'Stripe',
+    'pending': '待支付',
+    'alipay': '支付宝',
+    'wechat': '微信支付'
+  }
+  return methodMap[payMethod] || payMethod || '-'
 }
 
 const fetchOrders = async () => {

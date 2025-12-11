@@ -147,27 +147,6 @@ ticket:
 system-config:
   cache-ttl-seconds: ${SYSTEM_CONFIG_CACHE_TTL:60}
 
-# 支付宝配置
-alipay:
-  app-id: ${ALIPAY_APP_ID:}  # 支付宝应用ID
-  private-key: ${ALIPAY_PRIVATE_KEY:}  # 商户私钥
-  public-key: ${ALIPAY_PUBLIC_KEY:}  # 支付宝公钥
-  gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipaydev.com/gateway.do}  # 沙箱环境,生产环境改为 https://openapi.alipay.com/gateway.do
-  notify-url: ${ALIPAY_NOTIFY_URL:http://yourdomain.com/api/recharge/alipay/notify}  # 异步通知地址
-  return-url: ${ALIPAY_RETURN_URL:http://yourdomain.com/wallet}  # 同步跳转地址
-  sign-type: RSA2
-  charset: UTF-8
-  format: json
-
-# 微信支付配置
-wechat:
-  app-id: ${WECHAT_APP_ID:}  # 微信应用ID
-  mch-id: ${WECHAT_MCH_ID:}  # 商户号
-  api-v3-key: ${WECHAT_API_V3_KEY:}  # APIv3密钥
-  merchant-serial-number: ${WECHAT_MERCHANT_SERIAL_NUMBER:}  # 商户证书序列号
-  private-key-path: ${WECHAT_PRIVATE_KEY_PATH:classpath:apiclient_key.pem}  # 商户私钥路径
-  notify-url: ${WECHAT_NOTIFY_URL:http://yourdomain.com/api/recharge/wechat/notify}  # 异步通知地址
-
 # 管理后台安全配置
 admin:
   security:

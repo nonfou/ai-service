@@ -93,16 +93,14 @@ export interface RechargeOrder {
 
 export interface CreateRechargeRequest {
   amount: number
-  payMethod: string  // alipay, wechat
 }
 
 export interface PaymentResponse {
   orderId: number
   orderNo: string
   amount: number
-  paymentType: string  // alipay | wechat
-  paymentUrl?: string  // 支付宝跳转链接
-  qrCode?: string      // 微信二维码内容
+  paymentType: string
+  clientSecret?: string  // Stripe PaymentIntent clientSecret
 }
 
 

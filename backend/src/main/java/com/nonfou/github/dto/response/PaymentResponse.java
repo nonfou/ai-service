@@ -25,19 +25,14 @@ public class PaymentResponse {
     private String orderNo;
 
     /**
-     * 支付类型: alipay | wechat
+     * 支付类型
      */
     private String paymentType;
 
     /**
-     * 支付宝支付链接 (支付宝使用)
+     * Stripe PaymentIntent clientSecret (用于前端确认支付)
      */
-    private String paymentUrl;
-
-    /**
-     * 微信支付二维码内容 (微信使用)
-     */
-    private String qrCode;
+    private String clientSecret;
 
     /**
      * 金额

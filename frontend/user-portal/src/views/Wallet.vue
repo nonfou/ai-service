@@ -26,8 +26,8 @@
 
         <!-- 操作按钮 -->
         <div class="action-buttons">
-          <el-button type="primary" size="large" @click="showRechargeDialog">
-            充值
+          <el-button type="primary" size="large" @click="showRechargeDialog" disabled>
+            充值 (即将开放)
           </el-button>
         </div>
       </div>
@@ -111,55 +111,16 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="支付方式">
-          <el-radio-group v-model="rechargeForm.payMethod">
-            <el-radio label="alipay">支付宝</el-radio>
-            <el-radio label="wechat">微信支付</el-radio>
-          </el-radio-group>
-        </el-form-item>
+        <el-alert
+          title="支付功能即将开放，敬请期待"
+          type="info"
+          :closable="false"
+          style="margin-top: 16px"
+        />
       </el-form>
 
       <template #footer>
-        <el-button @click="rechargeDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleRecharge" :loading="rechargeLoading">
-          确认充值
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 支付信息对话框 -->
-    <el-dialog
-      v-model="paymentDialogVisible"
-      title="支付信息"
-      width="500px"
-      :close-on-click-modal="false"
-    >
-      <div class="payment-info">
-        <div v-if="paymentInfo.paymentType === 'alipay'" class="alipay-payment">
-          <p>请点击下方按钮跳转到支付宝完成支付:</p>
-          <el-button type="primary" @click="openPaymentUrl">
-            前往支付宝支付
-          </el-button>
-        </div>
-        <div v-else-if="paymentInfo.paymentType === 'wechat'" class="wechat-payment">
-          <p>请使用微信扫描下方二维码完成支付:</p>
-          <div class="qrcode">
-            <img :src="paymentInfo.qrCode" alt="微信支付二维码" />
-          </div>
-        </div>
-        <el-alert
-          title="支付完成后,余额将自动到账"
-          type="success"
-          :closable="false"
-          style="margin-top: 20px"
-        />
-      </div>
-
-      <template #footer>
-        <el-button @click="paymentDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="checkPaymentStatus">
-          检查支付状态
-        </el-button>
+        <el-button @click="rechargeDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -168,7 +129,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { balanceAPI, rechargeAPI, type BalanceLog } from '../api'
+import { balanceAPI, type BalanceLog } from '../api'
 
 // 余额信息
 const balance = ref(0)
@@ -191,21 +152,8 @@ const total = ref(0)
 
 // 充值对话框
 const rechargeDialogVisible = ref(false)
-const rechargeLoading = ref(false)
 const rechargeForm = ref({
-  amount: 100,
-  payMethod: 'alipay'
-})
-
-// 支付信息对话框
-const paymentDialogVisible = ref(false)
-const paymentInfo = ref({
-  orderId: 0,
-  orderNo: '',
-  amount: 0,
-  paymentType: '',
-  paymentUrl: '',
-  qrCode: ''
+  amount: 100
 })
 
 // 加载余额信息
@@ -262,69 +210,6 @@ const loadTransactions = async () => {
 // 显示充值对话框
 const showRechargeDialog = () => {
   rechargeDialogVisible.value = true
-}
-
-// 处理充值
-const handleRecharge = async () => {
-  if (rechargeForm.value.amount < 1) {
-    ElMessage.warning('充值金额不能小于 1 USD')
-    return
-  }
-
-  try {
-    rechargeLoading.value = true
-    const res = await rechargeAPI.createRecharge({
-      amount: rechargeForm.value.amount,
-      payMethod: rechargeForm.value.payMethod
-    })
-
-    if (res.data) {
-      paymentInfo.value = {
-        orderId: res.data.orderId,
-        orderNo: res.data.orderNo,
-        amount: res.data.amount,
-        paymentType: res.data.paymentType,
-        paymentUrl: res.data.paymentUrl || '',
-        qrCode: res.data.qrCode || ''
-      }
-
-      rechargeDialogVisible.value = false
-      paymentDialogVisible.value = true
-    }
-  } catch (error: any) {
-    console.error('创建充值订单失败:', error)
-    ElMessage.error(error.message || '创建充值订单失败')
-  } finally {
-    rechargeLoading.value = false
-  }
-}
-
-// 打开支付链接
-const openPaymentUrl = () => {
-  if (paymentInfo.value.paymentUrl) {
-    window.open(paymentInfo.value.paymentUrl, '_blank')
-  }
-}
-
-// 检查支付状态
-const checkPaymentStatus = async () => {
-  try {
-    const res = await rechargeAPI.queryOrder(paymentInfo.value.orderId)
-    if (res.data && res.data.status === 1) {
-      ElMessage.success('支付成功,余额已到账!')
-      paymentDialogVisible.value = false
-
-      // 刷新数据
-      await loadBalance()
-      await loadStatistics()
-      await loadTransactions()
-    } else {
-      ElMessage.warning('订单尚未支付')
-    }
-  } catch (error: any) {
-    console.error('查询支付状态失败:', error)
-    ElMessage.error(error.message || '查询支付状态失败')
-  }
 }
 
 // 分页处理
@@ -546,31 +431,6 @@ onMounted(() => {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-}
-
-/* 支付信息 */
-.payment-info {
-  text-align: center;
-  padding: 20px 0;
-}
-
-.payment-info p {
-  margin-bottom: 20px;
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.qrcode {
-  display: flex;
-  justify-content: center;
-  margin: 20px 0;
-}
-
-.qrcode img {
-  width: 200px;
-  height: 200px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
 }
 
 /* 响应式 */

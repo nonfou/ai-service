@@ -18,9 +18,4 @@ public class CreateRechargeRequest {
     @NotNull(message = "充值金额不能为空")
     @DecimalMin(value = "0.01", message = "充值金额必须大于0")
     private BigDecimal amount;
-
-    /**
-     * 支付方式: alipay, wechat
-     */
-    private String payMethod = "alipay";
 }

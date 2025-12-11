@@ -136,20 +136,6 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
 
-        <!-- 支付宝SDK -->
-        <dependency>
-            <groupId>com.alipay.sdk</groupId>
-            <artifactId>alipay-sdk-java</artifactId>
-            <version>4.38.157.ALL</version>
-        </dependency>
-
-        <!-- 微信支付SDK -->
-        <dependency>
-            <groupId>com.github.wechatpay-apiv3</groupId>
-            <artifactId>wechatpay-java</artifactId>
-            <version>0.2.12</version>
-        </dependency>
-
         <!-- Bean 注解 (javax.annotation.meta.When 等) -->
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
