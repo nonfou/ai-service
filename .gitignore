@@ -55,17 +55,11 @@ backend/target/
 backend/.mvn/
 backend/mvnw
 backend/mvnw.cmd
-backend/logs/
 *.class
 *.jar
 *.war
 *.ear
 *.nar
-*.zip
-*.tar.gz
-*.rar
-application-local.yml
-application-*.local.yml
 
 # IntelliJ IDEA
 *.iml
