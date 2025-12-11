@@ -28,7 +28,6 @@ mvnw.cmd
 .classpath
 
 # 环境变量和配置
-.env
 .env.local
 .env.*.local
 application-local.yml
