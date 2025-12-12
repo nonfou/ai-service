@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nonfou.github.config.CopilotProxyProperties;
 import com.nonfou.github.dto.request.ChatRequest;
+import com.nonfou.github.dto.request.ClaudeRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
 import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.dto.response.ChatResponse;
+import com.nonfou.github.dto.response.ClaudeResponse;
 import com.nonfou.github.dto.response.EmbeddingsResponse;
 import com.nonfou.github.dto.response.ModelsResponse;
 import com.nonfou.github.dto.response.ResponsesResponse;
@@ -41,6 +43,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Locale;
@@ -54,6 +57,7 @@ import java.util.Locale;
 public class CopilotProxyService implements ModelProxy {
 
     private static final String CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
+    private static final String MESSAGES_PATH = "/v1/messages";
     private static final String RESPONSES_PATH = "/v1/responses";
     private static final String MODELS_PATH = "/v1/models";
     private static final String EMBEDDINGS_PATH = "/v1/embeddings";
@@ -556,11 +560,14 @@ public class CopilotProxyService implements ModelProxy {
         if (request.getTopP() != null) {
             payload.put("top_p", request.getTopP());
         }
-        if (request.getTopK() != null) {
-            payload.put("top_k", request.getTopK());
+        if (request.getFrequencyPenalty() != null) {
+            payload.put("frequency_penalty", request.getFrequencyPenalty());
         }
-        if (request.getSystem() != null) {
-            payload.put("system", request.getSystem());
+        if (request.getPresencePenalty() != null) {
+            payload.put("presence_penalty", request.getPresencePenalty());
+        }
+        if (request.getStop() != null) {
+            payload.put("stop", request.getStop());
         }
         if (!CollectionUtils.isEmpty(request.getTools())) {
             payload.put("tools", request.getTools());
@@ -568,17 +575,29 @@ public class CopilotProxyService implements ModelProxy {
         if (request.getToolChoice() != null) {
             payload.put("tool_choice", request.getToolChoice());
         }
-        if (!CollectionUtils.isEmpty(request.getStopSequences())) {
-            payload.put("stop_sequences", request.getStopSequences());
+        if (request.getParallelToolCalls() != null) {
+            payload.put("parallel_tool_calls", request.getParallelToolCalls());
         }
-        if (request.getStop() != null) {
-            payload.put("stop", request.getStop());
+        if (request.getResponseFormat() != null) {
+            payload.put("response_format", request.getResponseFormat());
         }
-        if (!CollectionUtils.isEmpty(request.getMetadata())) {
-            payload.put("metadata", request.getMetadata());
+        if (request.getSeed() != null) {
+            payload.put("seed", request.getSeed());
+        }
+        if (request.getUser() != null) {
+            payload.put("user", request.getUser());
         }
         if (request.getStreamOptions() != null) {
             payload.put("stream_options", request.getStreamOptions());
+        }
+        if (request.getLogprobs() != null) {
+            payload.put("logprobs", request.getLogprobs());
+        }
+        if (request.getTopLogprobs() != null) {
+            payload.put("top_logprobs", request.getTopLogprobs());
+        }
+        if (request.getN() != null) {
+            payload.put("n", request.getN());
         }
         if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
             payload.putAll(request.getAdditionalParams());
@@ -866,7 +885,14 @@ public class CopilotProxyService implements ModelProxy {
     private Map<String, Object> buildEmbeddingsPayload(EmbeddingsRequest request) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("model", request.getModel());
-        payload.put("input", request.getInput());
+
+        // 上游 API 要求 input 必须是数组格式，如果客户端传入字符串则转换为数组
+        Object input = request.getInput();
+        if (input instanceof String) {
+            payload.put("input", List.of((String) input));
+        } else {
+            payload.put("input", input);
+        }
 
         if (request.getEncodingFormat() != null) {
             payload.put("encoding_format", request.getEncodingFormat());
@@ -882,6 +908,277 @@ public class CopilotProxyService implements ModelProxy {
         }
 
         return payload;
+    }
+
+    // ============================================================
+    // Claude Messages API 专用方法
+    // ============================================================
+
+    /**
+     * Claude Messages API 非流式请求
+     * 使用 ClaudeRequest 并返回 ClaudeResponse
+     */
+    public ClaudeResponse claudeMessages(ClaudeRequest request, ApiKey apiKey) {
+        validateApiKey(apiKey);
+        Map<String, Object> payload = buildClaudePayload(request, false);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildClaudeHeaders());
+
+        try {
+            ResponseEntity<ClaudeResponse> response = restTemplate.exchange(
+                    baseUrl() + MESSAGES_PATH,
+                    HttpMethod.POST,
+                    entity,
+                    ClaudeResponse.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                if (log.isDebugEnabled()) {
+                    try {
+                        log.debug("Claude Messages API 响应: {}", objectMapper.writeValueAsString(response.getBody()));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return response.getBody();
+            }
+
+            throw new ChatProcessingException("上游模型服务调用失败，HTTP " + response.getStatusCode());
+        } catch (HttpStatusCodeException ex) {
+            throw translateException(ex);
+        } catch (ChatAuthorizationException | ChatProcessingException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Claude Messages API 调用异常", ex);
+            throw new ChatProcessingException("Claude 服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    /**
+     * Claude Messages API 流式请求
+     */
+    public SseEmitter claudeMessagesStream(ClaudeRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
+        validateApiKey(apiKey);
+        SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
+        streamTaskExecutor.execute(() -> executeClaudeMessagesStream(request, emitter, callback));
+        return emitter;
+    }
+
+    /**
+     * 执行 Claude Messages API 流式请求
+     */
+    private void executeClaudeMessagesStream(ClaudeRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
+        HttpURLConnection connection = null;
+        BufferedReader reader = null;
+        String messageId = "msg_" + System.currentTimeMillis();
+        String model = request.getModel();
+        StringBuilder contentBuilder = new StringBuilder();
+        int inputTokens = 0;
+        int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
+
+        // 预先估算输入 token（基于请求消息）
+        int estimatedInputTokens = estimateClaudeInputTokens(request);
+
+        try {
+            connection = openClaudeStreamingConnection();
+            Map<String, Object> payload = buildClaudePayload(request, true);
+            writeRequestBody(connection, payload);
+
+            int status = connection.getResponseCode();
+            if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
+                log.warn("Claude Messages API 流式鉴权失败: HTTP {}", status);
+                sendClaudeStreamError(emitter, status, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
+                return;
+            }
+
+            if (status < 200 || status >= 300) {
+                String errorBody = readErrorBody(connection);
+                log.error("Claude Messages API 流式调用失败: HTTP {}, body={}", status, errorBody);
+                String friendly = extractFriendlyMessage(errorBody);
+                sendClaudeStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
+                return;
+            }
+
+            // 发送 message_start 事件
+            sendClaudeMessageStart(emitter, messageId, model);
+
+            // 发送 content_block_start 事件
+            sendClaudeContentBlockStart(emitter);
+
+            reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("data: ")) {
+                    continue;
+                }
+                String data = line.substring(6).trim();
+
+                if ("[DONE]".equals(data)) {
+                    break;
+                }
+
+                try {
+                    JsonNode chunk = objectMapper.readTree(data);
+                    JsonNode choices = chunk.path("choices");
+                    if (choices.isArray() && choices.size() > 0) {
+                        JsonNode delta = choices.get(0).path("delta");
+                        String content = safeText(delta.get("content"));
+                        if (StringUtils.hasText(content)) {
+                            contentBuilder.append(content);
+                            sendClaudeContentBlockDelta(emitter, content);
+                        }
+                    }
+
+                    // 提取 usage 信息
+                    JsonNode usage = chunk.path("usage");
+                    if (!usage.isMissingNode()) {
+                        if (usage.has("prompt_tokens")) {
+                            inputTokens = usage.path("prompt_tokens").asInt(0);
+                        }
+                        if (usage.has("completion_tokens")) {
+                            outputTokens = usage.path("completion_tokens").asInt(0);
+                        }
+                        // 解析缓存 token（Anthropic 格式）
+                        if (usage.has("cache_read_input_tokens")) {
+                            cacheReadTokens = usage.path("cache_read_input_tokens").asInt(0);
+                        }
+                        if (usage.has("cache_creation_input_tokens")) {
+                            cacheWriteTokens = usage.path("cache_creation_input_tokens").asInt(0);
+                        }
+                        // 解析缓存 token（OpenAI 格式，prompt_tokens_details）
+                        JsonNode promptDetails = usage.path("prompt_tokens_details");
+                        if (!promptDetails.isMissingNode() && promptDetails.has("cached_tokens")) {
+                            cacheReadTokens = promptDetails.path("cached_tokens").asInt(0);
+                        }
+                    }
+                } catch (Exception parseEx) {
+                    log.debug("解析 Claude 流式数据失败: {}", data);
+                }
+            }
+
+            // 发送 content_block_stop 事件
+            sendClaudeContentBlockStop(emitter);
+
+            // 发送 message_delta 事件（包含 stop_reason）
+            sendClaudeMessageDelta(emitter);
+
+            // 发送 message_stop 事件
+            sendClaudeMessageStop(emitter);
+
+            emitter.complete();
+
+            // 使用上游返回的 token 数，如果没有则使用估算值
+            int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+
+            TokenUsage tokenUsage = TokenUsage.builder()
+                    .inputTokens(finalInputTokens)
+                    .outputTokens(finalOutputTokens)
+                    .cacheReadTokens(cacheReadTokens)
+                    .cacheWriteTokens(cacheWriteTokens)
+                    .build();
+            invokeCallback(callback, tokenUsage, true, null);
+        } catch (Exception ex) {
+            log.error("Claude Messages API 流式调用异常", ex);
+            sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
+        } finally {
+            closeResources(reader, connection);
+        }
+    }
+
+    /**
+     * 构建 Claude Messages API 专用请求体
+     */
+    private Map<String, Object> buildClaudePayload(ClaudeRequest request, boolean stream) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", request.getModel());
+        payload.put("messages", request.getMessages());
+        payload.put("stream", stream);
+
+        if (request.getMaxTokens() != null) {
+            payload.put("max_tokens", request.getMaxTokens());
+        }
+        if (request.getSystem() != null) {
+            payload.put("system", request.getSystem());
+        }
+        if (request.getTemperature() != null) {
+            payload.put("temperature", request.getTemperature());
+        }
+        if (request.getTopP() != null) {
+            payload.put("top_p", request.getTopP());
+        }
+        if (request.getTopK() != null) {
+            payload.put("top_k", request.getTopK());
+        }
+        if (!CollectionUtils.isEmpty(request.getStopSequences())) {
+            payload.put("stop_sequences", request.getStopSequences());
+        }
+        if (!CollectionUtils.isEmpty(request.getTools())) {
+            payload.put("tools", request.getTools());
+        }
+        if (request.getToolChoice() != null) {
+            payload.put("tool_choice", request.getToolChoice());
+        }
+        if (!CollectionUtils.isEmpty(request.getMetadata())) {
+            payload.put("metadata", request.getMetadata());
+        }
+        if (request.getStreamOptions() != null) {
+            payload.put("stream_options", request.getStreamOptions());
+        }
+        if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
+            payload.putAll(request.getAdditionalParams());
+        }
+
+        return payload;
+    }
+
+    /**
+     * 构建 Claude API 请求头（包含 x-api-key）
+     */
+    private HttpHeaders buildClaudeHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        if (StringUtils.hasText(proxyProperties.getApiKey())) {
+            // Claude API 使用 x-api-key 或 Authorization
+            headers.set(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+        }
+
+        if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
+            proxyProperties.getExtraHeaders().forEach(headers::set);
+        }
+
+        return headers;
+    }
+
+    /**
+     * 打开 Claude Messages API 流式连接
+     */
+    private HttpURLConnection openClaudeStreamingConnection() throws Exception {
+        return openStreamingConnection(MESSAGES_PATH);
+    }
+
+    /**
+     * 估算 Claude 请求的输入 token 数
+     */
+    private int estimateClaudeInputTokens(ClaudeRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return 0;
+        }
+        int tokens = request.getMessages().stream()
+                .map(ClaudeRequest.Message::getContent)
+                .mapToInt(content -> tokenEstimator.estimateTextTokens(content != null ? content.toString() : ""))
+                .sum();
+
+        // 加上 system prompt 的 token
+        if (request.getSystem() != null) {
+            tokens += tokenEstimator.estimateTextTokens(request.getSystem().toString());
+        }
+
+        return tokens;
     }
 
     // ============================================================
