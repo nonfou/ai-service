@@ -84,7 +84,7 @@ public class BalanceService {
         BigDecimal inputPrice = systemConfigService.getBigDecimal("input_token_price"); // 4.1 元/百万
         BigDecimal outputPrice = systemConfigService.getBigDecimal("output_token_price"); // 16.4 元/百万
         BigDecimal cacheReadPrice = systemConfigService.getBigDecimal("cache_read_token_price", inputPrice.multiply(new BigDecimal("0.1"))); // 默认为输入价格的 10%
-        BigDecimal cacheWritePrice = systemConfigService.getBigDecimal("cache_write_token_price", inputPrice.multiply(new BigDecimal("1.25"))); // 默认为输入价格的 125%
+        BigDecimal cacheWritePrice = systemConfigService.getBigDecimal("cache_write_token_price", inputPrice.multiply(new BigDecimal("0.25"))); // 默认为输入价格的 25%
 
         // 获取模型倍率
         BigDecimal multiplier = getModelMultiplier(modelName);
