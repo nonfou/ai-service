@@ -104,6 +104,14 @@ public class ClaudeRequest {
     private Map<String, Object> additionalParams;
 
     /**
+     * Anthropic Beta 功能标记
+     * 从 HTTP 头 anthropic-beta 传递过来
+     * Claude Code 需要此头来启用特定功能
+     */
+    @JsonProperty("anthropic_beta")
+    private String anthropicBeta;
+
+    /**
      * Claude 消息格式
      */
     @Data

@@ -1201,7 +1201,8 @@ public class CopilotProxyService implements ModelProxy {
         int estimatedInputTokens = estimateClaudeInputTokens(request);
 
         try {
-            connection = openClaudeStreamingConnection();
+            // 传递 anthropic-beta 头（Claude Code 需要）
+            connection = openClaudeStreamingConnection(request.getAnthropicBeta());
             Map<String, Object> payload = buildClaudePayload(request, true);
             writeRequestBody(connection, payload);
 
@@ -1385,7 +1386,19 @@ public class CopilotProxyService implements ModelProxy {
      * 打开 Claude Messages API 流式连接
      */
     private HttpURLConnection openClaudeStreamingConnection() throws Exception {
-        return openStreamingConnection(ApiEndpoint.MESSAGES.getPath());
+        return openClaudeStreamingConnection(null);
+    }
+
+    /**
+     * 打开 Claude Messages API 流式连接（带 anthropic-beta 头）
+     */
+    private HttpURLConnection openClaudeStreamingConnection(String anthropicBeta) throws Exception {
+        Map<String, String> additionalHeaders = null;
+        if (StringUtils.hasText(anthropicBeta)) {
+            additionalHeaders = new HashMap<>();
+            additionalHeaders.put("anthropic-beta", anthropicBeta);
+        }
+        return openStreamingConnection(ApiEndpoint.MESSAGES.getPath(), additionalHeaders);
     }
 
     /**
@@ -1607,6 +1620,10 @@ public class CopilotProxyService implements ModelProxy {
     }
 
     private HttpURLConnection openStreamingConnection(String path) throws Exception {
+        return openStreamingConnection(path, null);
+    }
+
+    private HttpURLConnection openStreamingConnection(String path, Map<String, String> additionalHeaders) throws Exception {
         URL url = new URL(baseUrl() + path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("POST");
@@ -1621,6 +1638,10 @@ public class CopilotProxyService implements ModelProxy {
         }
         if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
             proxyProperties.getExtraHeaders().forEach(connection::setRequestProperty);
+        }
+        // 添加动态传入的额外头（如 anthropic-beta）
+        if (!CollectionUtils.isEmpty(additionalHeaders)) {
+            additionalHeaders.forEach(connection::setRequestProperty);
         }
 
         return connection;

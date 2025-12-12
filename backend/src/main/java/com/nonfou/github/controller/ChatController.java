@@ -69,11 +69,14 @@ public class ChatController {
     public Object claudeMessages(
             @RequestHeader(value = "x-api-key", required = false) String xApiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "anthropic-beta", required = false) String anthropicBeta,
             @RequestBody @Validated ClaudeRequest request) {
-        log.info("Claude API 兼容接口调用: /v1/messages, model={}", request.getModel());
+        log.info("Claude API 兼容接口调用: /v1/messages, model={}, anthropic-beta={}", request.getModel(), anthropicBeta);
 
         // Claude API 使用 x-api-key header，需要转换为 Authorization
         String authHeader = xApiKey != null ? "Bearer " + xApiKey : authorization;
+        // 保存 anthropic-beta 头到请求中
+        request.setAnthropicBeta(anthropicBeta);
         return handleClaudeRequest(authHeader, request);
     }
 
