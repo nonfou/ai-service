@@ -211,7 +211,7 @@ backend:
       base-url: ${COPILOT_PROXY_BASE_URL:http://67.209.176.51:2235}
       api-key: ${COPILOT_PROXY_API_KEY:}
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
-      read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:120000}
+      read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:300000}
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:600000}
 
   # 调度策略
