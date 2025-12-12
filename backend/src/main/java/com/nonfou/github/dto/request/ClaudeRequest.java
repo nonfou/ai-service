@@ -112,6 +112,14 @@ public class ClaudeRequest {
     private String anthropicBeta;
 
     /**
+     * Anthropic API 版本
+     * 从 HTTP 头 anthropic-version 传递过来
+     * Claude Code 需要此头来确定 API 版本
+     */
+    @JsonProperty("anthropic_version")
+    private String anthropicVersion;
+
+    /**
      * Claude 消息格式
      */
     @Data

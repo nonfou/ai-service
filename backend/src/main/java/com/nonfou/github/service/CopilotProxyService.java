@@ -1201,8 +1201,8 @@ public class CopilotProxyService implements ModelProxy {
         int estimatedInputTokens = estimateClaudeInputTokens(request);
 
         try {
-            // 传递 anthropic-beta 头（Claude Code 需要）
-            connection = openClaudeStreamingConnection(request.getAnthropicBeta());
+            // 传递 anthropic-beta 和 anthropic-version 头（Claude Code 需要）
+            connection = openClaudeStreamingConnection(request.getAnthropicBeta(), request.getAnthropicVersion());
             Map<String, Object> payload = buildClaudePayload(request, true);
             writeRequestBody(connection, payload);
 
@@ -1386,19 +1386,22 @@ public class CopilotProxyService implements ModelProxy {
      * 打开 Claude Messages API 流式连接
      */
     private HttpURLConnection openClaudeStreamingConnection() throws Exception {
-        return openClaudeStreamingConnection(null);
+        return openClaudeStreamingConnection(null, null);
     }
 
     /**
-     * 打开 Claude Messages API 流式连接（带 anthropic-beta 头）
+     * 打开 Claude Messages API 流式连接（带 anthropic-beta 和 anthropic-version 头）
      */
-    private HttpURLConnection openClaudeStreamingConnection(String anthropicBeta) throws Exception {
-        Map<String, String> additionalHeaders = null;
+    private HttpURLConnection openClaudeStreamingConnection(String anthropicBeta, String anthropicVersion) throws Exception {
+        Map<String, String> additionalHeaders = new HashMap<>();
         if (StringUtils.hasText(anthropicBeta)) {
-            additionalHeaders = new HashMap<>();
             additionalHeaders.put("anthropic-beta", anthropicBeta);
         }
-        return openStreamingConnection(ApiEndpoint.MESSAGES.getPath(), additionalHeaders);
+        if (StringUtils.hasText(anthropicVersion)) {
+            additionalHeaders.put("anthropic-version", anthropicVersion);
+        }
+        return openStreamingConnection(ApiEndpoint.MESSAGES.getPath(),
+                additionalHeaders.isEmpty() ? null : additionalHeaders);
     }
 
     /**
