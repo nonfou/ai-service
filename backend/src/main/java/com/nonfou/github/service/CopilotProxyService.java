@@ -19,6 +19,7 @@ import com.nonfou.github.exception.ChatUpstreamException;
 import com.nonfou.github.service.proxy.ModelProxy;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import com.nonfou.github.util.TokenEstimator;
+import com.nonfou.github.enums.ApiEndpoint;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -56,12 +57,6 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class CopilotProxyService implements ModelProxy {
 
-    private static final String CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
-    private static final String MESSAGES_PATH = "/v1/messages";
-    private static final String RESPONSES_PATH = "/v1/responses";
-    private static final String MODELS_PATH = "/v1/models";
-    private static final String EMBEDDINGS_PATH = "/v1/embeddings";
-
     private final RestTemplate restTemplate;
     private final CopilotProxyProperties proxyProperties;
     private final ObjectMapper objectMapper;
@@ -86,7 +81,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ChatResponse> response = restTemplate.exchange(
-                    baseUrl() + CHAT_COMPLETIONS_PATH,
+                    baseUrl() + ApiEndpoint.CHAT_COMPLETIONS.getPath(),
                     HttpMethod.POST,
                     entity,
                     ChatResponse.class
@@ -622,7 +617,7 @@ public class CopilotProxyService implements ModelProxy {
     }
 
     private HttpURLConnection openStreamingConnection() throws Exception {
-        return openStreamingConnection(CHAT_COMPLETIONS_PATH);
+        return openStreamingConnection(ApiEndpoint.CHAT_COMPLETIONS.getPath());
     }
 
     private void writeRequestBody(HttpURLConnection connection, Map<String, Object> payload) throws Exception {
@@ -820,7 +815,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ModelsResponse> response = restTemplate.exchange(
-                    baseUrl() + MODELS_PATH,
+                    baseUrl() + ApiEndpoint.MODELS.getPath(),
                     HttpMethod.GET,
                     entity,
                     ModelsResponse.class
@@ -855,7 +850,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<EmbeddingsResponse> response = restTemplate.exchange(
-                    baseUrl() + EMBEDDINGS_PATH,
+                    baseUrl() + ApiEndpoint.EMBEDDINGS.getPath(),
                     HttpMethod.POST,
                     entity,
                     EmbeddingsResponse.class
@@ -925,7 +920,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ClaudeResponse> response = restTemplate.exchange(
-                    baseUrl() + MESSAGES_PATH,
+                    baseUrl() + ApiEndpoint.MESSAGES.getPath(),
                     HttpMethod.POST,
                     entity,
                     ClaudeResponse.class
@@ -1021,36 +1016,42 @@ public class CopilotProxyService implements ModelProxy {
 
                 try {
                     JsonNode chunk = objectMapper.readTree(data);
-                    JsonNode choices = chunk.path("choices");
-                    if (choices.isArray() && choices.size() > 0) {
-                        JsonNode delta = choices.get(0).path("delta");
-                        String content = safeText(delta.get("content"));
+                    String eventType = safeText(chunk.get("type"));
+
+                    // 解析 Claude 原生 content_block_delta 事件
+                    if ("content_block_delta".equals(eventType)) {
+                        JsonNode delta = chunk.path("delta");
+                        String content = safeText(delta.get("text"));
                         if (StringUtils.hasText(content)) {
                             contentBuilder.append(content);
                             sendClaudeContentBlockDelta(emitter, content);
                         }
                     }
 
-                    // 提取 usage 信息
-                    JsonNode usage = chunk.path("usage");
-                    if (!usage.isMissingNode()) {
-                        if (usage.has("prompt_tokens")) {
-                            inputTokens = usage.path("prompt_tokens").asInt(0);
+                    // 解析 Claude 原生 message_start 事件中的 usage（获取 input_tokens）
+                    if ("message_start".equals(eventType)) {
+                        JsonNode message = chunk.path("message");
+                        if (!message.isMissingNode()) {
+                            JsonNode msgUsage = message.path("usage");
+                            if (!msgUsage.isMissingNode()) {
+                                if (msgUsage.has("input_tokens")) {
+                                    inputTokens = msgUsage.path("input_tokens").asInt(0);
+                                }
+                                if (msgUsage.has("cache_read_input_tokens")) {
+                                    cacheReadTokens = msgUsage.path("cache_read_input_tokens").asInt(0);
+                                }
+                                if (msgUsage.has("cache_creation_input_tokens")) {
+                                    cacheWriteTokens = msgUsage.path("cache_creation_input_tokens").asInt(0);
+                                }
+                            }
                         }
-                        if (usage.has("completion_tokens")) {
-                            outputTokens = usage.path("completion_tokens").asInt(0);
-                        }
-                        // 解析缓存 token（Anthropic 格式）
-                        if (usage.has("cache_read_input_tokens")) {
-                            cacheReadTokens = usage.path("cache_read_input_tokens").asInt(0);
-                        }
-                        if (usage.has("cache_creation_input_tokens")) {
-                            cacheWriteTokens = usage.path("cache_creation_input_tokens").asInt(0);
-                        }
-                        // 解析缓存 token（OpenAI 格式，prompt_tokens_details）
-                        JsonNode promptDetails = usage.path("prompt_tokens_details");
-                        if (!promptDetails.isMissingNode() && promptDetails.has("cached_tokens")) {
-                            cacheReadTokens = promptDetails.path("cached_tokens").asInt(0);
+                    }
+
+                    // 解析 Claude 原生 message_delta 事件中的 usage（获取 output_tokens）
+                    if ("message_delta".equals(eventType)) {
+                        JsonNode msgUsage = chunk.path("usage");
+                        if (!msgUsage.isMissingNode() && msgUsage.has("output_tokens")) {
+                            outputTokens = msgUsage.path("output_tokens").asInt(0);
                         }
                     }
                 } catch (Exception parseEx) {
@@ -1158,7 +1159,7 @@ public class CopilotProxyService implements ModelProxy {
      * 打开 Claude Messages API 流式连接
      */
     private HttpURLConnection openClaudeStreamingConnection() throws Exception {
-        return openStreamingConnection(MESSAGES_PATH);
+        return openStreamingConnection(ApiEndpoint.MESSAGES.getPath());
     }
 
     /**
@@ -1195,7 +1196,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ResponsesResponse> response = restTemplate.exchange(
-                    baseUrl() + RESPONSES_PATH,
+                    baseUrl() + ApiEndpoint.RESPONSES.getPath(),
                     HttpMethod.POST,
                     entity,
                     ResponsesResponse.class
@@ -1238,7 +1239,7 @@ public class CopilotProxyService implements ModelProxy {
         AtomicBoolean completed = new AtomicBoolean(false);
 
         try {
-            connection = openStreamingConnection(RESPONSES_PATH);
+            connection = openStreamingConnection(ApiEndpoint.RESPONSES.getPath());
             Map<String, Object> payload = buildResponsesPayload(request, true);
             writeRequestBody(connection, payload);
 
