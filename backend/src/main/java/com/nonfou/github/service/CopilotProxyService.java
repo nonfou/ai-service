@@ -991,6 +991,63 @@ public class CopilotProxyService implements ModelProxy {
         if (request.getTemperature() != null) {
             payload.put("temperature", request.getTemperature());
         }
+        if (request.getTopP() != null) {
+            payload.put("top_p", request.getTopP());
+        }
+        if (!CollectionUtils.isEmpty(request.getTools())) {
+            payload.put("tools", request.getTools());
+        }
+        if (request.getToolChoice() != null) {
+            payload.put("tool_choice", request.getToolChoice());
+        }
+        if (request.getParallelToolCalls() != null) {
+            payload.put("parallel_tool_calls", request.getParallelToolCalls());
+        }
+        if (request.getMaxToolCalls() != null) {
+            payload.put("max_tool_calls", request.getMaxToolCalls());
+        }
+        if (request.getPreviousResponseId() != null) {
+            payload.put("previous_response_id", request.getPreviousResponseId());
+        }
+        if (request.getConversation() != null) {
+            payload.put("conversation", request.getConversation());
+        }
+        if (request.getBackground() != null) {
+            payload.put("background", request.getBackground());
+        }
+        if (request.getStore() != null) {
+            payload.put("store", request.getStore());
+        }
+        if (request.getTruncation() != null) {
+            payload.put("truncation", request.getTruncation());
+        }
+        if (!CollectionUtils.isEmpty(request.getInclude())) {
+            payload.put("include", request.getInclude());
+        }
+        if (request.getReasoning() != null) {
+            payload.put("reasoning", request.getReasoning());
+        }
+        if (request.getText() != null) {
+            payload.put("text", request.getText());
+        }
+        if (!CollectionUtils.isEmpty(request.getMetadata())) {
+            payload.put("metadata", request.getMetadata());
+        }
+        if (request.getServiceTier() != null) {
+            payload.put("service_tier", request.getServiceTier());
+        }
+        if (request.getSafetyIdentifier() != null) {
+            payload.put("safety_identifier", request.getSafetyIdentifier());
+        }
+        if (request.getPromptCacheKey() != null) {
+            payload.put("prompt_cache_key", request.getPromptCacheKey());
+        }
+        if (request.getPromptCacheRetention() != null) {
+            payload.put("prompt_cache_retention", request.getPromptCacheRetention());
+        }
+        if (request.getStreamOptions() != null) {
+            payload.put("stream_options", request.getStreamOptions());
+        }
         if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
             payload.putAll(request.getAdditionalParams());
         }
