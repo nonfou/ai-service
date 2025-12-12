@@ -12,6 +12,7 @@ import java.util.List;
 /**
  * Anthropic Claude Messages API 响应格式
  * 用于 /v1/messages 接口返回
+ * 参考: https://docs.anthropic.com/en/api/messages
  */
 @Data
 @Builder
@@ -46,13 +47,13 @@ public class ClaudeResponse {
     private String model;
 
     /**
-     * 停止原因
+     * 停止原因: end_turn, max_tokens, stop_sequence, tool_use
      */
     @JsonProperty("stop_reason")
     private String stopReason;
 
     /**
-     * 停止序列（如果有）
+     * 停止序列（如果 stop_reason 为 stop_sequence）
      */
     @JsonProperty("stop_sequence")
     private String stopSequence;
@@ -63,7 +64,7 @@ public class ClaudeResponse {
     private Usage usage;
 
     /**
-     * 内容块
+     * 内容块基类
      */
     @Data
     @Builder
@@ -72,7 +73,7 @@ public class ClaudeResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ContentBlock {
         /**
-         * 类型: text, tool_use 等
+         * 类型: text, tool_use, tool_result
          */
         private String type;
 
@@ -80,6 +81,21 @@ public class ClaudeResponse {
          * 文本内容（type=text 时）
          */
         private String text;
+
+        /**
+         * 工具调用 ID（type=tool_use 时）
+         */
+        private String id;
+
+        /**
+         * 工具名称（type=tool_use 时）
+         */
+        private String name;
+
+        /**
+         * 工具输入参数（type=tool_use 时）
+         */
+        private Object input;
     }
 
     /**
@@ -89,6 +105,7 @@ public class ClaudeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Usage {
         @JsonProperty("input_tokens")
         private Integer inputTokens;

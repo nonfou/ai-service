@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonfou.github.common.Result;
 import com.nonfou.github.config.ModelMappingProperties;
 import com.nonfou.github.dto.request.ChatRequest;
+import com.nonfou.github.dto.request.ClaudeRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
 import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.dto.response.ChatResponse;
@@ -68,7 +69,7 @@ public class ChatController {
     public Object claudeMessages(
             @RequestHeader(value = "x-api-key", required = false) String xApiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestBody @Validated ChatRequest request) {
+            @RequestBody @Validated ClaudeRequest request) {
         log.info("Claude API 兼容接口调用: /v1/messages, model={}", request.getModel());
 
         // Claude API 使用 x-api-key header，需要转换为 Authorization
@@ -84,7 +85,7 @@ public class ChatController {
     public Object claudeCountTokens(
             @RequestHeader(value = "x-api-key", required = false) String xApiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestBody @Validated ChatRequest request) {
+            @RequestBody @Validated ClaudeRequest request) {
         log.info("Claude API count_tokens 接口调用: /v1/messages/count_tokens, model={}", request.getModel());
 
         // 简单估算 token 数量（实际应该使用 tokenizer）
@@ -287,8 +288,8 @@ public class ChatController {
     /**
      * Claude API 请求处理方法（Anthropic 格式）
      */
-    private Object handleClaudeRequest(String authorization, ChatRequest request) {
-        normalizeModelName(request);
+    private Object handleClaudeRequest(String authorization, ClaudeRequest request) {
+        normalizeClaudeModelName(request);
 
         // 如果请求流式响应，返回 SSE（Claude 格式）
         if (Boolean.TRUE.equals(request.getStream())) {
@@ -297,9 +298,8 @@ public class ChatController {
 
         // 非流式响应
         try {
-            ChatResponse response = chatWorkflowService.handleChat(authorization, request);
-            // 转换为 Claude 格式
-            return ClaudeResponse.fromChatResponse(response);
+            ClaudeResponse response = chatWorkflowService.handleClaudeChat(authorization, request);
+            return response;
         } catch (ChatAuthorizationException e) {
             return ClaudeErrorResponse.fromStatusCode(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
         } catch (BusinessException e) {
@@ -317,9 +317,9 @@ public class ChatController {
     /**
      * Claude 格式流式聊天接口
      */
-    private SseEmitter claudeStream(String authorization, ChatRequest request) {
+    private SseEmitter claudeStream(String authorization, ClaudeRequest request) {
         try {
-            return chatWorkflowService.handleClaudeStream(authorization, request);
+            return chatWorkflowService.handleClaudeStreamRequest(authorization, request);
         } catch (ChatAuthorizationException e) {
             log.warn("Claude 流式请求鉴权失败: {}", e.getMessage());
             return buildClaudeErrorEmitter(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
@@ -429,6 +429,32 @@ public class ChatController {
 
         if (!normalized.equals(raw)) {
             log.debug("模型名规范化: {} -> {}", raw, normalized);
+            request.setModel(normalized);
+        }
+    }
+
+    private void normalizeClaudeModelName(ClaudeRequest request) {
+        if (request == null || !StringUtils.hasText(request.getModel())) {
+            return;
+        }
+
+        if (!modelMappingProperties.isEnabled()) {
+            return;
+        }
+
+        Map<String, String> aliases = modelMappingProperties.getAliases();
+        if (aliases == null || aliases.isEmpty()) {
+            return;
+        }
+
+        String raw = request.getModel().trim();
+        String key = raw.toLowerCase(Locale.ROOT);
+
+        String normalized = modelMappingProperties.getAliases()
+                .getOrDefault(key, raw);
+
+        if (!normalized.equals(raw)) {
+            log.debug("Claude 模型名规范化: {} -> {}", raw, normalized);
             request.setModel(normalized);
         }
     }

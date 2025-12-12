@@ -2,12 +2,14 @@ package com.nonfou.github.service;
 
 import com.nonfou.github.config.BackendRoutingProperties;
 import com.nonfou.github.dto.request.ChatRequest;
+import com.nonfou.github.dto.request.ClaudeRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
 import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.dto.response.ChatResponse;
 import com.nonfou.github.dto.response.ChatResponse.Choice;
 import com.nonfou.github.dto.response.ChatResponse.Message;
 import com.nonfou.github.dto.response.ChatResponse.Usage;
+import com.nonfou.github.dto.response.ClaudeResponse;
 import com.nonfou.github.dto.response.EmbeddingsResponse;
 import com.nonfou.github.dto.response.ResponsesResponse;
 import com.nonfou.github.entity.ApiKey;
@@ -109,6 +111,209 @@ public class ChatWorkflowService {
         // 创建计费回调
         StreamCompletionCallback callback = createStreamCallback(context, request, requestTime, proxy.getProvider());
         return proxy.claudeStream(request, context.apiKey(), callback);
+    }
+
+    // ============================================================
+    // Claude Messages API 专用方法
+    // ============================================================
+
+    /**
+     * Claude Messages API 非流式请求处理
+     * 返回 Anthropic Messages API 格式的响应
+     */
+    public ClaudeResponse handleClaudeChat(String authorization, ClaudeRequest request) {
+        ChatContext context = authenticate(authorization);
+        LocalDateTime requestTime = LocalDateTime.now();
+        request.setStream(false);
+
+        CopilotProxyService copilotProxy = getCopilotProxy();
+        try {
+            ClaudeResponse response = copilotProxy.claudeMessages(request, context.apiKey());
+            recordClaudeSuccess(context, request, response, requestTime);
+            return response;
+        } catch (ChatAuthorizationException ex) {
+            throw ex;
+        } catch (ChatUpstreamException | BusinessException ex) {
+            recordClaudeFailure(context, request, requestTime, ex);
+            throw ex;
+        } catch (Exception ex) {
+            recordClaudeFailure(context, request, requestTime, ex);
+            throw new ChatProcessingException("Claude 服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
+    /**
+     * Claude Messages API 流式请求处理
+     * 返回 Anthropic SSE 格式的响应
+     */
+    public SseEmitter handleClaudeStreamRequest(String authorization, ClaudeRequest request) {
+        ChatContext context = authenticate(authorization);
+        LocalDateTime requestTime = LocalDateTime.now();
+        request.setStream(true);
+
+        CopilotProxyService copilotProxy = getCopilotProxy();
+        // 创建计费回调
+        StreamCompletionCallback callback = createClaudeStreamCallback(context, request, requestTime);
+        return copilotProxy.claudeMessagesStream(request, context.apiKey(), callback);
+    }
+
+    /**
+     * 创建 Claude 流式请求完成回调，用于计费
+     */
+    private StreamCompletionCallback createClaudeStreamCallback(ChatContext context, ClaudeRequest request,
+                                                                  LocalDateTime requestTime) {
+        return (tokenUsage, success, errorMessage) -> {
+            LocalDateTime endTime = LocalDateTime.now();
+            int duration = (int) ChronoUnit.MILLIS.between(requestTime, endTime);
+
+            ApiCall apiCall = buildClaudeApiCall(context, request, requestTime, endTime, duration);
+            apiCall.setInputTokens(tokenUsage.getInputTokens());
+            apiCall.setOutputTokens(tokenUsage.getOutputTokens());
+            apiCall.setCacheReadTokens(tokenUsage.getCacheReadTokens());
+            apiCall.setCacheWriteTokens(tokenUsage.getCacheWriteTokens());
+
+            if (success) {
+                BigDecimal cost = balanceService.calculateCost(request.getModel(), tokenUsage);
+                apiCall.setCost(cost);
+                apiCall.setRawCost(cost);
+                apiCall.setMarkupRate(BigDecimal.ONE);
+                apiCall.setMarkupCost(BigDecimal.ZERO);
+                apiCall.setStatus(1);
+
+                Long apiCallId = balanceService.logApiCall(apiCall);
+                apiCall.setId(apiCallId);
+                balanceService.deductBalance(context.user().getId(), cost, apiCallId);
+                apiKeyService.updateLastUsedTime(context.apiKeyValue());
+
+                recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+                int totalTokens = tokenUsage.getInputTokens() + tokenUsage.getOutputTokens()
+                        + tokenUsage.getCacheReadTokens() + tokenUsage.getCacheWriteTokens();
+                log.info("Claude 流式API调用成功: userId={}, model={}, tokens={}, cacheRead={}, cacheWrite={}, cost={}",
+                        context.user().getId(),
+                        request.getModel(),
+                        totalTokens,
+                        tokenUsage.getCacheReadTokens(),
+                        tokenUsage.getCacheWriteTokens(),
+                        cost);
+            } else {
+                apiCall.setCost(BigDecimal.ZERO);
+                apiCall.setRawCost(BigDecimal.ZERO);
+                apiCall.setMarkupRate(BigDecimal.ONE);
+                apiCall.setMarkupCost(BigDecimal.ZERO);
+                apiCall.setStatus(0);
+                apiCall.setErrorMsg(errorMessage);
+
+                Long apiCallId = balanceService.logApiCall(apiCall);
+                apiCall.setId(apiCallId);
+                recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+                log.error("Claude 流式API调用失败: userId={}, error={}", context.user().getId(), errorMessage);
+            }
+        };
+    }
+
+    private void recordClaudeSuccess(ChatContext context,
+                                      ClaudeRequest request,
+                                      ClaudeResponse response,
+                                      LocalDateTime startTime) {
+        LocalDateTime endTime = LocalDateTime.now();
+        int inputTokens = 0;
+        int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
+
+        if (response.getUsage() != null) {
+            inputTokens = response.getUsage().getInputTokens() != null ? response.getUsage().getInputTokens() : 0;
+            outputTokens = response.getUsage().getOutputTokens() != null ? response.getUsage().getOutputTokens() : 0;
+            cacheReadTokens = response.getUsage().getCacheReadInputTokens() != null ? response.getUsage().getCacheReadInputTokens() : 0;
+            cacheWriteTokens = response.getUsage().getCacheCreationInputTokens() != null ? response.getUsage().getCacheCreationInputTokens() : 0;
+        }
+
+        TokenUsage tokenUsage = TokenUsage.builder()
+                .inputTokens(inputTokens)
+                .outputTokens(outputTokens)
+                .cacheReadTokens(cacheReadTokens)
+                .cacheWriteTokens(cacheWriteTokens)
+                .build();
+        BigDecimal cost = balanceService.calculateCost(request.getModel(), tokenUsage);
+        int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
+
+        ApiCall apiCall = buildClaudeApiCall(context, request, startTime, endTime, duration);
+        apiCall.setInputTokens(inputTokens);
+        apiCall.setOutputTokens(outputTokens);
+        apiCall.setCacheReadTokens(cacheReadTokens);
+        apiCall.setCacheWriteTokens(cacheWriteTokens);
+        apiCall.setCost(cost);
+        apiCall.setRawCost(cost);
+        apiCall.setMarkupRate(BigDecimal.ONE);
+        apiCall.setMarkupCost(BigDecimal.ZERO);
+        apiCall.setStatus(1);
+
+        Long apiCallId = balanceService.logApiCall(apiCall);
+        apiCall.setId(apiCallId);
+        balanceService.deductBalance(context.user().getId(), cost, apiCallId);
+        apiKeyService.updateLastUsedTime(context.apiKeyValue());
+
+        recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+        int totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
+        log.info("Claude API调用成功: userId={}, model={}, tokens={}, cacheRead={}, cacheWrite={}, cost={}",
+                context.user().getId(),
+                request.getModel(),
+                totalTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
+                cost);
+    }
+
+    private void recordClaudeFailure(ChatContext context,
+                                      ClaudeRequest request,
+                                      LocalDateTime startTime,
+                                      Exception exception) {
+        LocalDateTime endTime = LocalDateTime.now();
+        int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
+
+        ApiCall apiCall = buildClaudeApiCall(context, request, startTime, endTime, duration);
+        apiCall.setInputTokens(0);
+        apiCall.setOutputTokens(0);
+        apiCall.setCacheReadTokens(0);
+        apiCall.setCacheWriteTokens(0);
+        apiCall.setCost(BigDecimal.ZERO);
+        apiCall.setRawCost(BigDecimal.ZERO);
+        apiCall.setMarkupRate(BigDecimal.ONE);
+        apiCall.setMarkupCost(BigDecimal.ZERO);
+        apiCall.setStatus(0);
+        apiCall.setErrorMsg(exception.getMessage());
+
+        Long apiCallId = balanceService.logApiCall(apiCall);
+        apiCall.setId(apiCallId);
+        recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+        log.error("Claude API调用失败: userId={}, error={}", context.user().getId(), exception.getMessage());
+    }
+
+    private ApiCall buildClaudeApiCall(ChatContext context,
+                                        ClaudeRequest request,
+                                        LocalDateTime startTime,
+                                        LocalDateTime endTime,
+                                        int duration) {
+        ApiCall apiCall = new ApiCall();
+        apiCall.setUserId(context.user().getId());
+        apiCall.setApiKey(context.apiKeyValue());
+        apiCall.setModel(request.getModel());
+        apiCall.setProvider("copilot");
+        apiCall.setCacheReadTokens(0);
+        apiCall.setCacheWriteTokens(0);
+        apiCall.setRequestTime(startTime);
+        apiCall.setResponseTime(endTime);
+        apiCall.setDuration(duration);
+        apiCall.setSessionHash(SessionUtil.generateSessionHash(
+                context.apiKeyValue(),
+                request.getModel(),
+                null
+        ));
+        return apiCall;
     }
 
     /**

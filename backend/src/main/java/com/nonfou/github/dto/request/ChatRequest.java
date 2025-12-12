@@ -9,14 +9,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Copilot 聊天请求
- * 兼容 OpenAI Chat Completions API 和 Anthropic Claude Messages API
+ * OpenAI Chat Completions API 请求 DTO
+ * 用于 /v1/chat/completions 接口
+ * 参考: https://platform.openai.com/docs/api-reference/chat/create
  */
 @Data
 public class ChatRequest {
 
     /**
      * 模型名称
+     * 如: gpt-4o, gpt-4-turbo, gpt-3.5-turbo
      */
     @NotBlank(message = "模型不能为空")
     private String model;
@@ -33,13 +35,13 @@ public class ChatRequest {
     private Boolean stream = false;
 
     /**
-     * 最大 tokens (OpenAI: max_tokens, Claude: max_tokens)
+     * 最大 tokens
      */
     @JsonProperty("max_tokens")
     private Integer maxTokens;
 
     /**
-     * 温度参数 (0-2 for OpenAI, 0-1 for Claude)
+     * 温度参数 (0-2)
      */
     private Double temperature;
 
@@ -50,61 +52,193 @@ public class ChatRequest {
     private Double topP;
 
     /**
-     * Top-K 采样 (Claude 特有)
+     * 频率惩罚 (-2.0 到 2.0)
      */
-    @JsonProperty("top_k")
-    private Integer topK;
+    @JsonProperty("frequency_penalty")
+    private Double frequencyPenalty;
 
     /**
-     * 系统提示 (Claude Messages API 格式)
-     * 可以是字符串或内容块列表
+     * 存在惩罚 (-2.0 到 2.0)
      */
-    private Object system;
+    @JsonProperty("presence_penalty")
+    private Double presencePenalty;
 
     /**
-     * 工具列表
+     * 停止序列
      */
-    private List<Object> tools;
+    private Object stop;
+
+    /**
+     * 工具定义列表
+     */
+    private List<Tool> tools;
 
     /**
      * 工具选择策略
+     * none | auto | required | { type: "function", function: { name: "xxx" } }
      */
     @JsonProperty("tool_choice")
     private Object toolChoice;
 
     /**
-     * 停止序列
+     * 是否并行调用工具
      */
-    @JsonProperty("stop_sequences")
-    private List<String> stopSequences;
+    @JsonProperty("parallel_tool_calls")
+    private Boolean parallelToolCalls;
 
     /**
-     * 停止序列 (OpenAI 格式)
+     * 响应格式
      */
-    private Object stop;
+    @JsonProperty("response_format")
+    private Object responseFormat;
 
     /**
-     * 元数据
+     * 随机种子
      */
-    private Map<String, String> metadata;
+    private Integer seed;
 
     /**
-     * 流式选项 (OpenAI)
+     * 用户标识
+     */
+    private String user;
+
+    /**
+     * 流式选项
      */
     @JsonProperty("stream_options")
     private Object streamOptions;
+
+    /**
+     * 日志概率
+     */
+    private Boolean logprobs;
+
+    /**
+     * Top 日志概率数量
+     */
+    @JsonProperty("top_logprobs")
+    private Integer topLogprobs;
+
+    /**
+     * 生成数量
+     */
+    private Integer n;
 
     /**
      * 其他参数
      */
     private Map<String, Object> additionalParams;
 
+    /**
+     * OpenAI 消息格式
+     */
     @Data
     public static class Message {
-        private String role;
         /**
-         * 消息内容可为字符串或内容块列表（OpenAI/Anthropic 兼容格式）
+         * 角色: system, user, assistant, tool
+         */
+        private String role;
+
+        /**
+         * 消息内容
+         * 可以是字符串或内容块列表
          */
         private Object content;
+
+        /**
+         * 消息名称（可选）
+         */
+        private String name;
+
+        /**
+         * 工具调用列表（assistant 消息）
+         */
+        @JsonProperty("tool_calls")
+        private List<ToolCall> toolCalls;
+
+        /**
+         * 工具调用 ID（tool 消息）
+         */
+        @JsonProperty("tool_call_id")
+        private String toolCallId;
+    }
+
+    /**
+     * OpenAI 工具定义
+     */
+    @Data
+    public static class Tool {
+        /**
+         * 工具类型，固定为 "function"
+         */
+        private String type = "function";
+
+        /**
+         * 函数定义
+         */
+        private Function function;
+    }
+
+    /**
+     * OpenAI 函数定义
+     */
+    @Data
+    public static class Function {
+        /**
+         * 函数名称
+         */
+        private String name;
+
+        /**
+         * 函数描述
+         */
+        private String description;
+
+        /**
+         * 参数 JSON Schema
+         */
+        private Object parameters;
+
+        /**
+         * 是否严格模式
+         */
+        private Boolean strict;
+    }
+
+    /**
+     * OpenAI 工具调用
+     */
+    @Data
+    public static class ToolCall {
+        /**
+         * 工具调用 ID
+         */
+        private String id;
+
+        /**
+         * 类型，固定为 "function"
+         */
+        private String type = "function";
+
+        /**
+         * 函数调用详情
+         */
+        private FunctionCall function;
+    }
+
+    /**
+     * OpenAI 函数调用
+     */
+    @Data
+    public static class FunctionCall {
+        /**
+         * 函数名称
+         */
+        private String name;
+
+        /**
+         * 函数参数（JSON 字符串）
+         */
+        private String arguments;
     }
 }
