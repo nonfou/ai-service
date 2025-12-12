@@ -11,6 +11,7 @@ import com.nonfou.github.mapper.ApiCallMapper;
 import com.nonfou.github.mapper.BalanceLogMapper;
 import com.nonfou.github.mapper.ModelMapper;
 import com.nonfou.github.mapper.UserMapper;
+import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,47 @@ public class BalanceService {
                 .divide(new BigDecimal("1000000"), 6, RoundingMode.HALF_UP);
 
         BigDecimal totalCost = inputCost.add(outputCost);
+
+        // 应用倍率
+        return totalCost.multiply(multiplier).setScale(6, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 计算费用（支持缓存 token）
+     * @param modelName 模型名称
+     * @param tokenUsage Token 使用情况（包含输入、输出、缓存读取、缓存写入）
+     * @return 费用（元）
+     */
+    public BigDecimal calculateCost(String modelName, TokenUsage tokenUsage) {
+        // 获取基础价格配置
+        BigDecimal inputPrice = systemConfigService.getBigDecimal("input_token_price"); // 4.1 元/百万
+        BigDecimal outputPrice = systemConfigService.getBigDecimal("output_token_price"); // 16.4 元/百万
+        BigDecimal cacheReadPrice = systemConfigService.getBigDecimal("cache_read_token_price", inputPrice.multiply(new BigDecimal("0.1"))); // 默认为输入价格的 10%
+        BigDecimal cacheWritePrice = systemConfigService.getBigDecimal("cache_write_token_price", inputPrice.multiply(new BigDecimal("1.25"))); // 默认为输入价格的 125%
+
+        // 获取模型倍率
+        BigDecimal multiplier = getModelMultiplier(modelName);
+
+        BigDecimal million = new BigDecimal("1000000");
+
+        // 计算各项费用
+        BigDecimal inputCost = new BigDecimal(tokenUsage.getInputTokens())
+                .multiply(inputPrice)
+                .divide(million, 6, RoundingMode.HALF_UP);
+
+        BigDecimal outputCost = new BigDecimal(tokenUsage.getOutputTokens())
+                .multiply(outputPrice)
+                .divide(million, 6, RoundingMode.HALF_UP);
+
+        BigDecimal cacheReadCost = new BigDecimal(tokenUsage.getCacheReadTokens())
+                .multiply(cacheReadPrice)
+                .divide(million, 6, RoundingMode.HALF_UP);
+
+        BigDecimal cacheWriteCost = new BigDecimal(tokenUsage.getCacheWriteTokens())
+                .multiply(cacheWritePrice)
+                .divide(million, 6, RoundingMode.HALF_UP);
+
+        BigDecimal totalCost = inputCost.add(outputCost).add(cacheReadCost).add(cacheWriteCost);
 
         // 应用倍率
         return totalCost.multiply(multiplier).setScale(6, RoundingMode.HALF_UP);

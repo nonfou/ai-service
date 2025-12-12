@@ -58,6 +58,14 @@ public class SystemConfigService {
     }
 
     /**
+     * 获取 BigDecimal 配置（带默认值）
+     */
+    public BigDecimal getBigDecimal(String key, BigDecimal defaultValue) {
+        String value = get(key);
+        return value != null ? new BigDecimal(value) : defaultValue;
+    }
+
+    /**
      * 获取 Integer 配置
      */
     public Integer getInteger(String key) {

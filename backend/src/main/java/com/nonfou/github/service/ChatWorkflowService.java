@@ -116,16 +116,16 @@ public class ChatWorkflowService {
      */
     private StreamCompletionCallback createStreamCallback(ChatContext context, ChatRequest request,
                                                            LocalDateTime requestTime, String provider) {
-        return (inputTokens, outputTokens, success, errorMessage) -> {
+        return (tokenUsage, success, errorMessage) -> {
             LocalDateTime endTime = LocalDateTime.now();
             int duration = (int) ChronoUnit.MILLIS.between(requestTime, endTime);
 
             ApiCall apiCall = buildApiCall(context, request, requestTime, endTime, duration, provider);
-            apiCall.setInputTokens(inputTokens);
-            apiCall.setOutputTokens(outputTokens);
+            apiCall.setInputTokens(tokenUsage.getInputTokens());
+            apiCall.setOutputTokens(tokenUsage.getOutputTokens());
 
             if (success) {
-                BigDecimal cost = balanceService.calculateCost(request.getModel(), inputTokens, outputTokens);
+                BigDecimal cost = balanceService.calculateCost(request.getModel(), tokenUsage);
                 apiCall.setCost(cost);
                 apiCall.setRawCost(cost);
                 apiCall.setMarkupRate(BigDecimal.ONE);
@@ -139,10 +139,14 @@ public class ChatWorkflowService {
 
                 recordUsageMetrics(context.apiKey().getId(), apiCall);
 
-                log.info("流式API调用成功: userId={}, model={}, tokens={}, cost={}",
+                int totalTokens = tokenUsage.getInputTokens() + tokenUsage.getOutputTokens()
+                        + tokenUsage.getCacheReadTokens() + tokenUsage.getCacheWriteTokens();
+                log.info("流式API调用成功: userId={}, model={}, tokens={}, cacheRead={}, cacheWrite={}, cost={}",
                         context.user().getId(),
                         request.getModel(),
-                        inputTokens + outputTokens,
+                        totalTokens,
+                        tokenUsage.getCacheReadTokens(),
+                        tokenUsage.getCacheWriteTokens(),
                         cost);
             } else {
                 apiCall.setCost(BigDecimal.ZERO);

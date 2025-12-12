@@ -15,6 +15,7 @@ import com.nonfou.github.exception.ChatAuthorizationException;
 import com.nonfou.github.exception.ChatProcessingException;
 import com.nonfou.github.exception.ChatUpstreamException;
 import com.nonfou.github.service.proxy.ModelProxy;
+import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import com.nonfou.github.util.TokenEstimator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -152,6 +153,8 @@ public class CopilotProxyService implements ModelProxy {
         AtomicBoolean completed = new AtomicBoolean(false);
         int inputTokens = 0;
         int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
         StringBuilder contentBuilder = new StringBuilder();
 
         // 预先估算输入 token（基于请求消息）
@@ -166,7 +169,7 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Copilot Proxy 流式鉴权失败: HTTP {}", status);
                 sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
-                invokeCallback(callback, 0, 0, false, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
                 return;
             }
 
@@ -177,7 +180,7 @@ public class CopilotProxyService implements ModelProxy {
                 sendStreamError(emitter, status,
                         friendly != null ? friendly : buildFriendlyMessage(status),
                         "processing_error");
-                invokeCallback(callback, 0, 0, false, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
                 return;
             }
 
@@ -214,6 +217,18 @@ public class CopilotProxyService implements ModelProxy {
                         if (usage.has("completion_tokens")) {
                             outputTokens = usage.path("completion_tokens").asInt(0);
                         }
+                        // 解析缓存 token（Anthropic 格式）
+                        if (usage.has("cache_read_input_tokens")) {
+                            cacheReadTokens = usage.path("cache_read_input_tokens").asInt(0);
+                        }
+                        if (usage.has("cache_creation_input_tokens")) {
+                            cacheWriteTokens = usage.path("cache_creation_input_tokens").asInt(0);
+                        }
+                        // 解析缓存 token（OpenAI 格式，prompt_tokens_details）
+                        JsonNode promptDetails = usage.path("prompt_tokens_details");
+                        if (!promptDetails.isMissingNode() && promptDetails.has("cached_tokens")) {
+                            cacheReadTokens = promptDetails.path("cached_tokens").asInt(0);
+                        }
                     }
                 } catch (Exception ignored) {
                 }
@@ -228,12 +243,18 @@ public class CopilotProxyService implements ModelProxy {
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
             int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
 
-            invokeCallback(callback, finalInputTokens, finalOutputTokens, true, null);
+            TokenUsage tokenUsage = TokenUsage.builder()
+                    .inputTokens(finalInputTokens)
+                    .outputTokens(finalOutputTokens)
+                    .cacheReadTokens(cacheReadTokens)
+                    .cacheWriteTokens(cacheWriteTokens)
+                    .build();
+            invokeCallback(callback, tokenUsage, true, null);
         } catch (Exception ex) {
             log.error("Copilot Proxy 流式调用异常", ex);
             sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "上游模型服务流式接口异常", "processing_error");
-            invokeCallback(callback, 0, 0, false, ex.getMessage());
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
         } finally {
             closeResources(reader, connection);
         }
@@ -251,6 +272,8 @@ public class CopilotProxyService implements ModelProxy {
         StringBuilder contentBuilder = new StringBuilder();
         int inputTokens = 0;
         int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
 
         // 预先估算输入 token（基于请求消息）
         int estimatedInputTokens = estimateInputTokens(request);
@@ -264,7 +287,7 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Claude 流式鉴权失败: HTTP {}", status);
                 sendClaudeStreamError(emitter, status, "上游模型服务鉴权失败");
-                invokeCallback(callback, 0, 0, false, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
                 return;
             }
 
@@ -273,7 +296,7 @@ public class CopilotProxyService implements ModelProxy {
                 log.error("Claude 流式调用失败: HTTP {}, body={}", status, errorBody);
                 String friendly = extractFriendlyMessage(errorBody);
                 sendClaudeStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status));
-                invokeCallback(callback, 0, 0, false, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
                 return;
             }
 
@@ -316,6 +339,18 @@ public class CopilotProxyService implements ModelProxy {
                         if (usage.has("completion_tokens")) {
                             outputTokens = usage.path("completion_tokens").asInt(0);
                         }
+                        // 解析缓存 token（Anthropic 格式）
+                        if (usage.has("cache_read_input_tokens")) {
+                            cacheReadTokens = usage.path("cache_read_input_tokens").asInt(0);
+                        }
+                        if (usage.has("cache_creation_input_tokens")) {
+                            cacheWriteTokens = usage.path("cache_creation_input_tokens").asInt(0);
+                        }
+                        // 解析缓存 token（OpenAI 格式，prompt_tokens_details）
+                        JsonNode promptDetails = usage.path("prompt_tokens_details");
+                        if (!promptDetails.isMissingNode() && promptDetails.has("cached_tokens")) {
+                            cacheReadTokens = promptDetails.path("cached_tokens").asInt(0);
+                        }
                     }
                 } catch (Exception parseEx) {
                     log.debug("解析流式数据失败: {}", data);
@@ -337,20 +372,26 @@ public class CopilotProxyService implements ModelProxy {
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
             int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
 
-            invokeCallback(callback, finalInputTokens, finalOutputTokens, true, null);
+            TokenUsage tokenUsage = TokenUsage.builder()
+                    .inputTokens(finalInputTokens)
+                    .outputTokens(finalOutputTokens)
+                    .cacheReadTokens(cacheReadTokens)
+                    .cacheWriteTokens(cacheWriteTokens)
+                    .build();
+            invokeCallback(callback, tokenUsage, true, null);
         } catch (Exception ex) {
             log.error("Claude 流式调用异常", ex);
             sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
-            invokeCallback(callback, 0, 0, false, ex.getMessage());
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
         } finally {
             closeResources(reader, connection);
         }
     }
 
-    private void invokeCallback(StreamCompletionCallback callback, int inputTokens, int outputTokens, boolean success, String errorMessage) {
+    private void invokeCallback(StreamCompletionCallback callback, TokenUsage tokenUsage, boolean success, String errorMessage) {
         if (callback != null) {
             try {
-                callback.onComplete(inputTokens, outputTokens, success, errorMessage);
+                callback.onComplete(tokenUsage, success, errorMessage);
             } catch (Exception e) {
                 log.error("流式回调执行失败", e);
             }
