@@ -735,6 +735,17 @@ public class ChatWorkflowService {
         return new ChatContext(apiKeyValue, apiKey, user);
     }
 
+    /**
+     * 公开的 API Key 验证方法
+     * 用于不需要执行实际请求但需要验证认证的场景（如 count_tokens）
+     *
+     * @param authorization Authorization 头的值
+     * @throws ChatAuthorizationException 如果认证失败
+     */
+    public void validateApiKey(String authorization) {
+        authenticate(authorization);
+    }
+
     private ApiKey buildLegacyApiKey(User user) {
         ApiKey legacyApiKey = new ApiKey();
         legacyApiKey.setUserId(user.getId());

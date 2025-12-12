@@ -1,5 +1,6 @@
 package com.nonfou.github.config;
 
+import com.nonfou.github.filter.RateLimitFilter;
 import com.nonfou.github.security.RestAccessDeniedHandler;
 import com.nonfou.github.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
 
@@ -35,6 +37,8 @@ public class SecurityConfig {
 
             // 配置请求授权
             .authorizeHttpRequests(auth -> auth
+                // 健康检查端点: 允许所有访问
+                .requestMatchers("/health", "/ready", "/live", "/actuator/**").permitAll()
                 // 公开接口:允许所有认证相关的请求(登录、发送验证码等)
                 .requestMatchers("/api/auth/**").permitAll()
                 // 公开接口:允许获取模型列表
@@ -79,7 +83,10 @@ public class SecurityConfig {
             .logout(AbstractHttpConfigurer::disable)
 
             // 添加 JWT 认证过滤器
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+            // 添加速率限制过滤器（在 JWT 认证之前）
+            .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

@@ -134,74 +134,72 @@ public class BalanceService {
     }
 
     /**
-     * 扣除余额（带事务）
+     * 扣除余额（带事务）- 使用原子操作避免竞态条件
      * @param userId 用户ID
      * @param cost 费用
      * @param apiCallId API调用ID
      */
     @Transactional
     public void deductBalance(Long userId, BigDecimal cost, Long apiCallId) {
-        // 查询用户（加行锁）
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-
-        // 检查余额
-        if (user.getBalance().compareTo(cost) < 0) {
+        // 使用原子操作扣减余额（同时检查余额是否充足）
+        int affected = userMapper.deductBalanceAtomic(userId, cost);
+        if (affected == 0) {
+            // 扣减失败，检查原因
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                throw new RuntimeException("用户不存在");
+            }
             throw new BusinessException(ApiErrorCodes.PAYMENT_REQUIRED, "余额不足，请先充值");
         }
 
-        // 扣除余额
-        BigDecimal newBalance = user.getBalance().subtract(cost);
-        user.setBalance(newBalance);
-        userMapper.updateById(user);
+        // 查询扣减后的余额用于记录日志
+        User user = userMapper.selectById(userId);
+        BigDecimal newBalance = user != null ? user.getBalance() : BigDecimal.ZERO;
 
         // 记录余额变动日志
-        BalanceLog log = new BalanceLog();
-        log.setUserId(userId);
-        log.setAmount(cost.negate()); // 负数表示扣除
-        log.setBalanceAfter(newBalance);
-        log.setType("consume");
-        log.setRelatedId(apiCallId);
-        log.setRemark("API调用扣费");
-        log.setCreatedAt(LocalDateTime.now());
-        balanceLogMapper.insert(log);
+        BalanceLog balanceLog = new BalanceLog();
+        balanceLog.setUserId(userId);
+        balanceLog.setAmount(cost.negate()); // 负数表示扣除
+        balanceLog.setBalanceAfter(newBalance);
+        balanceLog.setType("consume");
+        balanceLog.setRelatedId(apiCallId);
+        balanceLog.setRemark("API调用扣费");
+        balanceLog.setCreatedAt(LocalDateTime.now());
+        balanceLogMapper.insert(balanceLog);
 
-        this.log.info("余额扣除成功: userId={}, cost={}, balance={}", userId, cost, newBalance);
+        log.info("余额扣除成功: userId={}, cost={}, balance={}", userId, cost, newBalance);
     }
 
     /**
-     * 充值余额（带事务）
+     * 充值余额（带事务）- 使用原子操作
      * @param userId 用户ID
      * @param amount 充值金额
      * @param orderId 订单ID
      */
     @Transactional
     public void rechargeBalance(Long userId, BigDecimal amount, Long orderId) {
-        // 查询用户
-        User user = userMapper.selectById(userId);
-        if (user == null) {
+        // 使用原子操作增加余额
+        int affected = userMapper.addBalanceAtomic(userId, amount);
+        if (affected == 0) {
             throw new RuntimeException("用户不存在");
         }
 
-        // 增加余额
-        BigDecimal newBalance = user.getBalance().add(amount);
-        user.setBalance(newBalance);
-        userMapper.updateById(user);
+        // 查询充值后的余额用于记录日志
+        User user = userMapper.selectById(userId);
+        BigDecimal newBalance = user != null ? user.getBalance() : BigDecimal.ZERO;
 
         // 记录余额变动日志
-        BalanceLog log = new BalanceLog();
-        log.setUserId(userId);
-        log.setAmount(amount);
-        log.setBalanceAfter(newBalance);
-        log.setType("recharge");
-        log.setRelatedId(orderId);
-        log.setRemark("在线充值");
-        log.setCreatedAt(LocalDateTime.now());
-        balanceLogMapper.insert(log);
+        BalanceLog balanceLog = new BalanceLog();
+        balanceLog.setUserId(userId);
+        balanceLog.setAmount(amount);
+        balanceLog.setBalanceAfter(newBalance);
+        balanceLog.setType("recharge");
+        balanceLog.setRelatedId(orderId);
+        balanceLog.setRemark("在线充值");
+        balanceLog.setCreatedAt(LocalDateTime.now());
+        balanceLogMapper.insert(balanceLog);
 
-        this.log.info("余额充值成功: userId={}, amount={}, balance={}", userId, amount, newBalance);
+        log.info("余额充值成功: userId={}, amount={}, balance={}", userId, amount, newBalance);
     }
 
     /**
@@ -225,66 +223,66 @@ public class BalanceService {
     }
 
     /**
-     * 增加余额（通用方法）
+     * 增加余额（通用方法）- 使用原子操作
      */
     @Transactional
     public void addBalance(Long userId, BigDecimal amount, String type, Long relatedId, String remark) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
+        // 使用原子操作增加余额
+        int affected = userMapper.addBalanceAtomic(userId, amount);
+        if (affected == 0) {
             throw new RuntimeException("用户不存在");
         }
 
-        // 增加余额
-        BigDecimal newBalance = user.getBalance().add(amount);
-        user.setBalance(newBalance);
-        userMapper.updateById(user);
+        // 查询增加后的余额用于记录日志
+        User user = userMapper.selectById(userId);
+        BigDecimal newBalance = user != null ? user.getBalance() : BigDecimal.ZERO;
 
         // 记录余额变动日志
-        BalanceLog log = new BalanceLog();
-        log.setUserId(userId);
-        log.setAmount(amount);
-        log.setBalanceAfter(newBalance);
-        log.setType(type);
-        log.setRelatedId(relatedId);
-        log.setRemark(remark);
-        log.setCreatedAt(LocalDateTime.now());
-        balanceLogMapper.insert(log);
+        BalanceLog balanceLog = new BalanceLog();
+        balanceLog.setUserId(userId);
+        balanceLog.setAmount(amount);
+        balanceLog.setBalanceAfter(newBalance);
+        balanceLog.setType(type);
+        balanceLog.setRelatedId(relatedId);
+        balanceLog.setRemark(remark);
+        balanceLog.setCreatedAt(LocalDateTime.now());
+        balanceLogMapper.insert(balanceLog);
 
-        this.log.info("余额增加成功: userId={}, amount={}, balance={}, type={}", userId, amount, newBalance, type);
+        log.info("余额增加成功: userId={}, amount={}, balance={}, type={}", userId, amount, newBalance, type);
     }
 
     /**
-     * 扣除余额（通用方法）
+     * 扣除余额（通用方法）- 使用原子操作避免竞态条件
      */
     @Transactional
     public void deductBalance(Long userId, BigDecimal amount, String type, Long relatedId, String remark) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-
-        // 检查余额
-        if (user.getBalance().compareTo(amount) < 0) {
+        // 使用原子操作扣减余额（同时检查余额是否充足）
+        int affected = userMapper.deductBalanceAtomic(userId, amount);
+        if (affected == 0) {
+            // 扣减失败，检查原因
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                throw new RuntimeException("用户不存在");
+            }
             throw new BusinessException(ApiErrorCodes.PAYMENT_REQUIRED, "余额不足，请先充值");
         }
 
-        // 扣除余额
-        BigDecimal newBalance = user.getBalance().subtract(amount);
-        user.setBalance(newBalance);
-        userMapper.updateById(user);
+        // 查询扣减后的余额用于记录日志
+        User user = userMapper.selectById(userId);
+        BigDecimal newBalance = user != null ? user.getBalance() : BigDecimal.ZERO;
 
         // 记录余额变动日志
-        BalanceLog log = new BalanceLog();
-        log.setUserId(userId);
-        log.setAmount(amount.negate()); // 负数表示扣除
-        log.setBalanceAfter(newBalance);
-        log.setType(type);
-        log.setRelatedId(relatedId);
-        log.setRemark(remark);
-        log.setCreatedAt(LocalDateTime.now());
-        balanceLogMapper.insert(log);
+        BalanceLog balanceLog = new BalanceLog();
+        balanceLog.setUserId(userId);
+        balanceLog.setAmount(amount.negate()); // 负数表示扣除
+        balanceLog.setBalanceAfter(newBalance);
+        balanceLog.setType(type);
+        balanceLog.setRelatedId(relatedId);
+        balanceLog.setRemark(remark);
+        balanceLog.setCreatedAt(LocalDateTime.now());
+        balanceLogMapper.insert(balanceLog);
 
-        this.log.info("余额扣除成功: userId={}, amount={}, balance={}, type={}", userId, amount, newBalance, type);
+        log.info("余额扣除成功: userId={}, amount={}, balance={}, type={}", userId, amount, newBalance, type);
     }
 
     /**

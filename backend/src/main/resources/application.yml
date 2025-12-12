@@ -286,3 +286,11 @@ usage:
 app:
   cookie:
     secure: ${COOKIE_SECURE:true}  # Secure属性,开发环境设为false,生产环境必须为true
+
+# ====================================================
+# 速率限制配置
+# ====================================================
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  requests-per-minute: ${RATE_LIMIT_RPM:60}  # 普通请求每分钟限制
+  api-requests-per-minute: ${RATE_LIMIT_API_RPM:30}  # API请求每分钟限制
