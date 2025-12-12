@@ -171,7 +171,7 @@ public class ChatController {
     public Object responses(
             @RequestHeader("Authorization") String authorization,
             @RequestBody @Validated ResponsesRequest request) {
-        log.debug("Responses API 接口调用: /v1/responses, model={}", request.getModel());
+        log.info("Responses API 接口调用: /v1/responses, model={}, stream={}", request.getModel(), request.getStream());
         return handleResponsesRequest(authorization, request);
     }
 

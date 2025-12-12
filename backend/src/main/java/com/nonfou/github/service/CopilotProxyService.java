@@ -962,8 +962,9 @@ public class CopilotProxyService implements ModelProxy {
             }
 
             if (!completed.get()) {
-                // 发送完成标记
-                emitter.send(SseEmitter.event().name("done").data("{}"));
+                // 上游未发送 response.completed，手动补发以满足 Codex CLI 要求
+                log.warn("Responses 流结束但未收到 response.completed 事件，手动补发");
+                emitter.send(SseEmitter.event().name("response.completed").data("{\"type\":\"response.completed\"}"));
             }
             emitter.complete();
         } catch (Exception ex) {
