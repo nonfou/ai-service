@@ -7,6 +7,9 @@ import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
 import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.dto.response.ChatResponse;
+import com.nonfou.github.dto.response.ClaudeCountTokensResponse;
+import com.nonfou.github.dto.response.ClaudeErrorResponse;
+import com.nonfou.github.dto.response.ClaudeResponse;
 import com.nonfou.github.dto.response.EmbeddingsResponse;
 import com.nonfou.github.dto.response.ModelsResponse;
 import com.nonfou.github.dto.response.ResponsesResponse;
@@ -70,7 +73,40 @@ public class ChatController {
 
         // Claude API 使用 x-api-key header，需要转换为 Authorization
         String authHeader = xApiKey != null ? "Bearer " + xApiKey : authorization;
-        return handleChatRequest(authHeader, request);
+        return handleClaudeRequest(authHeader, request);
+    }
+
+    /**
+     * Claude API count_tokens 接口: /messages/count_tokens
+     * 计算消息的 token 数量
+     */
+    @PostMapping("/messages/count_tokens")
+    public Object claudeCountTokens(
+            @RequestHeader(value = "x-api-key", required = false) String xApiKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody @Validated ChatRequest request) {
+        log.debug("Claude API count_tokens 接口调用: /v1/messages/count_tokens");
+
+        // 简单估算 token 数量（实际应该使用 tokenizer）
+        // 这里使用粗略估算：约 4 个字符 = 1 个 token
+        int estimatedTokens = 0;
+        if (request.getMessages() != null) {
+            for (var message : request.getMessages()) {
+                if (message.getContent() != null) {
+                    Object content = message.getContent();
+                    if (content instanceof String text) {
+                        estimatedTokens += text.length() / 4 + 1;
+                    } else {
+                        // 复杂内容结构，粗略估算
+                        estimatedTokens += 100;
+                    }
+                }
+            }
+        }
+
+        return ClaudeCountTokensResponse.builder()
+                .inputTokens(estimatedTokens)
+                .build();
     }
 
     /**
@@ -220,7 +256,7 @@ public class ChatController {
     }
 
     /**
-     * 通用聊天处理方法
+     * 通用聊天处理方法（OpenAI 格式）
      */
     private Object handleChatRequest(String authorization, ChatRequest request) {
         normalizeModelName(request);
@@ -245,6 +281,60 @@ public class ChatController {
         } catch (Exception e) {
             log.error("API调用失败: {}", e.getMessage(), e);
             return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * Claude API 请求处理方法（Anthropic 格式）
+     */
+    private Object handleClaudeRequest(String authorization, ChatRequest request) {
+        normalizeModelName(request);
+
+        // 如果请求流式响应，返回 SSE（Claude 格式）
+        if (Boolean.TRUE.equals(request.getStream())) {
+            return claudeStream(authorization, request);
+        }
+
+        // 非流式响应
+        try {
+            ChatResponse response = chatWorkflowService.handleChat(authorization, request);
+            // 转换为 Claude 格式
+            return ClaudeResponse.fromChatResponse(response);
+        } catch (ChatAuthorizationException e) {
+            return ClaudeErrorResponse.fromStatusCode(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
+        } catch (BusinessException e) {
+            return ClaudeErrorResponse.fromStatusCode(e.getCode(), friendlyMessage(e.getCode(), e.getMessage()));
+        } catch (ChatUpstreamException e) {
+            return ClaudeErrorResponse.fromStatusCode(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
+        } catch (ChatProcessingException e) {
+            return ClaudeErrorResponse.fromStatusCode(500, e.getMessage());
+        } catch (Exception e) {
+            log.error("Claude API调用失败: {}", e.getMessage(), e);
+            return ClaudeErrorResponse.fromStatusCode(500, "服务暂时不可用，请稍后重试");
+        }
+    }
+
+    /**
+     * Claude 格式流式聊天接口
+     */
+    private SseEmitter claudeStream(String authorization, ChatRequest request) {
+        try {
+            return chatWorkflowService.handleClaudeStream(authorization, request);
+        } catch (ChatAuthorizationException e) {
+            log.warn("Claude 流式请求鉴权失败: {}", e.getMessage());
+            return buildClaudeErrorEmitter(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
+        } catch (BusinessException e) {
+            log.warn("Claude 流式请求业务异常: {}", e.getMessage());
+            return buildClaudeErrorEmitter(e.getCode(), friendlyMessage(e.getCode(), e.getMessage()));
+        } catch (ChatUpstreamException e) {
+            log.warn("Claude 流式请求上游异常: {}", e.getMessage());
+            return buildClaudeErrorEmitter(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
+        } catch (ChatProcessingException e) {
+            log.error("Claude 流式请求处理异常: {}", e.getMessage(), e);
+            return buildClaudeErrorEmitter(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage());
+        } catch (Exception e) {
+            log.error("Claude 流式API调用失败: {}", e.getMessage(), e);
+            return buildClaudeErrorEmitter(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务暂时不可用，请稍后重试");
         }
     }
 
@@ -291,6 +381,25 @@ public class ChatController {
                     .name("error")
                     .data(objectMapper.writeValueAsString(payload)));
             emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+        } catch (IOException ioException) {
+            emitter.completeWithError(ioException);
+        }
+        return emitter;
+    }
+
+    /**
+     * 构建 Claude 格式的错误 SSE 响应
+     */
+    private SseEmitter buildClaudeErrorEmitter(int statusCode, String message) {
+        SseEmitter emitter = new SseEmitter();
+        ClaudeErrorResponse errorResponse = ClaudeErrorResponse.fromStatusCode(statusCode, message);
+
+        try {
+            log.warn("Claude 流式错误响应: status={}, message={}", statusCode, message);
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(objectMapper.writeValueAsString(errorResponse)));
             emitter.complete();
         } catch (IOException ioException) {
             emitter.completeWithError(ioException);

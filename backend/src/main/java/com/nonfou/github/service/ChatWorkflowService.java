@@ -92,6 +92,17 @@ public class ChatWorkflowService {
         return proxy.chatStream(request, context.apiKey());
     }
 
+    /**
+     * Claude 格式流式请求处理
+     * 返回 Anthropic SSE 格式的响应
+     */
+    public SseEmitter handleClaudeStream(String authorization, ChatRequest request) {
+        ChatContext context = authenticate(authorization);
+        request.setStream(true);
+        ModelProxy proxy = selectProxy(request.getModel());
+        return proxy.claudeStream(request, context.apiKey());
+    }
+
     // ============================================================
     // Responses API 支持（用于 Codex 系列模型）
     // ============================================================

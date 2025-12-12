@@ -21,7 +21,15 @@ public interface ModelProxy {
     ChatResponse chat(ChatRequest request, ApiKey apiKey);
 
     /**
-     * 流式聊天请求
+     * 流式聊天请求（OpenAI 格式）
      */
     SseEmitter chatStream(ChatRequest request, ApiKey apiKey);
+
+    /**
+     * 流式聊天请求（Anthropic/Claude 格式）
+     * 默认实现调用 OpenAI 格式的流式接口
+     */
+    default SseEmitter claudeStream(ChatRequest request, ApiKey apiKey) {
+        return chatStream(request, apiKey);
+    }
 }

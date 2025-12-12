@@ -117,6 +117,17 @@ public class CopilotProxyService implements ModelProxy {
         return emitter;
     }
 
+    /**
+     * Claude 格式流式聊天请求，将 OpenAI SSE 转换为 Anthropic SSE 格式。
+     */
+    @Override
+    public SseEmitter claudeStream(ChatRequest request, ApiKey apiKey) {
+        validateApiKey(apiKey);
+        SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
+        streamTaskExecutor.execute(() -> executeClaudeStream(request, emitter));
+        return emitter;
+    }
+
     private void executeStream(ChatRequest request, SseEmitter emitter) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
@@ -169,6 +180,239 @@ public class CopilotProxyService implements ModelProxy {
                     "上游模型服务流式接口异常", "processing_error");
         } finally {
             closeResources(reader, connection);
+        }
+    }
+
+    /**
+     * 执行 Claude 格式的流式请求
+     * 将 OpenAI SSE 格式转换为 Anthropic SSE 格式
+     */
+    private void executeClaudeStream(ChatRequest request, SseEmitter emitter) {
+        HttpURLConnection connection = null;
+        BufferedReader reader = null;
+        String messageId = "msg_" + System.currentTimeMillis();
+        String model = request.getModel();
+        StringBuilder contentBuilder = new StringBuilder();
+        int inputTokens = 0;
+
+        try {
+            connection = openStreamingConnection();
+            Map<String, Object> payload = buildPayload(request, true);
+            writeRequestBody(connection, payload);
+
+            int status = connection.getResponseCode();
+            if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
+                log.warn("Claude 流式鉴权失败: HTTP {}", status);
+                sendClaudeStreamError(emitter, status, "上游模型服务鉴权失败");
+                return;
+            }
+
+            if (status < 200 || status >= 300) {
+                String errorBody = readErrorBody(connection);
+                log.error("Claude 流式调用失败: HTTP {}, body={}", status, errorBody);
+                String friendly = extractFriendlyMessage(errorBody);
+                sendClaudeStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status));
+                return;
+            }
+
+            // 发送 message_start 事件
+            sendClaudeMessageStart(emitter, messageId, model);
+
+            // 发送 content_block_start 事件
+            sendClaudeContentBlockStart(emitter);
+
+            reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("data: ")) {
+                    continue;
+                }
+                String data = line.substring(6).trim();
+
+                if ("[DONE]".equals(data)) {
+                    break;
+                }
+
+                try {
+                    JsonNode chunk = objectMapper.readTree(data);
+                    JsonNode choices = chunk.path("choices");
+                    if (choices.isArray() && choices.size() > 0) {
+                        JsonNode delta = choices.get(0).path("delta");
+                        String content = safeText(delta.get("content"));
+                        if (StringUtils.hasText(content)) {
+                            contentBuilder.append(content);
+                            sendClaudeContentBlockDelta(emitter, content);
+                        }
+                    }
+
+                    // 提取 usage 信息
+                    JsonNode usage = chunk.path("usage");
+                    if (!usage.isMissingNode() && usage.has("prompt_tokens")) {
+                        inputTokens = usage.path("prompt_tokens").asInt(0);
+                    }
+                } catch (Exception parseEx) {
+                    log.debug("解析流式数据失败: {}", data);
+                }
+            }
+
+            // 发送 content_block_stop 事件
+            sendClaudeContentBlockStop(emitter);
+
+            // 发送 message_delta 事件（包含 stop_reason）
+            sendClaudeMessageDelta(emitter);
+
+            // 发送 message_stop 事件
+            sendClaudeMessageStop(emitter);
+
+            emitter.complete();
+        } catch (Exception ex) {
+            log.error("Claude 流式调用异常", ex);
+            sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
+        } finally {
+            closeResources(reader, connection);
+        }
+    }
+
+    private void sendClaudeMessageStart(SseEmitter emitter, String messageId, String model) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "message_start");
+
+            Map<String, Object> message = new HashMap<>();
+            message.put("id", messageId);
+            message.put("type", "message");
+            message.put("role", "assistant");
+            message.put("content", java.util.Collections.emptyList());
+            message.put("model", model);
+            message.put("stop_reason", null);
+            message.put("stop_sequence", null);
+
+            Map<String, Object> usage = new HashMap<>();
+            usage.put("input_tokens", 0);
+            usage.put("output_tokens", 0);
+            message.put("usage", usage);
+
+            event.put("message", message);
+
+            emitter.send(SseEmitter.event()
+                    .name("message_start")
+                    .data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.error("发送 message_start 事件失败", e);
+        }
+    }
+
+    private void sendClaudeContentBlockStart(SseEmitter emitter) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "content_block_start");
+            event.put("index", 0);
+
+            Map<String, Object> contentBlock = new HashMap<>();
+            contentBlock.put("type", "text");
+            contentBlock.put("text", "");
+            event.put("content_block", contentBlock);
+
+            emitter.send(SseEmitter.event()
+                    .name("content_block_start")
+                    .data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.error("发送 content_block_start 事件失败", e);
+        }
+    }
+
+    private void sendClaudeContentBlockDelta(SseEmitter emitter, String text) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "content_block_delta");
+            event.put("index", 0);
+
+            Map<String, Object> delta = new HashMap<>();
+            delta.put("type", "text_delta");
+            delta.put("text", text);
+            event.put("delta", delta);
+
+            emitter.send(SseEmitter.event()
+                    .name("content_block_delta")
+                    .data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.error("发送 content_block_delta 事件失败", e);
+        }
+    }
+
+    private void sendClaudeContentBlockStop(SseEmitter emitter) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "content_block_stop");
+            event.put("index", 0);
+
+            emitter.send(SseEmitter.event()
+                    .name("content_block_stop")
+                    .data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.error("发送 content_block_stop 事件失败", e);
+        }
+    }
+
+    private void sendClaudeMessageDelta(SseEmitter emitter) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "message_delta");
+
+            Map<String, Object> delta = new HashMap<>();
+            delta.put("stop_reason", "end_turn");
+            delta.put("stop_sequence", null);
+            event.put("delta", delta);
+
+            Map<String, Object> usage = new HashMap<>();
+            usage.put("output_tokens", 0);
+            event.put("usage", usage);
+
+            emitter.send(SseEmitter.event()
+                    .name("message_delta")
+                    .data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.error("发送 message_delta 事件失败", e);
+        }
+    }
+
+    private void sendClaudeMessageStop(SseEmitter emitter) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "message_stop");
+
+            emitter.send(SseEmitter.event()
+                    .name("message_stop")
+                    .data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.error("发送 message_stop 事件失败", e);
+        }
+    }
+
+    private void sendClaudeStreamError(SseEmitter emitter, int statusCode, String message) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "error");
+
+            Map<String, Object> error = new HashMap<>();
+            String errorType = switch (statusCode) {
+                case 400 -> "invalid_request_error";
+                case 401 -> "authentication_error";
+                case 403 -> "permission_error";
+                case 404 -> "not_found_error";
+                case 429 -> "rate_limit_error";
+                default -> "api_error";
+            };
+            error.put("type", errorType);
+            error.put("message", message);
+            event.put("error", error);
+
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data(objectMapper.writeValueAsString(event)));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
         }
     }
 
