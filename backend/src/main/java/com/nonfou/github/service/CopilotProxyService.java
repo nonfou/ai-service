@@ -15,6 +15,7 @@ import com.nonfou.github.exception.ChatAuthorizationException;
 import com.nonfou.github.exception.ChatProcessingException;
 import com.nonfou.github.exception.ChatUpstreamException;
 import com.nonfou.github.service.proxy.ModelProxy;
+import com.nonfou.github.util.TokenEstimator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -59,6 +60,7 @@ public class CopilotProxyService implements ModelProxy {
     private final RestTemplate restTemplate;
     private final CopilotProxyProperties proxyProperties;
     private final ObjectMapper objectMapper;
+    private final TokenEstimator tokenEstimator;
     @Qualifier("streamTaskExecutor")
     private final TaskExecutor streamTaskExecutor;
 
@@ -152,6 +154,9 @@ public class CopilotProxyService implements ModelProxy {
         int outputTokens = 0;
         StringBuilder contentBuilder = new StringBuilder();
 
+        // 预先估算输入 token（基于请求消息）
+        int estimatedInputTokens = estimateInputTokens(request);
+
         try {
             connection = openStreamingConnection();
             Map<String, Object> payload = buildPayload(request, true);
@@ -219,11 +224,16 @@ public class CopilotProxyService implements ModelProxy {
             }
             emitter.complete();
 
-            // 估算 token（如果上游没有返回）
-            if (outputTokens == 0 && contentBuilder.length() > 0) {
-                outputTokens = contentBuilder.length() / 4 + 1;
-            }
-            invokeCallback(callback, inputTokens, outputTokens, true, null);
+            // 使用上游返回的 token 数，如果没有则使用估算值
+            int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+
+            log.info("OpenAI流式 token 统计: 上游输入={}, 上游输出={}, 预估输入={}, 预估输出={}, 最终输入={}, 最终输出={}",
+                    inputTokens, outputTokens, estimatedInputTokens,
+                    tokenEstimator.estimateTextTokens(contentBuilder.toString()),
+                    finalInputTokens, finalOutputTokens);
+
+            invokeCallback(callback, finalInputTokens, finalOutputTokens, true, null);
         } catch (Exception ex) {
             log.error("Copilot Proxy 流式调用异常", ex);
             sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
@@ -246,6 +256,9 @@ public class CopilotProxyService implements ModelProxy {
         StringBuilder contentBuilder = new StringBuilder();
         int inputTokens = 0;
         int outputTokens = 0;
+
+        // 预先估算输入 token（基于请求消息）
+        int estimatedInputTokens = estimateInputTokens(request);
 
         try {
             connection = openStreamingConnection();
@@ -325,11 +338,16 @@ public class CopilotProxyService implements ModelProxy {
 
             emitter.complete();
 
-            // 估算 token（如果上游没有返回）
-            if (outputTokens == 0 && contentBuilder.length() > 0) {
-                outputTokens = contentBuilder.length() / 4 + 1;
-            }
-            invokeCallback(callback, inputTokens, outputTokens, true, null);
+            // 使用上游返回的 token 数，如果没有则使用估算值
+            int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+
+            log.info("Claude流式 token 统计: 上游输入={}, 上游输出={}, 预估输入={}, 预估输出={}, 最终输入={}, 最终输出={}",
+                    inputTokens, outputTokens, estimatedInputTokens,
+                    tokenEstimator.estimateTextTokens(contentBuilder.toString()),
+                    finalInputTokens, finalOutputTokens);
+
+            invokeCallback(callback, finalInputTokens, finalOutputTokens, true, null);
         } catch (Exception ex) {
             log.error("Claude 流式调用异常", ex);
             sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
@@ -683,6 +701,19 @@ public class CopilotProxyService implements ModelProxy {
         if (apiKey.getStatus() != null && apiKey.getStatus() == 0) {
             throw new ChatAuthorizationException(HttpStatus.FORBIDDEN.value(), "API Key 已被禁用");
         }
+    }
+
+    /**
+     * 根据请求消息估算输入 token 数
+     */
+    private int estimateInputTokens(ChatRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return 0;
+        }
+        return request.getMessages().stream()
+                .map(ChatRequest.Message::getContent)
+                .mapToInt(content -> tokenEstimator.estimateTextTokens(content != null ? content.toString() : ""))
+                .sum();
     }
 
     private String baseUrl() {
