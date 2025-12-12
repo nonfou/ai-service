@@ -3,6 +3,9 @@ package com.nonfou.github.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nonfou.github.config.CopilotProxyProperties;
+import com.nonfou.github.dto.stream.ClaudeStreamEvent;
+import com.nonfou.github.dto.stream.ClaudeStreamEventParser;
+import com.nonfou.github.dto.stream.ContentBlockDeltaEvent;
 import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.request.ClaudeRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
@@ -62,6 +65,7 @@ public class CopilotProxyService implements ModelProxy {
     private final CopilotProxyProperties proxyProperties;
     private final ObjectMapper objectMapper;
     private final TokenEstimator tokenEstimator;
+    private final ClaudeStreamEventParser claudeStreamEventParser;
     @Qualifier("streamTaskExecutor")
     private final TaskExecutor streamTaskExecutor;
 
@@ -1185,7 +1189,7 @@ public class CopilotProxyService implements ModelProxy {
 
     /**
      * 执行 Claude Messages API 流式请求
-     * 透传模式：直接转发上游 SSE 事件，不做格式转换
+     * 透传模式：直接转发上游 SSE 事件，使用类型化对象解析
      */
     private void executeClaudeMessagesStream(ClaudeRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
@@ -1243,62 +1247,56 @@ public class CopilotProxyService implements ModelProxy {
                         continue;
                     }
 
-                    try {
-                        JsonNode chunk = objectMapper.readTree(data);
-                        String eventType = currentEventType != null ? currentEventType : safeText(chunk.get("type"));
+                    // 使用类型化事件解析器
+                    ClaudeStreamEvent event = claudeStreamEventParser.parse(data);
+                    if (event == null) {
+                        continue;
+                    }
 
-                        // 直接透传 SSE 事件到客户端
+                    // 确定事件类型：优先使用 SSE event 行，其次使用 JSON 中的 type
+                    String eventType = currentEventType != null ? currentEventType : event.getType();
+
+                    // 直接透传 SSE 事件到客户端（使用原始 JSON）
+                    try {
                         if (eventType != null && !eventType.isEmpty()) {
                             emitter.send(SseEmitter.event()
                                     .name(eventType)
-                                    .data(data));
+                                    .data(claudeStreamEventParser.toJson(event)));
                         } else {
-                            // 如果没有事件类型，直接发送数据
-                            emitter.send(SseEmitter.event().data(data));
+                            emitter.send(SseEmitter.event().data(claudeStreamEventParser.toJson(event)));
+                        }
+                    } catch (Exception sendEx) {
+                        log.debug("发送 SSE 事件失败: {}", sendEx.getMessage());
+                    }
+
+                    // 使用类型化方法收集文本内容用于估算 token
+                    String textContent = event.getTextContent();
+                    if (StringUtils.hasText(textContent)) {
+                        contentBuilder.append(textContent);
+                    }
+
+                    // 使用类型化方法提取 usage 信息
+                    if (event.hasUsage()) {
+                        // message_start 事件包含 input_tokens 和 cache tokens
+                        int eventInputTokens = event.getInputTokens();
+                        if (eventInputTokens > 0) {
+                            inputTokens = eventInputTokens;
                         }
 
-                        // 解析内容用于估算 token
-                        if ("content_block_delta".equals(eventType)) {
-                            JsonNode delta = chunk.path("delta");
-                            String content = safeText(delta.get("text"));
-                            if (StringUtils.hasText(content)) {
-                                contentBuilder.append(content);
-                            }
+                        int eventCacheRead = event.getCacheReadInputTokens();
+                        if (eventCacheRead > 0) {
+                            cacheReadTokens = eventCacheRead;
                         }
 
-                        // 解析 usage 信息
-                        if ("message_start".equals(eventType)) {
-                            JsonNode message = chunk.path("message");
-                            if (!message.isMissingNode()) {
-                                JsonNode msgUsage = message.path("usage");
-                                if (!msgUsage.isMissingNode()) {
-                                    if (msgUsage.has("input_tokens")) {
-                                        inputTokens = msgUsage.path("input_tokens").asInt(0);
-                                    }
-                                    if (msgUsage.has("cache_read_input_tokens")) {
-                                        cacheReadTokens = msgUsage.path("cache_read_input_tokens").asInt(0);
-                                    }
-                                    if (msgUsage.has("cache_creation_input_tokens")) {
-                                        cacheWriteTokens = msgUsage.path("cache_creation_input_tokens").asInt(0);
-                                    }
-                                }
-                            }
+                        int eventCacheWrite = event.getCacheCreationInputTokens();
+                        if (eventCacheWrite > 0) {
+                            cacheWriteTokens = eventCacheWrite;
                         }
 
-                        if ("message_delta".equals(eventType)) {
-                            JsonNode msgUsage = chunk.path("usage");
-                            if (!msgUsage.isMissingNode() && msgUsage.has("output_tokens")) {
-                                outputTokens = msgUsage.path("output_tokens").asInt(0);
-                            }
-                        }
-
-                    } catch (Exception parseEx) {
-                        log.debug("解析 Claude 流式数据失败: {}", data);
-                        // 即使解析失败，也尝试透传原始数据
-                        try {
-                            emitter.send(SseEmitter.event().data(data));
-                        } catch (Exception sendEx) {
-                            log.debug("发送原始数据失败: {}", sendEx.getMessage());
+                        // message_delta 事件包含最终 output_tokens
+                        int eventOutputTokens = event.getOutputTokens();
+                        if (eventOutputTokens > 0) {
+                            outputTokens = eventOutputTokens;
                         }
                     }
 
