@@ -228,11 +228,6 @@ public class CopilotProxyService implements ModelProxy {
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
             int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
 
-            log.info("OpenAI流式 token 统计: 上游输入={}, 上游输出={}, 预估输入={}, 预估输出={}, 最终输入={}, 最终输出={}",
-                    inputTokens, outputTokens, estimatedInputTokens,
-                    tokenEstimator.estimateTextTokens(contentBuilder.toString()),
-                    finalInputTokens, finalOutputTokens);
-
             invokeCallback(callback, finalInputTokens, finalOutputTokens, true, null);
         } catch (Exception ex) {
             log.error("Copilot Proxy 流式调用异常", ex);
@@ -341,11 +336,6 @@ public class CopilotProxyService implements ModelProxy {
             // 使用上游返回的 token 数，如果没有则使用估算值
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
             int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
-
-            log.info("Claude流式 token 统计: 上游输入={}, 上游输出={}, 预估输入={}, 预估输出={}, 最终输入={}, 最终输出={}",
-                    inputTokens, outputTokens, estimatedInputTokens,
-                    tokenEstimator.estimateTextTokens(contentBuilder.toString()),
-                    finalInputTokens, finalOutputTokens);
 
             invokeCallback(callback, finalInputTokens, finalOutputTokens, true, null);
         } catch (Exception ex) {
