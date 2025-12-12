@@ -32,7 +32,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/test",         // 测试接口不需要验证
                         "/api/auth/logout",       // 登出接口不需要CSRF Token(已通过Cookie验证身份)
                         "/api/admin/login",       // 管理后台登录接口不需要验证
-                        "/api/v1/**"              // AI API 接口通过 API Key 验证，不需要CSRF
+                        "/v1/**"                  // AI API 接口通过 API Key 验证，不需要CSRF
                 );
 
         // 注册管理后台安全拦截器

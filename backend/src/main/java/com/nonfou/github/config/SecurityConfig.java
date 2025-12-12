@@ -41,7 +41,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/models").permitAll()
                 // 公开接口:允许 AI API 聊天接口(通过 API Key 验证)
                 // 支持 OpenAI, Claude, Codex 等格式
-                .requestMatchers("/api/v1/**").permitAll()
+                .requestMatchers("/v1/**").permitAll()
                 // 公开接口:允许支付回调
                 .requestMatchers("/api/recharge/alipay/notify", "/api/recharge/alipay/return").permitAll()
                 .requestMatchers("/api/recharge/wechat/notify").permitAll()

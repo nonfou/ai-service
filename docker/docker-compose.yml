@@ -138,6 +138,22 @@ services:
     networks:
       - ai-service-network
 
+  # ====================================================
+  # Nginx 反向代理 (AI API 入口)
+  # ====================================================
+  nginx:
+    image: nginx:alpine
+    container_name: ai-service-nginx
+    restart: unless-stopped
+    ports:
+      - "9000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - ai-service-network
+
 volumes:
   mysql_data:
     driver: local

@@ -40,7 +40,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1")
+@RequestMapping("/v1")
 public class ChatController {
 
     private final ChatWorkflowService chatWorkflowService;
