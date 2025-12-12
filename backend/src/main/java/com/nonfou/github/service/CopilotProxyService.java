@@ -20,6 +20,7 @@ import com.nonfou.github.service.proxy.ModelProxy;
 import com.nonfou.github.service.CostCalculatorService.TokenUsage;
 import com.nonfou.github.util.TokenEstimator;
 import com.nonfou.github.enums.ApiEndpoint;
+import com.nonfou.github.enums.ApiProtocol;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -118,12 +119,22 @@ public class CopilotProxyService implements ModelProxy {
 
     /**
      * 流式聊天请求，带完成回调。
+     * 根据模型协议自动路由到正确的上游端点。
      */
     @Override
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeStream(request, emitter, callback));
+
+        // 根据模型名称判断协议，路由到正确的上游端点
+        ApiProtocol protocol = ApiProtocol.fromModel(request.getModel());
+        if (protocol == ApiProtocol.ANTHROPIC) {
+            // Claude 模型路由到 /v1/messages 端点，返回 OpenAI 格式响应
+            streamTaskExecutor.execute(() -> executeClaudeToOpenAiStream(request, emitter, callback));
+        } else {
+            // OpenAI 系列模型路由到 /v1/chat/completions 端点
+            streamTaskExecutor.execute(() -> executeStream(request, emitter, callback));
+        }
         return emitter;
     }
 
@@ -257,6 +268,221 @@ public class CopilotProxyService implements ModelProxy {
         } finally {
             closeResources(reader, connection);
         }
+    }
+
+    /**
+     * Claude 模型流式请求，调用 /v1/messages 端点并返回 OpenAI 格式响应
+     * 用于 /v1/chat/completions 端点调用 Claude 模型的场景
+     */
+    private void executeClaudeToOpenAiStream(ChatRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
+        HttpURLConnection connection = null;
+        BufferedReader reader = null;
+        String chatCompletionId = "chatcmpl-" + System.currentTimeMillis();
+        String model = request.getModel();
+        StringBuilder contentBuilder = new StringBuilder();
+        int inputTokens = 0;
+        int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
+
+        // 预先估算输入 token
+        int estimatedInputTokens = estimateInputTokens(request);
+
+        try {
+            connection = openClaudeStreamingConnection();
+            Map<String, Object> payload = buildClaudePayloadFromChatRequest(request);
+            writeRequestBody(connection, payload);
+
+            int status = connection.getResponseCode();
+            if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
+                log.warn("Claude 流式鉴权失败: HTTP {}", status);
+                sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
+                return;
+            }
+
+            if (status < 200 || status >= 300) {
+                String errorBody = readErrorBody(connection);
+                log.error("Claude 流式调用失败: HTTP {}, body={}", status, errorBody);
+                String friendly = extractFriendlyMessage(errorBody);
+                sendStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status), "processing_error");
+                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
+                return;
+            }
+
+            reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("data: ")) {
+                    continue;
+                }
+                String data = line.substring(6).trim();
+
+                if ("[DONE]".equals(data)) {
+                    break;
+                }
+
+                try {
+                    JsonNode chunk = objectMapper.readTree(data);
+                    String eventType = safeText(chunk.get("type"));
+
+                    // 解析 Claude 原生 content_block_delta 事件，转换为 OpenAI 格式
+                    if ("content_block_delta".equals(eventType)) {
+                        JsonNode delta = chunk.path("delta");
+                        String content = safeText(delta.get("text"));
+                        if (StringUtils.hasText(content)) {
+                            contentBuilder.append(content);
+                            // 发送 OpenAI 格式的流式响应
+                            sendOpenAiStreamChunk(emitter, chatCompletionId, model, content, null);
+                        }
+                    }
+
+                    // 解析 message_start 事件中的 usage
+                    if ("message_start".equals(eventType)) {
+                        JsonNode message = chunk.path("message");
+                        if (!message.isMissingNode()) {
+                            JsonNode msgUsage = message.path("usage");
+                            if (!msgUsage.isMissingNode()) {
+                                if (msgUsage.has("input_tokens")) {
+                                    inputTokens = msgUsage.path("input_tokens").asInt(0);
+                                }
+                                if (msgUsage.has("cache_read_input_tokens")) {
+                                    cacheReadTokens = msgUsage.path("cache_read_input_tokens").asInt(0);
+                                }
+                                if (msgUsage.has("cache_creation_input_tokens")) {
+                                    cacheWriteTokens = msgUsage.path("cache_creation_input_tokens").asInt(0);
+                                }
+                            }
+                        }
+                    }
+
+                    // 解析 message_delta 事件中的 usage
+                    if ("message_delta".equals(eventType)) {
+                        JsonNode msgUsage = chunk.path("usage");
+                        if (!msgUsage.isMissingNode() && msgUsage.has("output_tokens")) {
+                            outputTokens = msgUsage.path("output_tokens").asInt(0);
+                        }
+                    }
+                } catch (Exception parseEx) {
+                    log.debug("解析 Claude 流式数据失败: {}", data);
+                }
+            }
+
+            // 发送结束 chunk
+            sendOpenAiStreamChunk(emitter, chatCompletionId, model, null, "stop");
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+
+            // 计算 token 使用
+            int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+
+            TokenUsage tokenUsage = TokenUsage.builder()
+                    .inputTokens(finalInputTokens)
+                    .outputTokens(finalOutputTokens)
+                    .cacheReadTokens(cacheReadTokens)
+                    .cacheWriteTokens(cacheWriteTokens)
+                    .build();
+            invokeCallback(callback, tokenUsage, true, null);
+        } catch (Exception ex) {
+            log.error("Claude 流式调用异常", ex);
+            sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常", "processing_error");
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
+        } finally {
+            closeResources(reader, connection);
+        }
+    }
+
+    /**
+     * 发送 OpenAI 格式的流式响应 chunk
+     */
+    private void sendOpenAiStreamChunk(SseEmitter emitter, String id, String model, String content, String finishReason) {
+        try {
+            Map<String, Object> chunk = new HashMap<>();
+            chunk.put("id", id);
+            chunk.put("object", "chat.completion.chunk");
+            chunk.put("created", System.currentTimeMillis() / 1000);
+            chunk.put("model", model);
+
+            Map<String, Object> choice = new HashMap<>();
+            choice.put("index", 0);
+
+            Map<String, Object> delta = new HashMap<>();
+            if (content != null) {
+                delta.put("content", content);
+            }
+            if (finishReason != null) {
+                choice.put("finish_reason", finishReason);
+            } else {
+                choice.put("finish_reason", null);
+            }
+            choice.put("delta", delta);
+
+            chunk.put("choices", java.util.Collections.singletonList(choice));
+
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(chunk)));
+        } catch (Exception e) {
+            log.error("发送 OpenAI 流式 chunk 失败", e);
+        }
+    }
+
+    /**
+     * 将 ChatRequest 转换为 Claude Messages API 格式的 payload
+     */
+    private Map<String, Object> buildClaudePayloadFromChatRequest(ChatRequest request) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", request.getModel());
+        payload.put("stream", true);
+
+        // 处理 messages，提取 system 消息
+        java.util.List<Map<String, Object>> claudeMessages = new java.util.ArrayList<>();
+        String systemPrompt = null;
+
+        if (request.getMessages() != null) {
+            for (ChatRequest.Message msg : request.getMessages()) {
+                if ("system".equalsIgnoreCase(msg.getRole())) {
+                    // Claude API 的 system 放在顶层参数
+                    if (msg.getContent() != null) {
+                        systemPrompt = msg.getContent().toString();
+                    }
+                } else {
+                    Map<String, Object> claudeMsg = new HashMap<>();
+                    claudeMsg.put("role", msg.getRole());
+                    claudeMsg.put("content", msg.getContent());
+                    claudeMessages.add(claudeMsg);
+                }
+            }
+        }
+
+        payload.put("messages", claudeMessages);
+        if (systemPrompt != null) {
+            payload.put("system", systemPrompt);
+        }
+
+        // max_tokens 是 Claude API 必需参数
+        if (request.getMaxTokens() != null) {
+            payload.put("max_tokens", request.getMaxTokens());
+        } else {
+            payload.put("max_tokens", 8192); // 默认值
+        }
+
+        if (request.getTemperature() != null) {
+            payload.put("temperature", request.getTemperature());
+        }
+        if (request.getTopP() != null) {
+            payload.put("top_p", request.getTopP());
+        }
+        if (request.getStop() != null) {
+            payload.put("stop_sequences", request.getStop());
+        }
+        if (!CollectionUtils.isEmpty(request.getTools())) {
+            payload.put("tools", request.getTools());
+        }
+        if (request.getToolChoice() != null) {
+            payload.put("tool_choice", request.getToolChoice());
+        }
+
+        return payload;
     }
 
     /**
