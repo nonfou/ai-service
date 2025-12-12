@@ -3,6 +3,7 @@ package com.nonfou.github.service.proxy;
 import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.response.ChatResponse;
 import com.nonfou.github.entity.ApiKey;
+import com.nonfou.github.service.StreamCompletionCallback;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -26,10 +27,26 @@ public interface ModelProxy {
     SseEmitter chatStream(ChatRequest request, ApiKey apiKey);
 
     /**
+     * 流式聊天请求（OpenAI 格式），带完成回调
+     * 默认实现忽略回调
+     */
+    default SseEmitter chatStream(ChatRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
+        return chatStream(request, apiKey);
+    }
+
+    /**
      * 流式聊天请求（Anthropic/Claude 格式）
      * 默认实现调用 OpenAI 格式的流式接口
      */
     default SseEmitter claudeStream(ChatRequest request, ApiKey apiKey) {
         return chatStream(request, apiKey);
+    }
+
+    /**
+     * 流式聊天请求（Anthropic/Claude 格式），带完成回调
+     * 默认实现忽略回调
+     */
+    default SseEmitter claudeStream(ChatRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
+        return claudeStream(request, apiKey);
     }
 }

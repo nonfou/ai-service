@@ -87,9 +87,13 @@ public class ChatWorkflowService {
 
     public SseEmitter handleStream(String authorization, ChatRequest request) {
         ChatContext context = authenticate(authorization);
+        LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(true);
         ModelProxy proxy = selectProxy(request.getModel());
-        return proxy.chatStream(request, context.apiKey());
+
+        // 创建计费回调
+        StreamCompletionCallback callback = createStreamCallback(context, request, requestTime, proxy.getProvider());
+        return proxy.chatStream(request, context.apiKey(), callback);
     }
 
     /**
@@ -98,9 +102,63 @@ public class ChatWorkflowService {
      */
     public SseEmitter handleClaudeStream(String authorization, ChatRequest request) {
         ChatContext context = authenticate(authorization);
+        LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(true);
         ModelProxy proxy = selectProxy(request.getModel());
-        return proxy.claudeStream(request, context.apiKey());
+
+        // 创建计费回调
+        StreamCompletionCallback callback = createStreamCallback(context, request, requestTime, proxy.getProvider());
+        return proxy.claudeStream(request, context.apiKey(), callback);
+    }
+
+    /**
+     * 创建流式请求完成回调，用于计费
+     */
+    private StreamCompletionCallback createStreamCallback(ChatContext context, ChatRequest request,
+                                                           LocalDateTime requestTime, String provider) {
+        return (inputTokens, outputTokens, success, errorMessage) -> {
+            LocalDateTime endTime = LocalDateTime.now();
+            int duration = (int) ChronoUnit.MILLIS.between(requestTime, endTime);
+
+            ApiCall apiCall = buildApiCall(context, request, requestTime, endTime, duration, provider);
+            apiCall.setInputTokens(inputTokens);
+            apiCall.setOutputTokens(outputTokens);
+
+            if (success) {
+                BigDecimal cost = balanceService.calculateCost(request.getModel(), inputTokens, outputTokens);
+                apiCall.setCost(cost);
+                apiCall.setRawCost(cost);
+                apiCall.setMarkupRate(BigDecimal.ONE);
+                apiCall.setMarkupCost(BigDecimal.ZERO);
+                apiCall.setStatus(1);
+
+                Long apiCallId = balanceService.logApiCall(apiCall);
+                apiCall.setId(apiCallId);
+                balanceService.deductBalance(context.user().getId(), cost, apiCallId);
+                apiKeyService.updateLastUsedTime(context.apiKeyValue());
+
+                recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+                log.info("流式API调用成功: userId={}, model={}, tokens={}, cost={}",
+                        context.user().getId(),
+                        request.getModel(),
+                        inputTokens + outputTokens,
+                        cost);
+            } else {
+                apiCall.setCost(BigDecimal.ZERO);
+                apiCall.setRawCost(BigDecimal.ZERO);
+                apiCall.setMarkupRate(BigDecimal.ONE);
+                apiCall.setMarkupCost(BigDecimal.ZERO);
+                apiCall.setStatus(0);
+                apiCall.setErrorMsg(errorMessage);
+
+                Long apiCallId = balanceService.logApiCall(apiCall);
+                apiCall.setId(apiCallId);
+                recordUsageMetrics(context.apiKey().getId(), apiCall);
+
+                log.error("流式API调用失败: userId={}, error={}", context.user().getId(), errorMessage);
+            }
+        };
     }
 
     // ============================================================

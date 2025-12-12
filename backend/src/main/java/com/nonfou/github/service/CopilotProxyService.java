@@ -111,9 +111,17 @@ public class CopilotProxyService implements ModelProxy {
      */
     @Override
     public SseEmitter chatStream(ChatRequest request, ApiKey apiKey) {
+        return chatStream(request, apiKey, null);
+    }
+
+    /**
+     * 流式聊天请求，带完成回调。
+     */
+    @Override
+    public SseEmitter chatStream(ChatRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeStream(request, emitter));
+        streamTaskExecutor.execute(() -> executeStream(request, emitter, callback));
         return emitter;
     }
 
@@ -122,16 +130,27 @@ public class CopilotProxyService implements ModelProxy {
      */
     @Override
     public SseEmitter claudeStream(ChatRequest request, ApiKey apiKey) {
+        return claudeStream(request, apiKey, null);
+    }
+
+    /**
+     * Claude 格式流式聊天请求，带完成回调。
+     */
+    @Override
+    public SseEmitter claudeStream(ChatRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeClaudeStream(request, emitter));
+        streamTaskExecutor.execute(() -> executeClaudeStream(request, emitter, callback));
         return emitter;
     }
 
-    private void executeStream(ChatRequest request, SseEmitter emitter) {
+    private void executeStream(ChatRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         AtomicBoolean completed = new AtomicBoolean(false);
+        int inputTokens = 0;
+        int outputTokens = 0;
+        StringBuilder contentBuilder = new StringBuilder();
 
         try {
             connection = openStreamingConnection();
@@ -142,6 +161,7 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Copilot Proxy 流式鉴权失败: HTTP {}", status);
                 sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
+                invokeCallback(callback, 0, 0, false, "上游模型服务鉴权失败");
                 return;
             }
 
@@ -152,6 +172,7 @@ public class CopilotProxyService implements ModelProxy {
                 sendStreamError(emitter, status,
                         friendly != null ? friendly : buildFriendlyMessage(status),
                         "processing_error");
+                invokeCallback(callback, 0, 0, false, friendly != null ? friendly : buildFriendlyMessage(status));
                 return;
             }
 
@@ -161,12 +182,35 @@ public class CopilotProxyService implements ModelProxy {
                 if (!line.startsWith("data: ")) {
                     continue;
                 }
-                String data = line.substring(6);
+                String data = line.substring(6).trim();
                 emitter.send(SseEmitter.event().data(data));
 
-                if ("[DONE]".equals(data.trim())) {
+                if ("[DONE]".equals(data)) {
                     completed.set(true);
                     break;
+                }
+
+                // 解析 token 使用信息和内容
+                try {
+                    JsonNode chunk = objectMapper.readTree(data);
+                    JsonNode choices = chunk.path("choices");
+                    if (choices.isArray() && choices.size() > 0) {
+                        JsonNode delta = choices.get(0).path("delta");
+                        String content = safeText(delta.get("content"));
+                        if (StringUtils.hasText(content)) {
+                            contentBuilder.append(content);
+                        }
+                    }
+                    JsonNode usage = chunk.path("usage");
+                    if (!usage.isMissingNode()) {
+                        if (usage.has("prompt_tokens")) {
+                            inputTokens = usage.path("prompt_tokens").asInt(0);
+                        }
+                        if (usage.has("completion_tokens")) {
+                            outputTokens = usage.path("completion_tokens").asInt(0);
+                        }
+                    }
+                } catch (Exception ignored) {
                 }
             }
 
@@ -174,10 +218,17 @@ public class CopilotProxyService implements ModelProxy {
                 emitter.send(SseEmitter.event().data("[DONE]"));
             }
             emitter.complete();
+
+            // 估算 token（如果上游没有返回）
+            if (outputTokens == 0 && contentBuilder.length() > 0) {
+                outputTokens = contentBuilder.length() / 4 + 1;
+            }
+            invokeCallback(callback, inputTokens, outputTokens, true, null);
         } catch (Exception ex) {
             log.error("Copilot Proxy 流式调用异常", ex);
             sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "上游模型服务流式接口异常", "processing_error");
+            invokeCallback(callback, 0, 0, false, ex.getMessage());
         } finally {
             closeResources(reader, connection);
         }
@@ -187,13 +238,14 @@ public class CopilotProxyService implements ModelProxy {
      * 执行 Claude 格式的流式请求
      * 将 OpenAI SSE 格式转换为 Anthropic SSE 格式
      */
-    private void executeClaudeStream(ChatRequest request, SseEmitter emitter) {
+    private void executeClaudeStream(ChatRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         String messageId = "msg_" + System.currentTimeMillis();
         String model = request.getModel();
         StringBuilder contentBuilder = new StringBuilder();
         int inputTokens = 0;
+        int outputTokens = 0;
 
         try {
             connection = openStreamingConnection();
@@ -204,6 +256,7 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Claude 流式鉴权失败: HTTP {}", status);
                 sendClaudeStreamError(emitter, status, "上游模型服务鉴权失败");
+                invokeCallback(callback, 0, 0, false, "上游模型服务鉴权失败");
                 return;
             }
 
@@ -212,6 +265,7 @@ public class CopilotProxyService implements ModelProxy {
                 log.error("Claude 流式调用失败: HTTP {}, body={}", status, errorBody);
                 String friendly = extractFriendlyMessage(errorBody);
                 sendClaudeStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, 0, 0, false, friendly != null ? friendly : buildFriendlyMessage(status));
                 return;
             }
 
@@ -247,8 +301,13 @@ public class CopilotProxyService implements ModelProxy {
 
                     // 提取 usage 信息
                     JsonNode usage = chunk.path("usage");
-                    if (!usage.isMissingNode() && usage.has("prompt_tokens")) {
-                        inputTokens = usage.path("prompt_tokens").asInt(0);
+                    if (!usage.isMissingNode()) {
+                        if (usage.has("prompt_tokens")) {
+                            inputTokens = usage.path("prompt_tokens").asInt(0);
+                        }
+                        if (usage.has("completion_tokens")) {
+                            outputTokens = usage.path("completion_tokens").asInt(0);
+                        }
                     }
                 } catch (Exception parseEx) {
                     log.debug("解析流式数据失败: {}", data);
@@ -265,11 +324,28 @@ public class CopilotProxyService implements ModelProxy {
             sendClaudeMessageStop(emitter);
 
             emitter.complete();
+
+            // 估算 token（如果上游没有返回）
+            if (outputTokens == 0 && contentBuilder.length() > 0) {
+                outputTokens = contentBuilder.length() / 4 + 1;
+            }
+            invokeCallback(callback, inputTokens, outputTokens, true, null);
         } catch (Exception ex) {
             log.error("Claude 流式调用异常", ex);
             sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
+            invokeCallback(callback, 0, 0, false, ex.getMessage());
         } finally {
             closeResources(reader, connection);
+        }
+    }
+
+    private void invokeCallback(StreamCompletionCallback callback, int inputTokens, int outputTokens, boolean success, String errorMessage) {
+        if (callback != null) {
+            try {
+                callback.onComplete(inputTokens, outputTokens, success, errorMessage);
+            } catch (Exception e) {
+                log.error("流式回调执行失败", e);
+            }
         }
     }
 
