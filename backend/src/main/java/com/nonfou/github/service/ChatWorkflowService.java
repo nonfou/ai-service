@@ -420,12 +420,39 @@ public class ChatWorkflowService {
         int inputTokens = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
         int outputTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
 
-        BigDecimal cost = balanceService.calculateCost(request.getModel(), inputTokens, outputTokens);
+        // 提取缓存 token 信息
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
+
+        // OpenAI 格式: prompt_tokens_details.cached_tokens
+        if (usage.getPromptTokensDetails() != null && usage.getPromptTokensDetails().getCachedTokens() != null) {
+            cacheReadTokens = usage.getPromptTokensDetails().getCachedTokens();
+        }
+        // Anthropic 格式: cache_read_input_tokens
+        if (usage.getCacheReadInputTokens() != null) {
+            cacheReadTokens = usage.getCacheReadInputTokens();
+        }
+        // Anthropic 格式: cache_creation_input_tokens
+        if (usage.getCacheCreationInputTokens() != null) {
+            cacheWriteTokens = usage.getCacheCreationInputTokens();
+        }
+
+        // 使用支持缓存 token 的计费方法
+        TokenUsage tokenUsage = TokenUsage.builder()
+                .inputTokens(inputTokens)
+                .outputTokens(outputTokens)
+                .cacheReadTokens(cacheReadTokens)
+                .cacheWriteTokens(cacheWriteTokens)
+                .build();
+        BigDecimal cost = balanceService.calculateCost(request.getModel(), tokenUsage);
+
         int duration = (int) ChronoUnit.MILLIS.between(startTime, endTime);
 
         ApiCall apiCall = buildApiCall(context, request, startTime, endTime, duration, provider);
         apiCall.setInputTokens(inputTokens);
         apiCall.setOutputTokens(outputTokens);
+        apiCall.setCacheReadTokens(cacheReadTokens);
+        apiCall.setCacheWriteTokens(cacheWriteTokens);
         apiCall.setCost(cost);
         apiCall.setRawCost(cost);
         apiCall.setMarkupRate(BigDecimal.ONE);
@@ -439,10 +466,13 @@ public class ChatWorkflowService {
 
         recordUsageMetrics(context.apiKey().getId(), apiCall);
 
-        log.info("API调用成功: userId={}, model={}, tokens={}, cost={}",
+        int totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
+        log.info("API调用成功: userId={}, model={}, tokens={}, cacheRead={}, cacheWrite={}, cost={}",
                 context.user().getId(),
                 request.getModel(),
-                inputTokens + outputTokens,
+                totalTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
                 cost);
     }
 
