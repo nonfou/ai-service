@@ -69,7 +69,7 @@ public class ChatController {
             @RequestHeader(value = "x-api-key", required = false) String xApiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody @Validated ChatRequest request) {
-        log.debug("Claude API 兼容接口调用: /v1/messages");
+        log.info("Claude API 兼容接口调用: /v1/messages, model={}", request.getModel());
 
         // Claude API 使用 x-api-key header，需要转换为 Authorization
         String authHeader = xApiKey != null ? "Bearer " + xApiKey : authorization;
@@ -85,7 +85,7 @@ public class ChatController {
             @RequestHeader(value = "x-api-key", required = false) String xApiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody @Validated ChatRequest request) {
-        log.debug("Claude API count_tokens 接口调用: /v1/messages/count_tokens");
+        log.info("Claude API count_tokens 接口调用: /v1/messages/count_tokens, model={}", request.getModel());
 
         // 简单估算 token 数量（实际应该使用 tokenizer）
         // 这里使用粗略估算：约 4 个字符 = 1 个 token
