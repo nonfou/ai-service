@@ -197,7 +197,7 @@ backend:
     timeout-ms: ${BACKEND_STREAM_TIMEOUT_MS:300000}
     core-pool-size: ${BACKEND_STREAM_CORE_POOL:4}
     max-pool-size: ${BACKEND_STREAM_MAX_POOL:16}
-    queue-capacity: ${BACKEND_STREAM_QUEUE:200}
+    queue-capacity: ${BACKEND_STREAM_QUEUE:500}
     keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
 
   # 请求路由配置
