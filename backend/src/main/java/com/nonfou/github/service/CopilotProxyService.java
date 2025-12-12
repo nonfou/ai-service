@@ -553,6 +553,33 @@ public class CopilotProxyService implements ModelProxy {
         if (request.getTemperature() != null) {
             payload.put("temperature", request.getTemperature());
         }
+        if (request.getTopP() != null) {
+            payload.put("top_p", request.getTopP());
+        }
+        if (request.getTopK() != null) {
+            payload.put("top_k", request.getTopK());
+        }
+        if (request.getSystem() != null) {
+            payload.put("system", request.getSystem());
+        }
+        if (!CollectionUtils.isEmpty(request.getTools())) {
+            payload.put("tools", request.getTools());
+        }
+        if (request.getToolChoice() != null) {
+            payload.put("tool_choice", request.getToolChoice());
+        }
+        if (!CollectionUtils.isEmpty(request.getStopSequences())) {
+            payload.put("stop_sequences", request.getStopSequences());
+        }
+        if (request.getStop() != null) {
+            payload.put("stop", request.getStop());
+        }
+        if (!CollectionUtils.isEmpty(request.getMetadata())) {
+            payload.put("metadata", request.getMetadata());
+        }
+        if (request.getStreamOptions() != null) {
+            payload.put("stream_options", request.getStreamOptions());
+        }
         if (!CollectionUtils.isEmpty(request.getAdditionalParams())) {
             payload.putAll(request.getAdditionalParams());
         }
