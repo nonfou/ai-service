@@ -370,11 +370,19 @@ const initStripeElements = async () => {
 
   elements = stripe.elements({
     clientSecret: clientSecret.value,
-    appearance
+    appearance,
+    locale: 'zh' // 中文界面
   })
 
   const paymentElement = elements.create('payment', {
-    layout: 'tabs'
+    layout: {
+      type: 'tabs',
+      defaultCollapsed: false
+    },
+    // 支付宝和微信支付需要的业务名称
+    business: {
+      name: 'AI Service'
+    }
   })
   paymentElement.mount('#payment-element')
 }
@@ -393,7 +401,8 @@ const confirmPayment = async () => {
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/payment/success`
+        // 支付宝等重定向支付需要 return_url，带上订单ID
+        return_url: `${window.location.origin}/payment/success?order_id=${currentOrderId.value}`
       },
       redirect: 'if_required'
     })
@@ -402,13 +411,16 @@ const confirmPayment = async () => {
       paymentError.value = error.message || '支付失败'
       ElMessage.error(paymentError.value)
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-      // 支付成功
+      // 支付成功（卡支付等不需要重定向的情况）
       paymentSuccess.value = true
       rechargeStep.value = 3
       ElMessage.success('支付成功！')
+    } else if (paymentIntent && paymentIntent.status === 'processing') {
+      // 支付处理中（某些支付方式需要更长时间确认）
+      paymentError.value = '支付处理中，请稍候查看订单状态...'
     } else {
-      // 可能需要额外验证
-      paymentError.value = '支付处理中，请稍候...'
+      // 可能需要额外验证或重定向
+      paymentError.value = '请按照页面提示完成支付...'
     }
   } catch (error: any) {
     console.error('支付失败:', error)

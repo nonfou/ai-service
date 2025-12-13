@@ -35,6 +35,7 @@ public class StripeService {
 
     /**
      * 创建 PaymentIntent
+     * 支持的付款方式：信用卡、支付宝、微信支付等
      *
      * @param amount  金额（美元）
      * @param orderNo 订单号
@@ -48,15 +49,14 @@ public class StripeService {
                 .setAmount(amountInCents)
                 .setCurrency(stripeConfig.getCurrency())
                 .putMetadata("order_no", orderNo)
-                .setAutomaticPaymentMethods(
-                        PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
-                                .setEnabled(true)
-                                .build()
-                )
+                // 显式指定支持的支付方式，包括支付宝和微信支付
+                .addPaymentMethodType("card")
+                .addPaymentMethodType("alipay")
+                .addPaymentMethodType("wechat_pay")
                 .build();
 
         PaymentIntent paymentIntent = PaymentIntent.create(params);
-        log.info("Created PaymentIntent: {} for order: {}, amount: {} cents",
+        log.info("Created PaymentIntent: {} for order: {}, amount: {} cents, methods: card, alipay, wechat_pay",
                 paymentIntent.getId(), orderNo, amountInCents);
 
         return paymentIntent;
