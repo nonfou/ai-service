@@ -213,6 +213,8 @@ backend:
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
       read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:300000}
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:600000}
+      # Claude Code 热身请求使用的小模型（减少高级模型配额消耗）
+      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}
 
   # 调度策略
   scheduler:

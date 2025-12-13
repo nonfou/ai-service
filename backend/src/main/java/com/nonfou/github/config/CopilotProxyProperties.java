@@ -44,4 +44,11 @@ public class CopilotProxyProperties {
      * SSE 超时时间（毫秒）。
      */
     private long streamTimeoutMs = 300000L;
+
+    /**
+     * Claude Code 热身请求使用的小模型。
+     * 当请求有 anthropic-beta 头且无 tools 时，会使用此模型替代请求的模型。
+     * 用于优化 Claude Code 2.0.28+ 的热身请求，减少高级模型配额消耗。
+     */
+    private String warmupModel = "claude-haiku-4.5";
 }

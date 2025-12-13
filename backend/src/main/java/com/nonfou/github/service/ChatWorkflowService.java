@@ -1,6 +1,7 @@
 package com.nonfou.github.service;
 
 import com.nonfou.github.config.BackendRoutingProperties;
+import com.nonfou.github.config.CopilotProxyProperties;
 import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.request.ClaudeRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
@@ -45,6 +46,7 @@ public class ChatWorkflowService {
     private final ApiKeyService apiKeyService;
     private final BalanceService balanceService;
     private final BackendRoutingProperties routingProperties;
+    private final CopilotProxyProperties copilotProxyProperties;
     private final TokenEstimator tokenEstimator;
     private final UsageMetricsService usageMetricsService;
     private final Map<String, ModelProxy> proxyLookup;
@@ -52,12 +54,14 @@ public class ChatWorkflowService {
     public ChatWorkflowService(ApiKeyService apiKeyService,
                                BalanceService balanceService,
                                BackendRoutingProperties routingProperties,
+                               CopilotProxyProperties copilotProxyProperties,
                                TokenEstimator tokenEstimator,
                                List<ModelProxy> modelProxies,
                                @Nullable UsageMetricsService usageMetricsService) {
         this.apiKeyService = apiKeyService;
         this.balanceService = balanceService;
         this.routingProperties = routingProperties;
+        this.copilotProxyProperties = copilotProxyProperties;
         this.tokenEstimator = tokenEstimator;
         this.usageMetricsService = usageMetricsService;
         this.proxyLookup = modelProxies.stream()
@@ -126,6 +130,9 @@ public class ChatWorkflowService {
         LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(false);
 
+        // 热身请求优化：检测 Claude Code 热身请求并使用小模型
+        applyWarmupModelOptimization(request);
+
         CopilotProxyService copilotProxy = getCopilotProxy();
         try {
             ClaudeResponse response = copilotProxy.claudeMessages(request, context.apiKey());
@@ -151,10 +158,33 @@ public class ChatWorkflowService {
         LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(true);
 
+        // 热身请求优化：检测 Claude Code 热身请求并使用小模型
+        applyWarmupModelOptimization(request);
+
         CopilotProxyService copilotProxy = getCopilotProxy();
         // 创建计费回调
         StreamCompletionCallback callback = createClaudeStreamCallback(context, request, requestTime);
         return copilotProxy.claudeMessagesStream(request, context.apiKey(), callback);
+    }
+
+    /**
+     * 检测 Claude Code 热身请求并使用小模型替代
+     * 当请求有 anthropic-beta 头且无 tools 时，强制使用配置的小模型
+     * 用于减少 Claude Code 2.0.28+ 热身请求的高级模型配额消耗
+     */
+    private void applyWarmupModelOptimization(ClaudeRequest request) {
+        // 检测条件：有 anthropic-beta 头且无 tools
+        boolean hasAnthropicBeta = request.getAnthropicBeta() != null && !request.getAnthropicBeta().isEmpty();
+        boolean noTools = request.getTools() == null || request.getTools().isEmpty();
+
+        if (hasAnthropicBeta && noTools) {
+            String warmupModel = copilotProxyProperties.getWarmupModel();
+            if (warmupModel != null && !warmupModel.isEmpty()) {
+                String originalModel = request.getModel();
+                request.setModel(warmupModel);
+                log.debug("Claude Code 热身请求优化: {} -> {}", originalModel, warmupModel);
+            }
+        }
     }
 
     /**

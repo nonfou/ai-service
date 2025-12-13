@@ -289,6 +289,11 @@ public class CopilotProxyService implements ModelProxy {
         int cacheReadTokens = 0;
         int cacheWriteTokens = 0;
 
+        // 工具调用状态跟踪
+        java.util.Map<Integer, ToolCallState> toolCallStates = new java.util.HashMap<>();
+        int currentBlockIndex = -1;
+        String currentBlockType = null;
+
         // 预先估算输入 token
         int estimatedInputTokens = estimateInputTokens(request);
 
@@ -330,14 +335,48 @@ public class CopilotProxyService implements ModelProxy {
                     JsonNode chunk = objectMapper.readTree(data);
                     String eventType = safeText(chunk.get("type"));
 
+                    // 解析 content_block_start 事件
+                    if ("content_block_start".equals(eventType)) {
+                        currentBlockIndex = chunk.path("index").asInt(0);
+                        JsonNode contentBlock = chunk.path("content_block");
+                        currentBlockType = safeText(contentBlock.get("type"));
+
+                        if ("tool_use".equals(currentBlockType)) {
+                            // 开始新的工具调用
+                            String toolCallId = safeText(contentBlock.get("id"));
+                            String toolName = safeText(contentBlock.get("name"));
+                            ToolCallState state = new ToolCallState(toolCallId, toolName, currentBlockIndex);
+                            toolCallStates.put(currentBlockIndex, state);
+
+                            // 发送工具调用开始的 chunk
+                            sendOpenAiToolCallChunk(emitter, chatCompletionId, model,
+                                    toolCallStates.size() - 1, toolCallId, toolName, null, null);
+                        }
+                    }
+
                     // 解析 Claude 原生 content_block_delta 事件，转换为 OpenAI 格式
                     if ("content_block_delta".equals(eventType)) {
                         JsonNode delta = chunk.path("delta");
-                        String content = safeText(delta.get("text"));
-                        if (StringUtils.hasText(content)) {
-                            contentBuilder.append(content);
-                            // 发送 OpenAI 格式的流式响应
-                            sendOpenAiStreamChunk(emitter, chatCompletionId, model, content, null);
+                        String deltaType = safeText(delta.get("type"));
+
+                        if ("text_delta".equals(deltaType)) {
+                            String content = safeText(delta.get("text"));
+                            if (StringUtils.hasText(content)) {
+                                contentBuilder.append(content);
+                                // 发送 OpenAI 格式的流式响应
+                                sendOpenAiStreamChunk(emitter, chatCompletionId, model, content, null);
+                            }
+                        } else if ("input_json_delta".equals(deltaType)) {
+                            // 工具调用参数的增量更新
+                            String partialJson = safeText(delta.get("partial_json"));
+                            int blockIndex = chunk.path("index").asInt(0);
+                            ToolCallState state = toolCallStates.get(blockIndex);
+                            if (state != null && StringUtils.hasText(partialJson)) {
+                                state.appendArguments(partialJson);
+                                // 发送工具调用参数增量
+                                sendOpenAiToolCallChunk(emitter, chatCompletionId, model,
+                                        getToolCallIndex(toolCallStates, blockIndex), state.getToolCallId(), null, partialJson, null);
+                            }
                         }
                     }
 
@@ -373,7 +412,8 @@ public class CopilotProxyService implements ModelProxy {
             }
 
             // 发送结束 chunk
-            sendOpenAiStreamChunk(emitter, chatCompletionId, model, null, "stop");
+            String finishReason = toolCallStates.isEmpty() ? "stop" : "tool_calls";
+            sendOpenAiStreamChunk(emitter, chatCompletionId, model, null, finishReason);
             emitter.send(SseEmitter.event().data("[DONE]"));
             emitter.complete();
 
@@ -394,6 +434,112 @@ public class CopilotProxyService implements ModelProxy {
             invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
         } finally {
             closeResources(reader, connection);
+        }
+    }
+
+    /**
+     * 工具调用状态跟踪类
+     */
+    private static class ToolCallState {
+        private final String toolCallId;
+        private final String functionName;
+        private final int blockIndex;
+        private final StringBuilder arguments = new StringBuilder();
+
+        public ToolCallState(String toolCallId, String functionName, int blockIndex) {
+            this.toolCallId = toolCallId;
+            this.functionName = functionName;
+            this.blockIndex = blockIndex;
+        }
+
+        public String getToolCallId() {
+            return toolCallId;
+        }
+
+        public String getFunctionName() {
+            return functionName;
+        }
+
+        public int getBlockIndex() {
+            return blockIndex;
+        }
+
+        public void appendArguments(String json) {
+            arguments.append(json);
+        }
+
+        public String getArguments() {
+            return arguments.toString();
+        }
+    }
+
+    /**
+     * 获取工具调用在列表中的索引
+     */
+    private int getToolCallIndex(java.util.Map<Integer, ToolCallState> toolCallStates, int blockIndex) {
+        int index = 0;
+        for (Integer key : toolCallStates.keySet()) {
+            if (key.equals(blockIndex)) {
+                return index;
+            }
+            index++;
+        }
+        return 0;
+    }
+
+    /**
+     * 发送 OpenAI 格式的工具调用流式响应 chunk
+     */
+    private void sendOpenAiToolCallChunk(SseEmitter emitter, String id, String model,
+            int toolCallIndex, String toolCallId, String functionName, String argumentsDelta, String finishReason) {
+        try {
+            Map<String, Object> chunk = new HashMap<>();
+            chunk.put("id", id);
+            chunk.put("object", "chat.completion.chunk");
+            chunk.put("created", System.currentTimeMillis() / 1000);
+            chunk.put("model", model);
+
+            Map<String, Object> choice = new HashMap<>();
+            choice.put("index", 0);
+
+            Map<String, Object> delta = new HashMap<>();
+
+            // 构建 tool_calls 数组
+            java.util.List<Map<String, Object>> toolCalls = new java.util.ArrayList<>();
+            Map<String, Object> toolCall = new HashMap<>();
+            toolCall.put("index", toolCallIndex);
+
+            if (toolCallId != null) {
+                toolCall.put("id", toolCallId);
+                toolCall.put("type", "function");
+            }
+
+            Map<String, Object> function = new HashMap<>();
+            if (functionName != null) {
+                function.put("name", functionName);
+            }
+            if (argumentsDelta != null) {
+                function.put("arguments", argumentsDelta);
+            }
+            if (!function.isEmpty()) {
+                toolCall.put("function", function);
+            }
+
+            toolCalls.add(toolCall);
+            delta.put("tool_calls", toolCalls);
+
+            choice.put("delta", delta);
+            if (finishReason != null) {
+                choice.put("finish_reason", finishReason);
+            } else {
+                choice.put("finish_reason", null);
+            }
+
+            chunk.put("choices", java.util.Collections.singletonList(choice));
+
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(chunk)));
+        } catch (Exception e) {
+            log.error("发送 OpenAI 工具调用流式 chunk 失败", e);
         }
     }
 
