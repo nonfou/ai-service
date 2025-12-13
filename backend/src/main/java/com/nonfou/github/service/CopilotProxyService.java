@@ -45,6 +45,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -1464,9 +1465,22 @@ public class CopilotProxyService implements ModelProxy {
                     .cacheWriteTokens(cacheWriteTokens)
                     .build();
             invokeCallback(callback, tokenUsage, true, null);
+        } catch (SocketTimeoutException ex) {
+            log.error("Claude Messages API 流式调用超时: {}", ex.getMessage());
+            sendClaudeStreamError(emitter, HttpStatus.GATEWAY_TIMEOUT.value(),
+                    "上游模型服务响应超时，请稍后重试或缩短对话长度");
+            invokeCallback(callback, TokenUsage.builder().build(), false,
+                    "流式响应超时: " + ex.getMessage());
         } catch (Exception ex) {
             log.error("Claude Messages API 流式调用异常", ex);
-            sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
+            String errorMessage = ex.getMessage();
+            if (errorMessage != null && errorMessage.contains("timeout")) {
+                sendClaudeStreamError(emitter, HttpStatus.GATEWAY_TIMEOUT.value(),
+                        "上游模型服务响应超时，请稍后重试");
+            } else {
+                sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "上游模型服务流式接口异常");
+            }
             invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
         } finally {
             closeResources(reader, connection);
