@@ -298,3 +298,14 @@ rate-limit:
   enabled: ${RATE_LIMIT_ENABLED:true}
   requests-per-minute: ${RATE_LIMIT_RPM:60}  # 普通请求每分钟限制
   api-requests-per-minute: ${RATE_LIMIT_API_RPM:30}  # API请求每分钟限制
+
+# ====================================================
+# Stripe 支付配置
+# ====================================================
+stripe:
+  api-key: ${STRIPE_SECRET_KEY:}              # Stripe 密钥 (sk_test_xxx 或 sk_live_xxx)
+  publishable-key: ${STRIPE_PUBLISHABLE_KEY:} # 前端可公开密钥 (pk_test_xxx 或 pk_live_xxx)
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}   # Webhook 签名密钥 (whsec_xxx)
+  currency: ${STRIPE_CURRENCY:usd}            # 默认货币
+  min-amount: ${STRIPE_MIN_AMOUNT:1}          # 最低充值金额 (USD)
+  max-amount: ${STRIPE_MAX_AMOUNT:1000}       # 最高充值金额 (USD)

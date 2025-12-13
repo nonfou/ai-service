@@ -60,6 +60,9 @@ importers:
       '@element-plus/icons-vue':
         specifier: ^2.3.2
         version: 2.3.2(vue@3.5.24(typescript@5.9.3))
+      '@stripe/stripe-js':
+        specifier: ^8.5.3
+        version: 8.5.3
       axios:
         specifier: ^1.13.2
         version: 1.13.2
@@ -420,6 +423,10 @@ packages:
     resolution: {integrity: sha512-rLarc1Ofcs3DHtgSzFO31pZsCh8g05R2azN1q3fF+H423Co87My0R+tazOEvYVKXSLh8C4LerMK41/K7wlklcg==}
     cpu: [x64]
     os: [win32]
+
+  '@stripe/stripe-js@8.5.3':
+    resolution: {integrity: sha512-UM0GHAxlTN7v0lCK2P6t0VOlvBIdApIQxhnM3yZ2kupQ4PpSrLsK/n/NyYKtw2NJGMaNRRD1IicWS7fSL2sFtA==}
+    engines: {node: '>=12.16'}
 
   '@sxzz/popperjs-es@2.11.7':
     resolution: {integrity: sha512-Ccy0NlLkzr0Ex2FKvh2X+OyERHXJ88XJ1MXtsI9y9fGexlaXaVTPzBCRBwIxFkORuOb+uBqeu+RqnpgYTEZRUQ==}
@@ -1146,6 +1153,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.53.1':
     optional: true
+
+  '@stripe/stripe-js@8.5.3': {}
 
   '@sxzz/popperjs-es@2.11.7': {}
 

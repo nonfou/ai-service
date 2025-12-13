@@ -45,12 +45,18 @@ const router = createRouter({
           component: () => import('../views/ApiKeys.vue'),
           meta: { requiresAuth: true }
         },
-        // {
-        //   path: 'wallet',
-        //   name: 'Wallet',
-        //   component: () => import('../views/Wallet.vue'),
-        //   meta: { requiresAuth: true }
-        // },
+        {
+          path: 'wallet',
+          name: 'Wallet',
+          component: () => import('../views/Wallet.vue'),
+          meta: { requiresAuth: true }
+        },
+        {
+          path: 'payment/success',
+          name: 'PaymentSuccess',
+          component: () => import('../views/PaymentSuccess.vue'),
+          meta: { requiresAuth: true }
+        },
         {
           path: 'dashboard',
           name: 'Dashboard',

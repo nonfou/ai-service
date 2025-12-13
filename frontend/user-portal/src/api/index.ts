@@ -846,11 +846,28 @@ export const getSubscriptionHistoryAPI = (pageNum?: number, pageSize?: number) =
   subscriptionAPI.getHistory(pageNum, pageSize)
 
 // 充值相关
-export const createRechargeOrderAPI = async (data: { amount: number, paymentMethod: string }) => {
+export interface StripeConfig {
+  publishableKey: string
+  currency: string
+  minAmount: number
+  maxAmount: number
+  presetAmounts: number[]
+}
+
+export const getStripeConfigAPI = async (): Promise<StripeConfig> => {
+  const res = await request.get('/api/recharge/config')
+  return res.data.data
+}
+
+export const createRechargeOrderAPI = async (data: { amount: number }): Promise<PaymentResponse> => {
   const res = await request.post('/api/recharge/create', {
-    amount: data.amount,
-    payMethod: data.paymentMethod
+    amount: data.amount
   })
+  return res.data.data
+}
+
+export const queryRechargeOrderAPI = async (orderId: number) => {
+  const res = await request.get(`/api/recharge/query/${orderId}`)
   return res.data.data
 }
 

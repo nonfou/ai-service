@@ -60,6 +60,20 @@ public class RechargeOrderService {
     }
 
     /**
+     * 更新订单的 PaymentIntent ID
+     */
+    @Transactional
+    public void updatePaymentIntentId(Long orderId, String paymentIntentId) {
+        RechargeOrder order = rechargeOrderMapper.selectById(orderId);
+        if (order != null) {
+            order.setPaymentIntentId(paymentIntentId);
+            order.setUpdatedAt(LocalDateTime.now());
+            rechargeOrderMapper.updateById(order);
+            log.info("更新订单 PaymentIntent ID: orderId={}, paymentIntentId={}", orderId, paymentIntentId);
+        }
+    }
+
+    /**
      * 处理支付回调
      */
     @Transactional

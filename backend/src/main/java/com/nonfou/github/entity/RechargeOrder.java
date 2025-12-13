@@ -47,6 +47,11 @@ public class RechargeOrder {
     private String tradeNo;
 
     /**
+     * Stripe PaymentIntent ID
+     */
+    private String paymentIntentId;
+
+    /**
      * 支付时间
      */
     private LocalDateTime payTime;

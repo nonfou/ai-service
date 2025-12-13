@@ -49,6 +49,9 @@ public class SecurityConfig {
                 // 公开接口:允许支付回调
                 .requestMatchers("/api/recharge/alipay/notify", "/api/recharge/alipay/return").permitAll()
                 .requestMatchers("/api/recharge/wechat/notify").permitAll()
+                // 公开接口:允许 Stripe Webhook 回调
+                .requestMatchers("/api/recharge/webhook").permitAll()
+                .requestMatchers("/api/recharge/config").permitAll()
                 // 公开接口:允许管理员登录
                 .requestMatchers("/api/admin/login").permitAll()
                 // ? [安全修复] 已删除不安全的重置密码接口 (CVSS 9.8 - CWE-306)
