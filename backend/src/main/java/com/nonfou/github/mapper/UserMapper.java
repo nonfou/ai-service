@@ -20,7 +20,7 @@ public interface UserMapper extends BaseMapper<User> {
      *
      * @return 受影响行数，0 表示余额不足或用户不存在
      */
-    @Update("UPDATE user SET balance = balance - #{amount}, updated_at = NOW() " +
+    @Update("UPDATE users SET balance = balance - #{amount}, updated_at = NOW() " +
             "WHERE id = #{userId} AND balance >= #{amount}")
     int deductBalanceAtomic(@Param("userId") Long userId, @Param("amount") BigDecimal amount);
 
@@ -29,7 +29,7 @@ public interface UserMapper extends BaseMapper<User> {
      *
      * @return 受影响行数
      */
-    @Update("UPDATE user SET balance = balance + #{amount}, updated_at = NOW() " +
+    @Update("UPDATE users SET balance = balance + #{amount}, updated_at = NOW() " +
             "WHERE id = #{userId}")
     int addBalanceAtomic(@Param("userId") Long userId, @Param("amount") BigDecimal amount);
 }
