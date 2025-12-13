@@ -180,9 +180,11 @@ backend:
     proxy:
       base-url: ${COPILOT_PROXY_BASE_URL:https://api.githubcopilot.com/v1}
       api-key: ${COPILOT_PROXY_API_KEY:}
-      connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:5000}
-      read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:60000}
-      stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:300000}
+      connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
+      # 读超时：两次数据块之间的最大等待时间（10分钟，适用于 Claude 大模型长时间思考）
+      read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:600000}
+      # SSE 超时：整个流式响应的最大持续时间（30分钟）
+      stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
 
   scheduler:
     strategy: ${BACKEND_SCHEDULER_STRATEGY:HYBRID}
