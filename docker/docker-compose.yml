@@ -72,6 +72,8 @@ services:
 
       # JVM 配置
       - JAVA_OPTS=${JAVA_OPTS:--Xmx512m -Xms256m}
+    volumes:
+      - ./logs/backend:/app/logs
     depends_on:
       mysql:
         condition: service_healthy
@@ -149,6 +151,7 @@ services:
       - "9000:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx-api:/var/log/nginx
     depends_on:
       - backend
     networks:
@@ -168,6 +171,7 @@ services:
       - ./nginx/user-portal.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/html/user-portal:/usr/share/nginx/html:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx-user-portal:/var/log/nginx
     depends_on:
       - backend
     healthcheck:
@@ -191,6 +195,7 @@ services:
     volumes:
       - ./nginx/admin-portal.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/html/admin-portal:/usr/share/nginx/html:ro
+      - ./logs/nginx-admin-portal:/var/log/nginx
     depends_on:
       - backend
     healthcheck:
