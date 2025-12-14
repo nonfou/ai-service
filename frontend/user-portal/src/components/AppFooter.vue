@@ -23,6 +23,13 @@
                 support@xcoder.plus
               </a>
             </li>
+            <li class="footer-link-item">
+              <span class="footer-icon">✈️</span>
+              <span class="footer-label">Telegram:</span>
+              <a href="https://t.me/xcoderplus" target="_blank" rel="noopener noreferrer" class="footer-link">
+                @xcoderplus
+              </a>
+            </li>
           </ul>
         </div>
       </div>

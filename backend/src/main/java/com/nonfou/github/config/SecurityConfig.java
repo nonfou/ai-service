@@ -37,8 +37,8 @@ public class SecurityConfig {
 
             // 配置请求授权
             .authorizeHttpRequests(auth -> auth
-                // 健康检查端点: 允许所有访问
-                .requestMatchers("/health", "/ready", "/live", "/actuator/**").permitAll()
+                // 健康检查端点: 允许所有访问 (同时支持有/无 /api 前缀)
+                .requestMatchers("/health", "/ready", "/live", "/api/health", "/api/ready", "/api/live", "/actuator/**").permitAll()
                 // 公开接口:允许所有认证相关的请求(登录、发送验证码等)
                 .requestMatchers("/api/auth/**").permitAll()
                 // 公开接口:允许获取模型列表
@@ -53,13 +53,13 @@ public class SecurityConfig {
                 .requestMatchers("/api/recharge/webhook").permitAll()
                 .requestMatchers("/api/recharge/config").permitAll()
                 // 公开接口:允许管理员登录
-                .requestMatchers("/api/admin/login").permitAll()
+                .requestMatchers("/admin/login").permitAll()
                 // ? [安全修复] 已删除不安全的重置密码接口 (CVSS 9.8 - CWE-306)
                 // 该接口允许任何人无需身份验证即可重置管理员密码,存在严重安全风险
                 // 管理员密码重置请通过数据库直接修改,或使用需要身份验证的修改密码功能
 
                 // 管理端接口:仅管理员可访问
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/models/admin/**").hasRole("ADMIN")
 
                 // 用户端接口:普通用户和管理员都可访问

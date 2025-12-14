@@ -42,6 +42,12 @@ public class VerifyCodeService {
     @Value("${auth.verify-code.hash-secret:${jwt.secret:verify-code-secret}}")
     private String hashSecret;
 
+    /**
+     * 测试环境默认验证码，生产环境应设为空或不配置
+     */
+    @Value("${auth.verify-code.default-code:}")
+    private String defaultCode;
+
     private final Map<String, LocalCodeRecord> localCodes = new ConcurrentHashMap<>();
     private final Map<String, Long> localCooldown = new ConcurrentHashMap<>();
     private final Map<String, LocalRateRecord> localHourly = new ConcurrentHashMap<>();
@@ -77,8 +83,15 @@ public class VerifyCodeService {
 
     /**
      * 校验验证码（成功后立即清除）。
+     * 支持默认测试验证码（仅在配置了 auth.verify-code.default-code 时生效）
      */
     public boolean verifyCode(String email, String plainCode) {
+        // 检查是否匹配默认测试验证码
+        if (defaultCode != null && !defaultCode.isEmpty() && defaultCode.equals(plainCode)) {
+            log.info("使用默认测试验证码登录: {}", email);
+            return true;
+        }
+
         String expectedHash = fetchStoredHash(email);
         if (expectedHash == null) {
             return false;

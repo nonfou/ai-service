@@ -31,13 +31,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/status",       // 状态检查接口不需要验证(GET请求)
                         "/api/auth/test",         // 测试接口不需要验证
                         "/api/auth/logout",       // 登出接口不需要CSRF Token(已通过Cookie验证身份)
-                        "/api/admin/login",       // 管理后台登录接口不需要验证
+                        "/admin/login",           // 管理后台登录接口不需要验证
                         "/v1/**"                  // AI API 接口通过 API Key 验证，不需要CSRF
                 );
 
         // 注册管理后台安全拦截器
         registry.addInterceptor(adminSecurityInterceptor)
-                .addPathPatterns("/api/admin/**")
-                .excludePathPatterns("/api/admin/login"); // 登录接口不拦截
+                .addPathPatterns("/admin/**")
+                .excludePathPatterns("/admin/login"); // 登录接口不拦截
     }
 }

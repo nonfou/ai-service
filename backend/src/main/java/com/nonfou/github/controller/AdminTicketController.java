@@ -21,7 +21,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/tickets")
+@RequestMapping("/admin/tickets")
 @RequireAdmin
 @RequiredArgsConstructor
 public class AdminTicketController {

@@ -9,14 +9,14 @@ const router = useRouter()
 // 根据登录状态决定"立即开始"按钮的行为
 const handleGetStarted = () => {
   if (userStore.isLoggedIn) {
-    router.push('/subscriptions')
+    router.push('/models')
   } else {
-    router.push('/login?redirect=/subscriptions')
+    router.push('/login?redirect=/models')
   }
 }
 
 // 固定 CTA 文案
-const ctaButtonText = computed(() => '选择订阅方案')
+const ctaButtonText = computed(() => '立即开始')
 </script>
 
 <template>

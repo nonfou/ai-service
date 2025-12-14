@@ -3,157 +3,448 @@
     <!-- 欢迎标题 -->
     <div class="welcome-section">
       <h1 class="welcome-title">欢迎回来,{{ username }}</h1>
-      <p class="welcome-subtitle">这是您的配额使用概览</p>
+      <p class="welcome-subtitle">这是您的使用情况分析</p>
     </div>
 
-    <!-- 今日使用统计 -->
-    <div class="today-usage-card v2board-card">
-      <div class="card-header-row">
-        <div class="card-icon">
-          <el-icon><TrendCharts /></el-icon>
-        </div>
-        <div class="card-header-content">
-          <h3 class="card-title">我的今日使用</h3>
-          <p class="card-date">{{ formatToday() }}</p>
-        </div>
+    <!-- 时间维度选择器 -->
+    <div class="time-selector">
+      <div class="time-buttons">
+        <button
+          v-for="option in timeOptions"
+          :key="option.value"
+          :class="['time-btn', { active: selectedDays === option.value }]"
+          @click="selectTimeRange(option.value)"
+        >
+          {{ option.label }}
+        </button>
       </div>
-
-      <div class="usage-stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">{{ stats.todayRequests || 0 }}</div>
-          <div class="stat-label">请求次数</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ stats.modelsUsed || 0 }}</div>
-          <div class="stat-label">使用模型</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ stats.creditsUsed || 0 }}</div>
-          <div class="stat-label">消耗积分</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">${{ formatNumber(stats.todayCost) }}</div>
-          <div class="stat-label">总消费</div>
-        </div>
-      </div>
-
-      <div class="model-usage-section">
-        <h4 class="section-title">模型使用详情</h4>
-        <div v-if="stats.modelUsage && stats.modelUsage.length > 0" class="model-list">
-          <div v-for="model in stats.modelUsage" :key="model.name" class="model-item">
-            <span class="model-name">{{ model.name }}</span>
-            <span class="model-count">{{ model.count }} 次</span>
-          </div>
-        </div>
-        <div v-else class="empty-data">
-          <el-icon class="empty-icon"><DataLine /></el-icon>
-          <p>暂无使用数据</p>
-        </div>
-      </div>
-
       <div class="last-update">最后更新: {{ formatTime(new Date()) }}</div>
     </div>
 
-    <!-- 第二行: 配额、套餐、订阅 -->
-    <div class="info-cards-grid">
-      <!-- 当前可用配额 -->
-      <div class="quota-card v2board-card">
-        <div class="card-icon-header">
-          <el-icon class="header-icon"><Coin /></el-icon>
+    <!-- 统计卡片 -->
+    <div class="stats-cards" v-loading="loading">
+      <div class="stat-card">
+        <div class="stat-icon requests">
+          <el-icon><TrendCharts /></el-icon>
         </div>
-        <dl class="info-list">
-          <dt>当前可用</dt>
-          <dd>{{ stats.currentQuota || 0 }} / {{ stats.totalQuota || 0 }}</dd>
-        </dl>
-        <div class="progress-section">
-          <el-progress
-            :percentage="quotaPercentage"
-            :color="quotaColor"
-            :stroke-width="8"
-          />
-          <p class="progress-text">{{ quotaPercentage }}% 剩余</p>
-          <p class="reset-time">下次重置: {{ formatResetTime() }}</p>
+        <div class="stat-content">
+          <div class="stat-value">{{ formatNumber(stats.totalCalls) }}</div>
+          <div class="stat-label">请求次数</div>
         </div>
       </div>
-
-      <!-- 套餐到期时间 -->
-      <div class="plan-card v2board-card">
-        <div class="card-icon-header">
-          <el-icon class="header-icon"><Calendar /></el-icon>
+      <div class="stat-card">
+        <div class="stat-icon models">
+          <el-icon><Box /></el-icon>
         </div>
-        <dl class="info-list">
-          <dt>套餐到期时间</dt>
-          <dd>{{ stats.planExpiry || '暂无订阅' }}</dd>
-        </dl>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.uniqueModels || 0 }}</div>
+          <div class="stat-label">使用模型</div>
+        </div>
       </div>
-
-      <!-- 活跃订阅 -->
-      <div class="subscription-card v2board-card">
-        <div class="card-icon-header">
-          <el-icon class="header-icon"><ShoppingCart /></el-icon>
+      <div class="stat-card">
+        <div class="stat-icon cost">
+          <el-icon><Wallet /></el-icon>
         </div>
-        <dt class="info-label">活跃订阅</dt>
-        <dd class="info-value">
-          <span class="sub-count">{{ stats.activeSubscriptions || 0 }}</span>
-          <span class="sub-unit">个套餐</span>
-        </dd>
+        <div class="stat-content">
+          <div class="stat-value">${{ formatCost(stats.totalCost) }}</div>
+          <div class="stat-label">消耗金额</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon tokens">
+          <el-icon><Coin /></el-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ formatTokens(stats.totalTokens) }}</div>
+          <div class="stat-label">Token 消耗</div>
+        </div>
       </div>
     </div>
 
-    <!-- 系统公告与快速开始已移除，根据需求保留右侧主要内容 -->
+    <!-- 使用趋势图表 -->
+    <div class="chart-section">
+      <div class="section-header">
+        <h3 class="section-title">使用趋势</h3>
+      </div>
+      <div class="chart-container">
+        <canvas ref="trendChartRef" v-show="trendData.length > 0"></canvas>
+        <div v-if="trendData.length === 0 && !loading" class="empty-chart">
+          <el-icon class="empty-icon"><DataLine /></el-icon>
+          <p>暂无趋势数据</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模型消耗分析 -->
+    <div class="model-analysis">
+      <div class="model-chart-section">
+        <div class="section-header">
+          <h3 class="section-title">模型消耗分布</h3>
+        </div>
+        <div class="chart-container pie-container">
+          <canvas ref="modelChartRef" v-show="modelStats.length > 0"></canvas>
+          <div v-if="modelStats.length === 0 && !loading" class="empty-chart">
+            <el-icon class="empty-icon"><PieChart /></el-icon>
+            <p>暂无模型数据</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="model-table-section">
+        <div class="section-header">
+          <h3 class="section-title">模型详情</h3>
+        </div>
+        <div class="model-table-container">
+          <el-table :data="modelStats" v-loading="loading" style="width: 100%" size="small">
+            <el-table-column prop="model" label="模型" min-width="180">
+              <template #default="scope">
+                <span class="model-name-cell">{{ scope.row.model }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="calls" label="调用次数" width="100" align="right">
+              <template #default="scope">
+                {{ formatNumber(scope.row.calls) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Token" width="120" align="right">
+              <template #default="scope">
+                {{ formatTokens(scope.row.totalInputTokens + scope.row.totalOutputTokens) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="费用" width="100" align="right">
+              <template #default="scope">
+                ${{ formatCost(scope.row.totalCost) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="占比" width="80" align="right">
+              <template #default="scope">
+                {{ calculatePercentage(scope.row.totalCost) }}%
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="modelStats.length === 0 && !loading" class="empty-table">
+            <p>暂无模型使用数据</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import {
   TrendCharts,
-  DataLine,
+  Box,
+  Wallet,
   Coin,
-  Calendar,
-  ShoppingCart
+  DataLine,
+  PieChart
 } from '@element-plus/icons-vue'
-import { userAPI } from '../../api'
+import { statisticsAPI } from '../../api'
 import { useUserStore } from '../../stores/user'
+
+// 动态导入 Chart.js 避免 SSR/编译问题
+let Chart: any = null
 
 const userStore = useUserStore()
 const username = computed(() => userStore.user?.username || '用户')
 
+// 时间维度选项
+const timeOptions = [
+  { value: 1, label: '当天' },
+  { value: 7, label: '7天' },
+  { value: 30, label: '30天' }
+]
+
+const selectedDays = ref(7)
+const loading = ref(false)
+
+// 统计数据
 const stats = ref({
-  todayRequests: 0,
-  modelsUsed: 0,
-  creditsUsed: 0,
-  todayCost: 0,
-  currentQuota: 3607,
-  totalQuota: 1000,
-  planExpiry: '',
-  activeSubscriptions: 0,
-  modelUsage: [] as Array<{ name: string; count: number }>
+  totalCalls: 0,
+  uniqueModels: 0,
+  totalCost: 0,
+  totalTokens: 0
 })
 
-const quotaPercentage = computed(() => {
-  if (!stats.value.totalQuota) return 100
-  return Math.round((stats.value.currentQuota / stats.value.totalQuota) * 100)
-})
+// 趋势数据
+const trendData = ref<Array<{ date: string; calls: number; cost: number }>>([])
 
-const quotaColor = computed(() => {
-  const percentage = quotaPercentage.value
-  if (percentage > 50) return '#67c23a'
-  if (percentage > 20) return '#e6a23c'
-  return '#f56c6c'
-})
+// 模型统计
+const modelStats = ref<Array<{
+  model: string
+  calls: number
+  totalCost: number
+  totalInputTokens: number
+  totalOutputTokens: number
+}>>([])
 
-const formatNumber = (num: number) => {
-  return (num || 0).toFixed(3)
+// Chart 实例
+let trendChart: any = null
+let modelChart: any = null
+const trendChartRef = ref<HTMLCanvasElement | null>(null)
+const modelChartRef = ref<HTMLCanvasElement | null>(null)
+
+// 选择时间范围
+const selectTimeRange = (days: number) => {
+  selectedDays.value = days
 }
 
-const formatToday = () => {
-  const today = new Date()
-  return today.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+// 加载数据
+const loadData = async () => {
+  loading.value = true
+  try {
+    // 加载趋势数据
+    const trendRes = await statisticsAPI.getUsageTrend(selectedDays.value)
+    if (trendRes.data) {
+      trendData.value = trendRes.data.map((item: any) => ({
+        date: item.date,
+        calls: item.calls || 0,
+        cost: parseFloat(item.cost) || 0
+      })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+      // 计算汇总统计
+      stats.value.totalCalls = trendData.value.reduce((sum, item) => sum + item.calls, 0)
+      stats.value.totalCost = trendData.value.reduce((sum, item) => sum + item.cost, 0)
+    }
+
+    // 加载模型统计
+    const modelRes = await statisticsAPI.getModelUsage()
+    if (modelRes.data) {
+      modelStats.value = modelRes.data.map((item: any) => ({
+        model: item.model,
+        calls: item.calls || 0,
+        totalCost: parseFloat(item.totalCost) || 0,
+        totalInputTokens: item.totalInputTokens || 0,
+        totalOutputTokens: item.totalOutputTokens || 0
+      })).sort((a: any, b: any) => b.totalCost - a.totalCost)
+
+      stats.value.uniqueModels = modelStats.value.length
+      stats.value.totalTokens = modelStats.value.reduce(
+        (sum, item) => sum + item.totalInputTokens + item.totalOutputTokens, 0
+      )
+    }
+
+    // 更新图表
+    await nextTick()
+    updateTrendChart()
+    updateModelChart()
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 更新趋势图表
+const updateTrendChart = () => {
+  if (!Chart || !trendChartRef.value || trendData.value.length === 0) return
+
+  const ctx = trendChartRef.value.getContext('2d')
+  if (!ctx) return
+
+  // 销毁旧图表
+  if (trendChart) {
+    trendChart.destroy()
+  }
+
+  const labels = trendData.value.map(item => {
+    const date = new Date(item.date)
+    return `${date.getMonth() + 1}/${date.getDate()}`
   })
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '请求数',
+          data: trendData.value.map(item => item.calls),
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          yAxisID: 'y'
+        },
+        {
+          label: '费用 (USD)',
+          data: trendData.value.map(item => item.cost),
+          borderColor: '#f093fb',
+          backgroundColor: 'rgba(240, 147, 251, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true,
+            padding: 20
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          titleFont: { size: 14 },
+          bodyFont: { size: 13 },
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || ''
+              const value = context.parsed.y
+              if (label.includes('费用')) {
+                return `${label}: $${value.toFixed(4)}`
+              }
+              return `${label}: ${value}`
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: '请求数'
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.05)'
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: '费用 (USD)'
+          },
+          grid: {
+            drawOnChartArea: false
+          }
+        }
+      }
+    }
+  })
+}
+
+// 更新模型饼图
+const updateModelChart = () => {
+  if (!Chart || !modelChartRef.value || modelStats.value.length === 0) return
+
+  const ctx = modelChartRef.value.getContext('2d')
+  if (!ctx) return
+
+  // 销毁旧图表
+  if (modelChart) {
+    modelChart.destroy()
+  }
+
+  const colors = [
+    '#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe',
+    '#43e97b', '#38f9d7', '#fa709a', '#fee140', '#ff6b6b'
+  ]
+
+  // 取前10个模型
+  const topModels = modelStats.value.slice(0, 10)
+
+  modelChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: topModels.map(item => item.model),
+      datasets: [{
+        data: topModels.map(item => item.totalCost),
+        backgroundColor: colors.slice(0, topModels.length),
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            usePointStyle: true,
+            padding: 15,
+            font: { size: 11 },
+            generateLabels: function(chart) {
+              const data = chart.data
+              if (data.labels && data.datasets.length) {
+                return data.labels.map((label, i) => {
+                  const value = data.datasets[0].data[i] as number
+                  const shortLabel = (label as string).length > 20
+                    ? (label as string).substring(0, 20) + '...'
+                    : label
+                  return {
+                    text: `${shortLabel}: $${value.toFixed(4)}`,
+                    fillStyle: colors[i],
+                    strokeStyle: colors[i],
+                    lineWidth: 0,
+                    pointStyle: 'circle',
+                    hidden: false,
+                    index: i
+                  }
+                })
+              }
+              return []
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed
+              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
+              const percentage = ((value / total) * 100).toFixed(1)
+              return `$${value.toFixed(4)} (${percentage}%)`
+            }
+          }
+        }
+      }
+    }
+  })
+}
+
+// 格式化函数
+const formatNumber = (num: number) => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+  return num.toString()
+}
+
+const formatCost = (cost: number) => {
+  if (cost === undefined || cost === null) return '0.00'
+  return cost.toFixed(4)
+}
+
+const formatTokens = (tokens: number) => {
+  if (tokens >= 1000000) return (tokens / 1000000).toFixed(2) + 'M'
+  if (tokens >= 1000) return (tokens / 1000).toFixed(1) + 'K'
+  return tokens.toString()
 }
 
 const formatTime = (date: Date) => {
@@ -164,41 +455,33 @@ const formatTime = (date: Date) => {
   })
 }
 
-const formatResetTime = () => {
-  // 示例: 下一天的 8:00
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  tomorrow.setHours(8, 0, 0, 0)
-
-  const now = new Date()
-  const diff = tomorrow.getTime() - now.getTime()
-  const hours = Math.floor(diff / 3600000)
-  const minutes = Math.floor((diff % 3600000) / 60000)
-  const seconds = Math.floor((diff % 60000) / 1000)
-
-  const dateStr = `${tomorrow.getMonth() + 1}-${tomorrow.getDate()} 08:00`
-  const countdownStr = `(${hours}小时${minutes}分钟${seconds}秒后)`
-
-  return `${dateStr} ${countdownStr}`
+const calculatePercentage = (cost: number) => {
+  const total = modelStats.value.reduce((sum, item) => sum + item.totalCost, 0)
+  if (total === 0) return '0.0'
+  return ((cost / total) * 100).toFixed(1)
 }
 
-const loadStats = async () => {
-  try {
-    const res = await userAPI.getStats()
-    if (res.data) {
-      stats.value = { ...stats.value, ...res.data }
-    }
-  } catch (error) {
-    console.error('Failed to load stats')
+// 监听时间范围变化
+watch(selectedDays, () => {
+  if (Chart) {
+    loadData()
   }
-}
+})
 
-onMounted(() => {
-  loadStats()
-  // 每5秒更新一次时间
-  setInterval(() => {
-    // 触发响应式更新
-  }, 5000)
+onMounted(async () => {
+  // 动态导入 Chart.js
+  try {
+    const chartModule = await import('chart.js/auto')
+    Chart = chartModule.Chart || chartModule.default
+    loadData()
+  } catch (error) {
+    console.error('Failed to load Chart.js:', error)
+  }
+})
+
+onUnmounted(() => {
+  if (trendChart) trendChart.destroy()
+  if (modelChart) modelChart.destroy()
 })
 </script>
 
@@ -209,7 +492,7 @@ onMounted(() => {
 
 /* 欢迎区域 */
 .welcome-section {
-  margin-bottom: var(--spacing-8);
+  margin-bottom: var(--spacing-6);
 }
 
 .welcome-title {
@@ -225,66 +508,113 @@ onMounted(() => {
   margin: 0;
 }
 
-/* 今日使用卡片 */
-.today-usage-card {
+/* 时间选择器 */
+.time-selector {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: var(--spacing-6);
 }
 
-.card-header-row {
+.time-buttons {
   display: flex;
-  align-items: center;
+  gap: var(--spacing-2);
+  background: var(--color-gray-100);
+  padding: 4px;
+  border-radius: var(--radius-lg);
+}
+
+.time-btn {
+  padding: var(--spacing-2) var(--spacing-4);
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.time-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.time-btn.active {
+  background: white;
+  color: var(--color-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.last-update {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* 统计卡片 */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-4);
   margin-bottom: var(--spacing-6);
 }
 
-.card-icon {
+.stat-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border-light);
+  transition: all var(--transition-fast);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-xl);
 }
 
-.card-header-content {
+.stat-icon.requests {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.stat-icon.models {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.stat-icon.cost {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.stat-icon.tokens {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: white;
+}
+
+.stat-content {
   flex: 1;
 }
 
-.card-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-1) 0;
-}
-
-.card-date {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  margin: 0;
-}
-
-/* 使用统计网格 */
-.usage-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-6);
-  margin-bottom: var(--spacing-6);
-  padding-bottom: var(--spacing-6);
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.stat-item {
-  text-align: center;
-}
-
 .stat-value {
-  font-size: var(--font-size-3xl);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  margin-bottom: var(--spacing-2);
+  margin-bottom: 2px;
 }
 
 .stat-label {
@@ -292,295 +622,111 @@ onMounted(() => {
   color: var(--color-text-secondary);
 }
 
-/* 模型使用详情 */
-.model-usage-section {
+/* 图表区域 */
+.chart-section {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
+  margin-bottom: var(--spacing-6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border-light);
+}
+
+.section-header {
   margin-bottom: var(--spacing-4);
 }
 
 .section-title {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-4) 0;
+  margin: 0;
 }
 
-.model-list {
+.chart-container {
+  height: 300px;
+  position: relative;
+}
+
+.pie-container {
+  height: 280px;
+}
+
+.empty-chart {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
-}
-
-.model-item {
-  display: flex;
-  justify-content: space-between;
-  padding: var(--spacing-2);
-  background: var(--color-gray-50);
-  border-radius: var(--radius-base);
-}
-
-.model-name {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-}
-
-.model-count {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-sm);
-}
-
-.empty-data {
-  text-align: center;
-  padding: var(--spacing-8) var(--spacing-4);
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   color: var(--color-text-tertiary);
 }
 
 .empty-icon {
-  font-size: var(--font-size-4xl);
-  color: var(--color-text-disabled);
+  font-size: 48px;
   margin-bottom: var(--spacing-2);
 }
 
-.empty-data p {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
-.last-update {
-  text-align: right;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-}
-
-/* 信息卡片网格 */
-.info-cards-grid {
+/* 模型分析 */
+.model-analysis {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1.5fr;
   gap: var(--spacing-6);
-  margin-bottom: var(--spacing-6);
 }
 
-.card-icon-header {
-  margin-bottom: var(--spacing-4);
-}
-
-.header-icon {
-  width: 40px;
-  height: 40px;
-  padding: var(--spacing-2);
+.model-chart-section,
+.model-table-section {
+  background: white;
   border-radius: var(--radius-lg);
-  background: var(--color-primary-50);
-  color: var(--color-primary);
-  font-size: var(--font-size-xl);
+  padding: var(--spacing-6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border-light);
 }
 
-.info-list {
-  margin: 0 0 var(--spacing-4) 0;
+.model-table-container {
+  max-height: 320px;
+  overflow-y: auto;
 }
 
-.info-list dt {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-2);
-}
-
-.info-list dd {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin: 0;
-}
-
-/* 进度条部分 */
-.progress-section {
-  margin-top: var(--spacing-4);
-}
-
-.progress-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin: var(--spacing-2) 0;
-}
-
-.reset-time {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  margin: var(--spacing-1) 0 0 0;
-}
-
-/* 活跃订阅卡片 */
-.info-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-3);
-}
-
-.info-value {
-  display: flex;
-  align-items: baseline;
-  gap: var(--spacing-2);
-}
-
-.sub-count {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-}
-
-.sub-unit {
-  font-size: var(--font-size-base);
-  color: var(--color-text-secondary);
-}
-
-/* 底部卡片网格 */
-.bottom-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-6);
-}
-
-.card-header-with-badge {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-4);
-}
-
-/* 系统公告 */
-.announcement-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-}
-
-.announcement-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  padding: var(--spacing-3);
-  background: var(--color-gray-50);
-  border-radius: var(--radius-base);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-primary);
-}
-
-.announcement-icon {
-  color: var(--color-warning-500);
-  flex-shrink: 0;
-}
-
-/* 快速开始 */
-.quick-start-steps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-  margin-bottom: var(--spacing-6);
-}
-
-.step-item {
-  display: flex;
-  gap: var(--spacing-4);
-}
-
-.step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--font-weight-semibold);
-  flex-shrink: 0;
-}
-
-.step-content {
-  flex: 1;
-}
-
-.step-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-2) 0;
-}
-
-.step-code {
-  display: block;
+.model-name-cell {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
-  background: var(--color-gray-100);
-  padding: var(--spacing-2) var(--spacing-3);
-  border-radius: var(--radius-base);
-  color: var(--color-text-primary);
-  overflow-x: auto;
-}
-
-.step-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.quick-start-actions {
-  display: flex;
-  gap: var(--spacing-3);
-  padding-top: var(--spacing-4);
-  border-top: 1px solid var(--color-border-light);
-}
-
-.action-link {
-  flex: 1;
-  padding: var(--spacing-3) var(--spacing-4);
-  border-radius: var(--radius-md);
-  text-align: center;
-  text-decoration: none;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  transition: all var(--transition-fast);
-  border: 1px solid var(--color-border-light);
-  color: var(--color-text-primary);
-}
-
-.action-link:hover {
-  border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
-.action-link.primary {
-  background: var(--color-primary);
-  color: white;
-  border-color: var(--color-primary);
-}
-
-.action-link.primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-  color: white;
+.empty-table {
+  text-align: center;
+  padding: var(--spacing-8);
+  color: var(--color-text-tertiary);
 }
 
 /* 响应式 */
-@media (max-width: 1024px) {
-  .usage-stats-grid {
+@media (max-width: 1280px) {
+  .stats-cards {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .info-cards-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .bottom-cards-grid {
+  .model-analysis {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .usage-stats-grid {
+  .stats-cards {
     grid-template-columns: 1fr;
   }
 
-  .quick-start-actions {
+  .time-selector {
     flex-direction: column;
+    gap: var(--spacing-3);
+    align-items: flex-start;
+  }
+
+  .stat-card {
+    padding: var(--spacing-4);
+  }
+
+  .chart-container {
+    height: 250px;
   }
 }
 </style>

@@ -42,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String requestUri = request.getRequestURI();
-        boolean isAdminRequest = requestUri.startsWith("/api/admin");
+        boolean isAdminRequest = requestUri.startsWith("/admin");
         String clientIp = getClientIp(request);
         String token = null;
 

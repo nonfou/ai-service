@@ -35,7 +35,7 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
         String requestURI = request.getRequestURI();
 
         // 只拦截管理后台接口
-        if (!requestURI.startsWith("/api/admin")) {
+        if (!requestURI.startsWith("/admin")) {
             return true;
         }
 

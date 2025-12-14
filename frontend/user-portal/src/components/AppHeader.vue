@@ -16,11 +16,11 @@
         <!-- 登录后显示完整菜单 -->
         <template v-else>
           <router-link to="/models" class="nav-link">模型</router-link>
-          <router-link to="/subscriptions" class="nav-link">订阅套餐</router-link>
+          <!-- <router-link to="/subscriptions" class="nav-link">订阅套餐</router-link> -->
           <router-link to="/api-keys" class="nav-link">API密钥</router-link>
-          <router-link to="/tickets" class="nav-link">工单</router-link>
+          <router-link to="/wallet" class="nav-link">钱包</router-link>
+          <!-- <router-link to="/tickets" class="nav-link">工单</router-link> -->
           <router-link to="/dashboard" class="nav-link">控制台</router-link>
-          <!-- <router-link to="/wallet" class="nav-link">钱包</router-link> -->
         </template>
       </nav>
 

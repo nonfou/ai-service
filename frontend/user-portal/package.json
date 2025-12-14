@@ -13,6 +13,7 @@
     "@element-plus/icons-vue": "^2.3.2",
     "@stripe/stripe-js": "^8.5.3",
     "axios": "^1.13.2",
+    "chart.js": "^4.5.1",
     "echarts": "^5.5.0",
     "element-plus": "^2.11.7",
     "pinia": "^3.0.4",

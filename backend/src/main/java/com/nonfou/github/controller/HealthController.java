@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.sql.DataSource;
@@ -27,8 +28,9 @@ public class HealthController {
     /**
      * 存活探针 - 检查应用是否还在运行
      * Kubernetes liveness probe
+     * 支持 /health 和 /api/health 两种路径
      */
-    @GetMapping("/health")
+    @GetMapping({"/health", "/api/health"})
     public ResponseEntity<Map<String, Object>> health() {
         Map<String, Object> result = new HashMap<>();
         result.put("status", "UP");
@@ -38,8 +40,9 @@ public class HealthController {
 
     /**
      * 存活探针（别名）
+     * 支持 /live 和 /api/live 两种路径
      */
-    @GetMapping("/live")
+    @GetMapping({"/live", "/api/live"})
     public ResponseEntity<Map<String, Object>> live() {
         return health();
     }
@@ -47,8 +50,9 @@ public class HealthController {
     /**
      * 就绪探针 - 检查应用是否准备好接收流量
      * Kubernetes readiness probe
+     * 支持 /ready 和 /api/ready 两种路径
      */
-    @GetMapping("/ready")
+    @GetMapping({"/ready", "/api/ready"})
     public ResponseEntity<Map<String, Object>> ready() {
         Map<String, Object> result = new HashMap<>();
         Map<String, Object> checks = new HashMap<>();

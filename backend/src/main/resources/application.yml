@@ -208,7 +208,7 @@ backend:
   # Copilot 配置（直连 & Relay）
   copilot:
     proxy:
-      base-url: ${COPILOT_PROXY_BASE_URL:http://67.209.176.51:2235}
+      base-url: ${COPILOT_PROXY_BASE_URL:http://23.252.106.80:2235}
       api-key: ${COPILOT_PROXY_API_KEY:}
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
       # 读超时：两次数据块之间的最大等待时间（10分钟，适用于 Claude 大模型长时间思考）

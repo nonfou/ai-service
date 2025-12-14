@@ -113,10 +113,10 @@ export interface BalanceInfo {
 
 export interface BalanceLog {
   id: number
-  type: number  // 1-充值, 2-消费, 3-退款
+  type: string  // recharge-充值, consume-消费
   amount: number
-  balance: number
-  description: string
+  balanceAfter: number
+  remark: string
   createdAt: string
 }
 
@@ -167,6 +167,10 @@ export interface Model {
   contextLength?: number  // 上下文长度
   speed?: string  // 速度等级：fast, medium, slow
   tags?: string[]  // 模型标签数组，如 ['推荐', '低价', '新品']
+  inputTokenPrice?: number  // 输入 token 价格（每百万 token 的美元价格）
+  outputTokenPrice?: number  // 输出 token 价格（每百万 token 的美元价格）
+  cacheReadTokenPrice?: number  // 缓存读取价格（每百万 token，可选）
+  cacheWriteTokenPrice?: number  // 缓存写入价格（每百万 token，可选）
 }
 
 // ==================== 用户相关类型 ====================
@@ -345,7 +349,7 @@ export const balanceAPI = {
 
   // 获取余额变动日志
   getBalanceLogs: (pageNum: number = 1, pageSize: number = 10) => {
-    return request.get<any, { data: { list: BalanceLog[], total: number } }>(
+    return request.get<any, { data: { records: BalanceLog[], total: number } }>(
       `/api/balance/logs?pageNum=${pageNum}&pageSize=${pageSize}`
     )
   },

@@ -55,7 +55,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column prop="description" label="描述" min-width="300" />
+          <el-table-column prop="remark" label="描述" min-width="300" />
 
           <el-table-column label="金额" width="150" align="right">
             <template #default="scope">
@@ -65,9 +65,9 @@
             </template>
           </el-table-column>
 
-          <el-table-column prop="balance" label="余额" width="150" align="right">
+          <el-table-column label="余额" width="150" align="right">
             <template #default="scope">
-              {{ scope.row.balance.toFixed(2) }}
+              {{ scope.row.balanceAfter?.toFixed(2) || '-' }}
             </template>
           </el-table-column>
         </el-table>
@@ -288,7 +288,7 @@ const loadTransactions = async () => {
     loading.value = true
     const res = await balanceAPI.getBalanceLogs(currentPage.value, pageSize.value)
     if (res.data) {
-      transactions.value = (res.data.list || []).map((log: BalanceLog) => ({
+      transactions.value = (res.data.records || []).map((log: BalanceLog) => ({
         ...log,
         createdAt: formatDateTime(log.createdAt)
       }))
@@ -454,25 +454,23 @@ const handleSizeChange = (size: number) => {
 }
 
 // 获取交易类型标签
-const getTransactionTypeTag = (type: number) => {
-  const typeMap: Record<number, any> = {
-    1: 'success',  // 充值
-    2: 'warning',  // 消费
-    3: 'danger',   // 退款
-    0: 'info'      // 支付中
+const getTransactionTypeTag = (type: string) => {
+  const typeMap: Record<string, any> = {
+    'recharge': 'success',  // 充值
+    'consume': 'warning',   // 消费
+    'refund': 'danger',     // 退款
   }
   return typeMap[type] || 'info'
 }
 
 // 获取交易类型名称
-const getTransactionTypeName = (type: number) => {
-  const nameMap: Record<number, string> = {
-    1: '充值',
-    2: '购买',
-    3: '退款',
-    0: '支付中'
+const getTransactionTypeName = (type: string) => {
+  const nameMap: Record<string, string> = {
+    'recharge': '充值',
+    'consume': '消费',
+    'refund': '退款',
   }
-  return nameMap[type] || '未知'
+  return nameMap[type] || type
 }
 
 // 获取金额样式类

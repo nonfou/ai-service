@@ -16,7 +16,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/plans")
+@RequestMapping("/admin/plans")
 @RequireAdmin
 public class AdminPlanController {
 

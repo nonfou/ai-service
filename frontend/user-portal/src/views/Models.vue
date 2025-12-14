@@ -1,82 +1,5 @@
 <template>
   <div class="models-page">
-    <!-- Hero 区域 -->
-    <section class="hero-section">
-      <div class="hero-content">
-        <div class="hero-badge">
-          <span class="badge-icon">✨</span>
-          <span>AI 模型市场</span>
-        </div>
-        <h1 class="hero-title">丰富的 AI 模型库</h1>
-        <p class="hero-description">
-          集成 OpenAI、Anthropic、Google 等主流 AI 厂商的最新模型<br/>
-          为开发者提供统一 API 接口，支持文本、视觉、代码等多种能力，一键调用即可集成到你的应用中
-        </p>
-        <div class="hero-stats">
-          <div class="stat-item">
-            <div class="stat-number">{{ models.length }}+</div>
-            <div class="stat-label">可用模型</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-number">{{ groupedModels.length }}</div>
-            <div class="stat-label">顶级厂商</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-number">99.9%</div>
-            <div class="stat-label">服务可用性</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 精选模型区域 -->
-    <section class="featured-section" v-if="featuredModels.length > 0">
-      <div class="section-header">
-        <h2 class="section-title">精选模型</h2>
-        <p class="section-subtitle">开发者最常用的高性能 AI 模型</p>
-      </div>
-
-      <div class="featured-grid">
-        <div
-          v-for="model in featuredModels"
-          :key="model.id"
-          class="featured-card"
-        >
-          <div class="featured-tags-top" v-if="model.tags && model.tags.length > 0">
-            <el-tag
-              v-for="tag in model.tags.slice(0, 2)"
-              :key="tag"
-              size="small"
-              class="tag-item"
-            >
-              {{ tag }}
-            </el-tag>
-          </div>
-          <div class="featured-header">
-            <span class="provider-badge">{{ model.provider }}</span>
-          </div>
-          <h3 class="featured-title">{{ model.displayName }}</h3>
-          <p class="featured-model-name">{{ model.modelName }}</p>
-          <p class="featured-description">{{ model.description || '强大的AI模型，适用于各种应用场景' }}</p>
-
-          <div class="featured-specs">
-            <div class="spec-item" v-if="model.contextLength">
-              <span class="spec-icon">📊</span>
-              <span class="spec-text">{{ formatContextLength(model.contextLength) }}</span>
-            </div>
-            <div class="spec-item" v-if="model.speed">
-              <span class="spec-icon">⚡</span>
-              <span class="spec-text">{{ formatSpeed(model.speed) }}</span>
-            </div>
-            <div class="spec-item">
-              <span class="spec-icon">💰</span>
-              <span class="spec-text">{{ model.priceMultiplier }}x 倍率</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- 所有模型区域 -->
     <section class="all-models-section">
       <div class="section-header">
@@ -84,9 +7,21 @@
         <p class="section-subtitle">按提供商分组展示</p>
       </div>
 
+      <!-- 搜索栏 -->
+      <div class="search-bar">
+        <el-input
+          v-model="searchQuery"
+          placeholder="搜索模型名称、提供商或描述..."
+          :prefix-icon="Search"
+          clearable
+          size="large"
+          class="search-input"
+        />
+      </div>
+
       <!-- 按提供商分组展示 -->
       <div
-        v-for="group in groupedModels"
+        v-for="group in filteredGroupedModels"
         :key="group.provider"
         class="provider-group"
       >
@@ -134,7 +69,7 @@
               {{ model.description || '优质AI模型，提供强大的AI能力' }}
             </p>
 
-            <div class="model-specs">
+            <div class="model-specs" v-if="model.contextLength || model.speed">
               <div class="spec-row" v-if="model.contextLength">
                 <span class="spec-label">上下文长度：</span>
                 <span class="spec-value">{{ formatContextLength(model.contextLength) }}</span>
@@ -143,9 +78,27 @@
                 <span class="spec-label">响应速度：</span>
                 <span class="spec-value">{{ formatSpeed(model.speed) }}</span>
               </div>
-              <div class="spec-row">
-                <span class="spec-label">计费倍率：</span>
-                <span class="spec-value">{{ model.priceMultiplier }}x</span>
+            </div>
+
+            <div class="model-pricing">
+              <div class="pricing-title">Token 价格 (每百万)</div>
+              <div class="pricing-grid">
+                <div class="price-item">
+                  <span class="price-label">输入</span>
+                  <span class="price-value">{{ formatTokenPrice(model.inputTokenPrice) }}</span>
+                </div>
+                <div class="price-item">
+                  <span class="price-label">输出</span>
+                  <span class="price-value">{{ formatTokenPrice(model.outputTokenPrice) }}</span>
+                </div>
+                <div class="price-item">
+                  <span class="price-label">缓存输入</span>
+                  <span class="price-value">{{ formatTokenPrice(model.cacheReadTokenPrice) }}</span>
+                </div>
+                <div class="price-item">
+                  <span class="price-label">缓存输出</span>
+                  <span class="price-value">{{ formatTokenPrice(model.cacheWriteTokenPrice) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -153,10 +106,12 @@
       </div>
 
       <!-- 空状态 -->
-      <div v-if="groupedModels.length === 0" class="empty-state">
+      <div v-if="filteredGroupedModels.length === 0" class="empty-state">
         <div class="empty-icon">📦</div>
-        <p class="empty-text">暂无可用模型</p>
-        <p class="empty-hint">请稍后再试</p>
+        <p class="empty-text" v-if="searchQuery">未找到匹配的模型</p>
+        <p class="empty-text" v-else>暂无可用模型</p>
+        <p class="empty-hint" v-if="searchQuery">尝试使用其他关键词搜索</p>
+        <p class="empty-hint" v-else>请稍后再试</p>
       </div>
     </section>
   </div>
@@ -165,9 +120,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import { modelsAPI, type Model } from '../api'
 
 const models = ref<Model[]>([])
+const searchQuery = ref('')
 
 // 加载模型列表
 const loadModels = async () => {
@@ -181,18 +138,15 @@ const loadModels = async () => {
   }
 }
 
-// 精选模型（按 ID 排序，取前3个可用模型）
-const featuredModels = computed(() => {
-  return models.value
-    .filter(m => m.status === 1)
-    .sort((a, b) => a.id - b.id)
-    .slice(0, 3)
-})
+// 需要隐藏的提供商列表
+const hiddenProviders = ['xai', 'google']
 
 // 按提供商分组的模型
 const groupedModels = computed(() => {
-  // 获取所有可用模型
-  const availableModels = models.value.filter(m => m.status === 1)
+  // 获取所有可用模型，排除隐藏的提供商
+  const availableModels = models.value.filter(m =>
+    m.status === 1 && !hiddenProviders.includes(m.provider.toLowerCase())
+  )
 
   // 按提供商分组
   const groups = availableModels.reduce((acc, model) => {
@@ -210,6 +164,27 @@ const groupedModels = computed(() => {
       models: models.sort((a, b) => a.id - b.id)
     }))
     .sort((a, b) => a.provider.localeCompare(b.provider))
+})
+
+// 根据搜索过滤后的分组模型
+const filteredGroupedModels = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return groupedModels.value
+  }
+
+  const query = searchQuery.value.toLowerCase().trim()
+
+  return groupedModels.value
+    .map(group => ({
+      provider: group.provider,
+      models: group.models.filter(model =>
+        model.modelName.toLowerCase().includes(query) ||
+        model.displayName.toLowerCase().includes(query) ||
+        model.provider.toLowerCase().includes(query) ||
+        (model.description && model.description.toLowerCase().includes(query))
+      )
+    }))
+    .filter(group => group.models.length > 0)
 })
 
 // 格式化上下文长度
@@ -232,6 +207,21 @@ const formatSpeed = (speed: string) => {
   return speedMap[speed] || speed
 }
 
+// 格式化 Token 价格（每百万 token 的美元价格）
+const formatTokenPrice = (price: number | undefined | null) => {
+  if (price === undefined || price === null) {
+    return '-'
+  }
+  // 根据价格大小决定显示精度
+  if (price >= 1) {
+    return `$${price.toFixed(2)}`
+  } else if (price >= 0.01) {
+    return `$${price.toFixed(3)}`
+  } else {
+    return `$${price.toFixed(4)}`
+  }
+}
+
 
 onMounted(() => {
   loadModels()
@@ -244,99 +234,7 @@ onMounted(() => {
   background: linear-gradient(180deg, #f8f8ff 0%, #ffffff 100%);
 }
 
-/* ==================== Hero 区域 ==================== */
-.hero-section {
-  background: linear-gradient(135deg, #f7f9ff 0%, #f1f0ff 100%);
-  padding: 5rem 2rem;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-section::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -10%;
-  width: 40%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.hero-content {
-  max-width: 900px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(124, 58, 237, 0.2);
-  border-radius: 2rem;
-  font-size: 0.9rem;
-  color: #7c3aed;
-  font-weight: 500;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
-}
-
-.badge-icon {
-  font-size: 1.1rem;
-}
-
-.hero-title {
-  font-size: 3.5rem;
-  font-weight: 700;
-  margin: 0 0 1.5rem 0;
-  background: linear-gradient(135deg, #7c3aed, #2563eb);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.2;
-}
-
-.hero-description {
-  font-size: 1.2rem;
-  color: #64748b;
-  line-height: 1.8;
-  margin-bottom: 3rem;
-}
-
-.hero-stats {
-  display: flex;
-  justify-content: center;
-  gap: 4rem;
-  margin-top: 3rem;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-number {
-  font-size: 2.5rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #7c3aed, #2563eb);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.5rem;
-}
-
-.stat-label {
-  font-size: 0.95rem;
-  color: #64748b;
-  font-weight: 500;
-}
-
 /* ==================== Section 通用样式 ==================== */
-.featured-section,
 .all-models-section {
   padding: 5rem 2rem;
   max-width: 1400px;
@@ -361,113 +259,26 @@ onMounted(() => {
   margin: 0;
 }
 
-/* ==================== 精选模型卡片 ==================== */
-.featured-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  margin-bottom: 2rem;
+/* ==================== 搜索栏 ==================== */
+.search-bar {
+  max-width: 500px;
+  margin: 0 auto 3rem;
 }
 
-.featured-card {
-  background: #ffffff;
-  border-radius: 1.5rem;
-  padding: 2.5rem;
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
-  transition: all 0.25s ease;
-  position: relative;
-  overflow: hidden;
+.search-input :deep(.el-input__wrapper) {
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 0.25rem 0.5rem;
 }
 
-.featured-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #7c3aed, #2563eb);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.featured-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.15);
+.search-input :deep(.el-input__wrapper:hover) {
   border-color: rgba(124, 58, 237, 0.3);
 }
 
-.featured-card:hover::before {
-  opacity: 1;
-}
-
-.featured-tags-top {
-  position: absolute;
-  top: 2rem;
-  right: 2rem;
-  display: flex;
-  gap: 0.5rem;
-  z-index: 2;
-}
-
-.featured-header {
-  margin-bottom: 1.5rem;
-}
-
-.provider-badge {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(37, 99, 235, 0.1));
-  color: #7c3aed;
-  border-radius: 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border: 1px solid rgba(124, 58, 237, 0.2);
-}
-
-.featured-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 0.5rem 0;
-}
-
-.featured-model-name {
-  font-family: 'Courier New', monospace;
-  font-size: 0.9rem;
-  color: #7c3aed;
-  margin: 0 0 1rem 0;
-  font-weight: 500;
-}
-
-.featured-description {
-  color: #64748b;
-  line-height: 1.6;
-  margin: 0 0 1.5rem 0;
-  min-height: 3rem;
-}
-
-.featured-specs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.spec-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  background: rgba(124, 58, 237, 0.05);
-  border-radius: 0.75rem;
-  font-size: 0.85rem;
-  color: #475569;
-}
-
-.spec-icon {
-  font-size: 1rem;
+.search-input :deep(.el-input__wrapper.is-focus) {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
 }
 
 .tag-item {
@@ -479,45 +290,45 @@ onMounted(() => {
 
 /* ==================== 提供商分组 ==================== */
 .provider-group {
-  margin-bottom: 4rem;
+  margin-bottom: 2.5rem;
 }
 
 .provider-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.25rem;
 }
 
 .provider-title-wrapper {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .provider-icon-large {
-  width: 80px;
-  height: 80px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #7c3aed, #2563eb);
-  border-radius: 1.25rem;
-  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2);
 }
 
 .provider-icon-large span {
-  font-size: 2.5rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: white;
 }
 
 .provider-title {
-  font-size: 2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #1e293b;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.15rem 0;
 }
 
 .provider-count {
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: #64748b;
   margin: 0;
 }
@@ -525,55 +336,55 @@ onMounted(() => {
 /* ==================== 所有模型网格 ==================== */
 .models-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 }
 
 .model-card {
   background: white;
-  border-radius: 1.25rem;
-  padding: 1.75rem;
+  border-radius: 0.875rem;
+  padding: 1rem;
   border: 1px solid rgba(226, 232, 240, 0.7);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .model-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
   border-color: rgba(124, 58, 237, 0.2);
 }
 
 .model-card-header {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .model-tags-header {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
   flex-wrap: wrap;
   margin-left: auto;
 }
 
 .model-icon {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f7f9ff, #f1f0ff);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .model-icon img {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
 }
 
@@ -583,7 +394,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #7c3aed;
 }
@@ -594,15 +405,15 @@ onMounted(() => {
 }
 
 .model-title {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #1e293b;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.15rem 0;
 }
 
 .model-name {
   font-family: 'Courier New', monospace;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: #7c3aed;
   margin: 0;
   overflow: hidden;
@@ -612,9 +423,9 @@ onMounted(() => {
 
 .model-description {
   color: #64748b;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  margin: 0 0 1rem 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin: 0 0 0.75rem 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -624,17 +435,17 @@ onMounted(() => {
 .model-specs {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  padding: 1rem;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem;
   background: rgba(248, 250, 252, 0.8);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
 }
 
 .spec-row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
 .spec-label {
@@ -645,6 +456,48 @@ onMounted(() => {
 .spec-value {
   color: #1e293b;
   font-weight: 600;
+}
+
+/* ==================== 模型价格区域 ==================== */
+.model-pricing {
+  padding: 0.6rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.05), rgba(37, 99, 235, 0.05));
+  border-radius: 0.5rem;
+  border: 1px solid rgba(124, 58, 237, 0.1);
+}
+
+.pricing-title {
+  font-size: 0.65rem;
+  color: #7c3aed;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.5rem;
+}
+
+.price-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.2rem 0;
+}
+
+.price-label {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.price-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  font-family: 'Courier New', monospace;
 }
 
 /* ==================== 空状态 ==================== */
@@ -673,82 +526,39 @@ onMounted(() => {
 }
 
 /* ==================== 响应式设计 ==================== */
+@media (max-width: 1280px) {
+  .models-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 1024px) {
-  .hero-title {
-    font-size: 2.75rem;
-  }
-
-  .hero-stats {
-    gap: 2rem;
-  }
-
-  .featured-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .models-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 768px) {
-  .hero-section {
-    padding: 3rem 1.5rem;
-  }
-
-  .hero-title {
-    font-size: 2rem;
-  }
-
-  .hero-description {
-    font-size: 1rem;
-  }
-
-  .hero-stats {
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
   .section-title {
     font-size: 2rem;
-  }
-
-  .featured-grid {
-    grid-template-columns: 1fr;
   }
 
   .models-grid {
     grid-template-columns: 1fr;
   }
 
-  .filter-bar {
-    flex-direction: column;
-    gap: 1rem;
+  .pricing-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
-  .filter-item {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-  }
-
-  .provider-select {
-    width: 100%;
+  .search-bar {
+    max-width: 100%;
   }
 }
 
 @media (max-width: 480px) {
-  .featured-section,
   .all-models-section {
     padding: 3rem 1rem;
-  }
-
-  .hero-title {
-    font-size: 1.75rem;
-  }
-
-  .stat-number {
-    font-size: 2rem;
   }
 }
 </style>

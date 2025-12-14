@@ -16,7 +16,7 @@ import java.util.Map;
  * 管理员专用API
  */
 @RestController
-@RequestMapping("/api/admin/backend-accounts")
+@RequestMapping("/admin/backend-accounts")
 @RequiredArgsConstructor
 public class BackendAccountController {
 
