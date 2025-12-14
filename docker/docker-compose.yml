@@ -30,6 +30,7 @@ services:
       # JWT 配置 (必需)
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-604800000}
+      - JWT_ISSUER=${JWT_ISSUER}
 
       # 验证码配置 (必需)
       - VERIFY_CODE_SECRET=${VERIFY_CODE_SECRET}
