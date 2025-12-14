@@ -210,6 +210,7 @@ const handleLogin = async () => {
       // ✅ 后端通过 Set-Cookie 设置 HttpOnly Cookie
 
       // 设置用户信息,包含所有后端返回的字段
+      // setUserInfo 会同时设置 isLoggedIn = true 并同步到 localStorage
       userStore.setUserInfo({
         userId: data.userId,
         email: data.email,
@@ -217,9 +218,6 @@ const handleLogin = async () => {
         // apiKey: data.apiKey,  // ❌ 已删除 - 不再在前端存储API密钥
         balance: data.balance
       })
-
-      // ✅ 更新登录状态
-      userStore.isLoggedIn = true
 
       ElMessage.success('登录成功')
       // 跳转到重定向目标或默认控制台

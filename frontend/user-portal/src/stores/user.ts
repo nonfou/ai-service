@@ -17,8 +17,8 @@ export const useUserStore = defineStore('user', () => {
   // ❌ 删除: const token = ref<string>(localStorage.getItem('token') || '')
   // ✅ Token现在存储在HttpOnly Cookie中,前端无法访问
 
-  // ✅ 改为直接使用 ref,初始值为 false
-  const isLoggedIn = ref<boolean>(false)
+  // ✅ 从 localStorage 恢复登录状态
+  const isLoggedIn = ref<boolean>(localStorage.getItem('isLoggedIn') === 'true')
   const userInfo = ref<UserInfo | null>(loadUserInfo())
 
   // 兼容部分组件使用的名称：user
@@ -34,25 +34,31 @@ export const useUserStore = defineStore('user', () => {
   async function checkLoginStatus() {
     try {
       const res = await request.get<any, { data: { isLoggedIn: boolean, userInfo?: UserInfo } }>('/api/auth/status')
-      isLoggedIn.value = res.data.isLoggedIn || false
+      const loggedIn = res.data.isLoggedIn || false
+      isLoggedIn.value = loggedIn
+      localStorage.setItem('isLoggedIn', String(loggedIn))
 
       if (res.data.userInfo) {
         setUserInfo(res.data.userInfo)
-      } else if (!res.data.isLoggedIn) {
+      } else if (!loggedIn) {
         userInfo.value = null
         localStorage.removeItem('userInfo')
       }
     } catch (error) {
       console.error('Failed to check login status:', error)
       isLoggedIn.value = false
+      localStorage.setItem('isLoggedIn', 'false')
       userInfo.value = null
     }
   }
 
   function setUserInfo(info: UserInfo) {
     userInfo.value = info
+    // 同时更新登录状态
+    isLoggedIn.value = true
     try {
       localStorage.setItem('userInfo', JSON.stringify(info))
+      localStorage.setItem('isLoggedIn', 'true')
     } catch {
       // ignore
     }
@@ -66,6 +72,7 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn.value = false
     userInfo.value = null
     localStorage.removeItem('userInfo')
+    localStorage.removeItem('isLoggedIn')
   }
 
   async function logout() {
