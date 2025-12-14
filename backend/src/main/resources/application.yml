@@ -111,6 +111,7 @@ mybatis-plus:
 jwt:
   secret: ${JWT_SECRET}  # ✅ 移除默认值,强制使用环境变量
   expiration: ${JWT_EXPIRATION:604800000}  # 7天（毫秒）
+  issuer: ${JWT_ISSUER:localhost}  # Token 签发者标识，用于区分不同环境
 
 auth:
   verify-code:

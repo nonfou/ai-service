@@ -89,6 +89,7 @@ mybatis-plus:
 jwt:
   secret: ${JWT_SECRET}  # ⚠️ 必须设置,长度>=32字符,使用: openssl rand -base64 32
   expiration: ${JWT_EXPIRATION:604800000}  # 7天
+  issuer: ${JWT_ISSUER}  # ⚠️ 必须设置，生产环境使用实际域名如: api.example.com
 
 # 认证配置 - 生产环境
 auth:

@@ -24,6 +24,9 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private Long expiration;
 
+    @Value("${jwt.issuer}")
+    private String issuer;
+
     /**
      * 生成 JWT Token (普通用户)
      */
@@ -51,6 +54,7 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .claims(claims)
+                .issuer(issuer)  // 添加签发者标识，用于区分不同环境
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSignKey(), Jwts.SIG.HS256)
@@ -95,11 +99,13 @@ public class JwtUtil {
 
     /**
      * 从 Token 中获取 Claims
+     * 验证时会校验 issuer 是否匹配当前环境
      */
     private Claims getClaimsFromToken(String token) {
         try {
             return Jwts.parser()
                     .verifyWith(getSignKey())
+                    .requireIssuer(issuer)  // 校验 issuer 必须匹配当前环境
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
