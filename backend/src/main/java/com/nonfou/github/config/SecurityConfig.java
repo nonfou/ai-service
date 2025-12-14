@@ -21,7 +21,8 @@ import java.util.Arrays;
 
 /**
  * Spring Security 配置类
- * 为管理后台和用户端配置不同的 Session 策略
+ * 全部使用 STATELESS 无状态认证（纯 JWT）
+ * CSRF 防护依赖 SameSite=Strict Cookie
  */
 @Configuration
 @EnableWebSecurity
@@ -83,7 +84,7 @@ public class SecurityConfig {
     }
 
     /**
-     * 用户端及其他接口安全过滤器链 - 使用 IF_REQUIRED (支持 Session/CSRF)
+     * 用户端及其他接口安全过滤器链 - 使用 STATELESS (纯 JWT)
      */
     @Bean
     @Order(2)
@@ -98,16 +99,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/models").permitAll()
                 .requestMatchers("/v1/**").permitAll()
-                .requestMatchers("/api/recharge/alipay/notify", "/api/recharge/alipay/return").permitAll()
-                .requestMatchers("/api/recharge/wechat/notify").permitAll()
-                .requestMatchers("/api/recharge/webhook").permitAll()
-                .requestMatchers("/api/recharge/config").permitAll()
                 .requestMatchers("/api/models/admin/**").hasRole("ADMIN")
                 .anyRequest().hasAnyRole("USER", "ADMIN")
             )
-            // 用户端使用 IF_REQUIRED，支持 Session 和 CSRF Token
+            // 使用 STATELESS，不创建 Session
             .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .exceptionHandling(handler -> handler
                 .authenticationEntryPoint(restAuthenticationEntryPoint)

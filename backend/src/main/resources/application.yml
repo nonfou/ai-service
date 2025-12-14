@@ -13,25 +13,9 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  # ====================================================
-  # Session 和 Cookie 配置 (用于CSRF防护)
-  # ====================================================
+  # 禁用 Spring Session（使用 STATELESS JWT 认证，不需要 Session）
   session:
-    # 使用Redis存储Session (推荐)
-    store-type: redis
-    timeout: 7d  # Session过期时间 (7天)
-    redis:
-      namespace: spring:session  # Redis key前缀
-
-  # Servlet配置
-  servlet:
-    session:
-      cookie:
-        name: JSESSIONID  # Session Cookie名称
-        http-only: true  # HttpOnly Cookie
-        secure: ${SESSION_COOKIE_SECURE:true}  # Secure属性(生产环境必须为true)
-        same-site: strict  # SameSite=Strict防止CSRF
-        max-age: 7d  # Cookie过期时间
+    store-type: none
 
   # 数据库配置 - 具体值由环境配置提供
   datasource:
@@ -298,14 +282,3 @@ rate-limit:
   enabled: ${RATE_LIMIT_ENABLED:true}
   requests-per-minute: ${RATE_LIMIT_RPM:60}  # 普通请求每分钟限制
   api-requests-per-minute: ${RATE_LIMIT_API_RPM:30}  # API请求每分钟限制
-
-# ====================================================
-# Stripe 支付配置
-# ====================================================
-stripe:
-  api-key: ${STRIPE_SECRET_KEY:}              # Stripe 密钥 (sk_test_xxx 或 sk_live_xxx)
-  publishable-key: ${STRIPE_PUBLISHABLE_KEY:} # 前端可公开密钥 (pk_test_xxx 或 pk_live_xxx)
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}   # Webhook 签名密钥 (whsec_xxx)
-  currency: ${STRIPE_CURRENCY:usd}            # 默认货币
-  min-amount: ${STRIPE_MIN_AMOUNT:1}          # 最低充值金额 (USD)
-  max-amount: ${STRIPE_MAX_AMOUNT:1000}       # 最高充值金额 (USD)

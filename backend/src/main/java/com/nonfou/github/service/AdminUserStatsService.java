@@ -8,11 +8,9 @@ import com.nonfou.github.dto.response.UserTokenStatsResponse;
 import com.nonfou.github.entity.ApiCall;
 import com.nonfou.github.entity.BalanceLog;
 import com.nonfou.github.entity.Model;
-import com.nonfou.github.entity.RechargeOrder;
 import com.nonfou.github.mapper.ApiCallMapper;
 import com.nonfou.github.mapper.BalanceLogMapper;
 import com.nonfou.github.mapper.ModelMapper;
-import com.nonfou.github.mapper.RechargeOrderMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,9 +32,6 @@ public class AdminUserStatsService {
 
     @Autowired
     private ApiCallMapper apiCallMapper;
-
-    @Autowired
-    private RechargeOrderMapper rechargeOrderMapper;
 
     @Autowired
     private BalanceLogMapper balanceLogMapper;
@@ -151,18 +146,6 @@ public class AdminUserStatsService {
 
             return response;
         }).collect(Collectors.toList());
-    }
-
-    /**
-     * 获取用户订单列表
-     */
-    public Page<RechargeOrder> getUserOrders(Long userId, int pageNum, int pageSize) {
-        QueryWrapper<RechargeOrder> wrapper = new QueryWrapper<>();
-        wrapper.eq("user_id", userId);
-        wrapper.orderByDesc("created_at");
-
-        Page<RechargeOrder> page = new Page<>(pageNum, pageSize);
-        return rechargeOrderMapper.selectPage(page, wrapper);
     }
 
     /**

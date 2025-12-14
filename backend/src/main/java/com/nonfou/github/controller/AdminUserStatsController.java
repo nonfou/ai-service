@@ -8,7 +8,6 @@ import com.nonfou.github.dto.response.TokenTrendResponse;
 import com.nonfou.github.dto.response.UserTokenStatsResponse;
 import com.nonfou.github.entity.ApiCall;
 import com.nonfou.github.entity.BalanceLog;
-import com.nonfou.github.entity.RechargeOrder;
 import com.nonfou.github.service.AdminUserStatsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,24 +70,6 @@ public class AdminUserStatsController {
         } catch (Exception e) {
             log.error("获取用户模型统计失败", e);
             return Result.error("获取用户模型统计失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 获取用户订单列表
-     */
-    @GetMapping("/{userId}/orders")
-    @RequireAdmin
-    public Result<Page<RechargeOrder>> getUserOrders(
-            @PathVariable Long userId,
-            @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
-        try {
-            Page<RechargeOrder> orders = adminUserStatsService.getUserOrders(userId, pageNum, pageSize);
-            return Result.success(orders);
-        } catch (Exception e) {
-            log.error("获取用户订单列表失败", e);
-            return Result.error("获取用户订单列表失败: " + e.getMessage());
         }
     }
 

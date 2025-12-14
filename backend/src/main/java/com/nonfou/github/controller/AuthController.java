@@ -3,7 +3,6 @@ package com.nonfou.github.controller;
 import com.nonfou.github.common.Result;
 import com.nonfou.github.dto.request.LoginRequest;
 import com.nonfou.github.dto.request.SendCodeRequest;
-import com.nonfou.github.dto.response.CsrfTokenResponse;
 import com.nonfou.github.dto.response.LoginResponse;
 import com.nonfou.github.dto.response.LoginStatusResponse;
 import com.nonfou.github.entity.User;
@@ -12,14 +11,11 @@ import com.nonfou.github.util.JwtUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 /**
  * 认证 Controller
@@ -131,24 +127,6 @@ public class AuthController {
                         .username(user.getEmail()) // 如果有username字段可使用
                         .balance(user.getBalance())
                         .build())
-                .build());
-    }
-
-    /**
-     * 获取CSRF Token
-     */
-    @GetMapping("/csrf-token")
-    public Result<CsrfTokenResponse> getCsrfToken(HttpSession session) {
-        // 生成CSRF Token
-        String csrfToken = UUID.randomUUID().toString();
-
-        // 存储到Session
-        session.setAttribute("CSRF_TOKEN", csrfToken);
-
-        log.debug("CSRF Token已生成并存储到Session");
-
-        return Result.success(CsrfTokenResponse.builder()
-                .csrfToken(csrfToken)
                 .build());
     }
 

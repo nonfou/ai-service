@@ -211,4 +211,37 @@ public class AdminController {
         }
     }
 
+    // ====================================================
+    // 订单相关占位接口（支付功能暂时移除，后续重新集成）
+    // ====================================================
+
+    /**
+     * 获取订单统计（占位接口）
+     */
+    @GetMapping("/orders/statistics")
+    public Result<Map<String, Object>> getOrderStatistics() {
+        Map<String, Object> stats = new java.util.HashMap<>();
+        stats.put("totalOrders", 0L);
+        stats.put("pendingOrders", 0L);
+        stats.put("paidOrders", 0L);
+        stats.put("todayOrders", 0L);
+        stats.put("todayAmount", java.math.BigDecimal.ZERO);
+        return Result.success(stats);
+    }
+
+    /**
+     * 获取订单列表（占位接口）
+     */
+    @GetMapping("/orders")
+    public Result<Page<Map<String, Object>>> getOrderList(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String orderNo) {
+        Page<Map<String, Object>> emptyPage = new Page<>(pageNum, pageSize);
+        emptyPage.setRecords(new java.util.ArrayList<>());
+        emptyPage.setTotal(0);
+        return Result.success(emptyPage);
+    }
+
 }
