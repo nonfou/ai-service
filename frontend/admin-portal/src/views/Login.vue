@@ -2,8 +2,8 @@
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
-        <h1>AI API Management Platform</h1>
-        <p>Administrator Login</p>
+        <h1>AI API 管理平台</h1>
+        <p>管理员登录</p>
       </div>
 
       <el-form
@@ -16,7 +16,7 @@
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
-            placeholder="Username"
+            placeholder="用户名"
             size="large"
             :prefix-icon="User"
           />
@@ -26,7 +26,7 @@
           <el-input
             v-model="loginForm.password"
             type="password"
-            placeholder="Password"
+            placeholder="密码"
             size="large"
             :prefix-icon="Lock"
             show-password
@@ -41,7 +41,7 @@
             class="login-button"
             @click="handleLogin"
           >
-            Login
+            登录
           </el-button>
         </el-form-item>
       </el-form>
@@ -74,11 +74,11 @@ const loginForm = reactive({
 
 const rules: FormRules = {
   username: [
-    { required: true, message: 'Please enter username', trigger: 'blur' }
+    { required: true, message: '请输入用户名', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: 'Please enter password', trigger: 'blur' },
-    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
   ]
 }
 
@@ -104,10 +104,10 @@ const handleLogin = async () => {
         role: data.role
       })
 
-      message.success('Login successful')
+      message.success('登录成功')
       router.push('/')
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Login failed')
+      message.error(error.response?.data?.message || '登录失败')
     } finally {
       loading.value = false
     }

@@ -156,8 +156,12 @@ request.interceptors.response.use(
       } else {
         message.error(data?.message || '请求失败')
       }
+    } else if (error.code === 'ECONNABORTED') {
+      message.error('请求超时，服务器响应缓慢，请稍后重试')
+    } else if (error.request) {
+      message.error('网络连接失败，请检查网络设置')
     } else {
-      message.error('网络错误,请检查您的网络连接')
+      message.error('请求配置错误')
     }
 
     return Promise.reject(error)

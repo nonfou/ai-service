@@ -53,7 +53,7 @@ public class AdminAuthAspect {
         // 获取请求对象
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
-            throw new UnauthorizedException("未授权:无法获取请求上下文");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
         HttpServletRequest request = attributes.getRequest();
 
@@ -61,7 +61,7 @@ public class AdminAuthAspect {
         String authorization = request.getHeader("Authorization");
         if (authorization == null || authorization.isEmpty()) {
             log.warn("未提供认证令牌: {} {}", request.getMethod(), request.getRequestURI());
-            throw new UnauthorizedException("未授权:缺少认证令牌");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
 
         // 提取token
@@ -72,7 +72,7 @@ public class AdminAuthAspect {
         // 验证token有效性
         if (!jwtUtil.validateToken(token)) {
             log.warn("无效的认证令牌: {} {}", request.getMethod(), request.getRequestURI());
-            throw new UnauthorizedException("未授权:无效的认证令牌");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
 
         // 验证ADMIN角色
@@ -81,7 +81,7 @@ public class AdminAuthAspect {
             String email = jwtUtil.getEmailFromToken(token);
             log.warn("非管理员尝试访问管理接口: user={}, role={}, uri={}",
                     email, role, request.getRequestURI());
-            throw new ForbiddenException("未授权:需要管理员权限");
+            throw new ForbiddenException("权限不足，无法访问该资源");
         }
 
         // 检查令牌签发时间,服务重启后需重新登录
@@ -90,12 +90,12 @@ public class AdminAuthAspect {
 
         if (issuedAt == null) {
             log.warn("认证令牌缺少签发时间: uri={}", request.getRequestURI());
-            throw new UnauthorizedException("未授权:无效的认证令牌");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
 
         if (serverStartTime != null && issuedAt.toInstant().isBefore(serverStartTime)) {
             log.info("检测到服务重启前旧令牌,强制要求重新登录: uri={}", request.getRequestURI());
-            throw new UnauthorizedException("登录状态已失效,请重新登录");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
 
         // 权限验证通过,继续执行

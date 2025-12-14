@@ -141,8 +141,10 @@ request.interceptors.response.use(
           // 交由业务页面自行处理
           break
       }
+    } else if (error.code === 'ECONNABORTED') {
+      ElMessage.error('请求超时，服务器响应缓慢，请稍后重试')
     } else if (error.request) {
-      ElMessage.error('网络错误,请检查网络连接')
+      ElMessage.error('网络连接失败，请检查网络设置')
     } else {
       ElMessage.error('请求配置错误')
     }
