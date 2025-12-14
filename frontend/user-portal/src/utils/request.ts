@@ -74,29 +74,9 @@ const promptReLogin = () => {
   return authPromptPromise
 }
 
-/**
- * 从 Cookie 中获取指定名称的值
- */
-const getCookie = (name: string): string | null => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop()?.split(';').shift() || null
-  }
-  return null
-}
-
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    const csrfToken =
-      document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-      getCookie('XSRF-TOKEN')
-
-    if (csrfToken) {
-      config.headers['X-CSRF-Token'] = csrfToken
-    }
-
     return config
   },
   (error) => {

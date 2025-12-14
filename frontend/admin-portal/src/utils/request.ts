@@ -75,15 +75,6 @@ const promptReLogin = () => {
   return authPromptPromise
 }
 
-const getCookie = (name: string): string | null => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) {
-    return parts.pop()?.split(';').shift() || null
-  }
-  return null
-}
-
 const buildBusinessError = (response: AxiosResponse<ApiResponse>) => {
   const error = new Error(response.data?.message || '请求失败')
   Object.assign(error, {
@@ -100,17 +91,6 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-
-    const csrfToken =
-      typeof document !== 'undefined'
-        ? document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content') ||
-          getCookie('XSRF-TOKEN')
-        : null
-
-    if (csrfToken) {
-      config.headers['X-CSRF-Token'] = csrfToken
-    }
-
     return config
   },
   (error) => {
