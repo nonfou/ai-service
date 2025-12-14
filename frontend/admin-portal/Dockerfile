@@ -1,6 +1,5 @@
 # ====================================================
-# 多阶段构建 - AI API Platform Frontend
-# 支持构建 user-portal 和 admin-portal
+# 多阶段构建 - Admin Portal
 # ====================================================
 
 # 第一阶段：构建环境
@@ -21,26 +20,20 @@ RUN pnpm install --frozen-lockfile
 # 复制源码
 COPY . .
 
-# 构建参数：指定要构建的项目
-ARG BUILD_TARGET=all
-
-# 构建前端应用
-RUN if [ "$BUILD_TARGET" = "user" ]; then \
-        pnpm build:user; \
-    elif [ "$BUILD_TARGET" = "admin" ]; then \
-        pnpm build:admin; \
-    else \
-        pnpm build:all; \
-    fi
+# 构建 admin-portal
+RUN pnpm build:admin
 
 # ====================================================
-# 第二阶段：导出构建产物
+# 第二阶段：生产环境
 # ====================================================
-FROM alpine:latest AS exporter
+FROM nginx:alpine
+
+# 安装 curl 用于健康检查
+RUN apk add --no-cache curl
 
 # 复制构建产物
-COPY --from=builder /app/user-portal/dist /dist/user-portal
-COPY --from=builder /app/admin-portal/dist /dist/admin-portal
+COPY --from=builder /app/admin-portal/dist /usr/share/nginx/html
 
-# 默认命令：列出构建产物
-CMD ["ls", "-la", "/dist"]
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

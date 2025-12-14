@@ -161,7 +161,10 @@ services:
   # User Portal 前端 (用户端)
   # ====================================================
   user-portal:
-    image: nginx:alpine
+    build:
+      context: ../frontend
+      dockerfile: user-portal/Dockerfile
+    image: ai-api-platform-user-portal:latest
     container_name: ai-service-user-portal
     restart: unless-stopped
     ports:
@@ -169,7 +172,6 @@ services:
       - "${USER_PORTAL_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/user-portal.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/html/user-portal:/usr/share/nginx/html:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./logs/nginx-user-portal:/var/log/nginx
     depends_on:
@@ -187,14 +189,16 @@ services:
   # Admin Portal 前端 (管理端)
   # ====================================================
   admin-portal:
-    image: nginx:alpine
+    build:
+      context: ../frontend
+      dockerfile: admin-portal/Dockerfile
+    image: ai-api-platform-admin-portal:latest
     container_name: ai-service-admin-portal
     restart: unless-stopped
     ports:
       - "${ADMIN_PORTAL_PORT:-9001}:80"
     volumes:
       - ./nginx/admin-portal.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/html/admin-portal:/usr/share/nginx/html:ro
       - ./logs/nginx-admin-portal:/var/log/nginx
     depends_on:
       - backend
@@ -206,30 +210,6 @@ services:
       start_period: 10s
     networks:
       - ai-service-network
-
-  # ====================================================
-  # 前端构建服务 (用于 CI/CD 或首次部署)
-  # 使用: docker-compose run --rm frontend-builder
-  # ====================================================
-  frontend-builder:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-    image: ai-api-platform-frontend-builder:latest
-    container_name: ai-service-frontend-builder
-    volumes:
-      - ./nginx/html/user-portal:/output/user-portal
-      - ./nginx/html/admin-portal:/output/admin-portal
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Copying user-portal build..."
-        cp -r /dist/user-portal/* /output/user-portal/
-        echo "Copying admin-portal build..."
-        cp -r /dist/admin-portal/* /output/admin-portal/
-        echo "Frontend build completed!"
-    profiles:
-      - build
 
 volumes:
   mysql_data:
