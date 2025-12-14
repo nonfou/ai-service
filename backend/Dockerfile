@@ -19,19 +19,11 @@ WORKDIR /app
 # 安装必要工具
 RUN apk add --no-cache curl
 
-# 创建非 root 用户
-RUN addgroup -S spring && adduser -S spring -G spring
-
 # 创建日志目录
-RUN mkdir -p /app/logs && chown -R spring:spring /app/logs
+RUN mkdir -p /app/logs
 
 # 复制 jar 文件
 COPY --from=builder /app/target/*.jar app.jar
-
-# 设置文件权限
-RUN chown spring:spring app.jar
-
-USER spring:spring
 
 # 暴露端口
 EXPOSE 8080
