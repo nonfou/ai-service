@@ -32,6 +32,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // 启用 CORS (使用 WebConfig 中定义的 CorsFilter)
+            .cors(cors -> {})
+
             // 禁用 CSRF(因为使用 JWT,不需要 CSRF 保护)
             .csrf(AbstractHttpConfigurer::disable)
 
