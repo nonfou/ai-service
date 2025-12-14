@@ -25,11 +25,15 @@ public class BalanceLogService {
 
     /**
      * 获取用户余额变动日志（分页）
+     * 钱包页面只显示充值、退款等交易记录，不显示每次 API 调用的消费记录
+     * API 调用消费记录在控制台页面单独展示
      */
     public Page<BalanceLog> getUserBalanceLogs(Long userId, int pageNum, int pageSize) {
         Page<BalanceLog> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<BalanceLog> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BalanceLog::getUserId, userId)
+                // 排除 consume 类型（API 调用消费），只显示充值、退款、订阅等交易记录
+                .ne(BalanceLog::getType, "consume")
                 .orderByDesc(BalanceLog::getCreatedAt);
 
         return balanceLogMapper.selectPage(page, wrapper);

@@ -456,9 +456,11 @@ const handleSizeChange = (size: number) => {
 // 获取交易类型标签
 const getTransactionTypeTag = (type: string) => {
   const typeMap: Record<string, any> = {
-    'recharge': 'success',  // 充值
-    'consume': 'warning',   // 消费
-    'refund': 'danger',     // 退款
+    'recharge': 'success',      // 充值
+    'refund': 'warning',        // 退款
+    'subscription': 'primary',  // 订阅购买
+    'gift': 'success',          // 赠送
+    'adjustment': 'info',       // 人工调整
   }
   return typeMap[type] || 'info'
 }
@@ -467,8 +469,10 @@ const getTransactionTypeTag = (type: string) => {
 const getTransactionTypeName = (type: string) => {
   const nameMap: Record<string, string> = {
     'recharge': '充值',
-    'consume': '消费',
     'refund': '退款',
+    'subscription': '订阅购买',
+    'gift': '赠送',
+    'adjustment': '余额调整',
   }
   return nameMap[type] || type
 }
