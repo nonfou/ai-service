@@ -154,6 +154,54 @@ services:
     networks:
       - ai-service-network
 
+  # ====================================================
+  # User Portal 前端 (用户端)
+  # ====================================================
+  user-portal:
+    image: nginx:alpine
+    container_name: ai-service-user-portal
+    restart: unless-stopped
+    ports:
+      - "${USER_PORTAL_HTTP_PORT:-80}:80"
+      - "${USER_PORTAL_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/user-portal.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html/user-portal:/usr/share/nginx/html:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ai-service-network
+
+  # ====================================================
+  # Admin Portal 前端 (管理端)
+  # ====================================================
+  admin-portal:
+    image: nginx:alpine
+    container_name: ai-service-admin-portal
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORTAL_PORT:-9001}:80"
+    volumes:
+      - ./nginx/admin-portal.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html/admin-portal:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ai-service-network
+
 volumes:
   mysql_data:
     driver: local
