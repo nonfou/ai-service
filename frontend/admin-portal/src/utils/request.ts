@@ -10,8 +10,19 @@ interface ApiResponse<T = any> {
   data: T
 }
 
+// 获取 API 基础地址
+// 空字符串表示使用相对路径（同源代理），避免 CORS 问题
+const getBaseURL = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  // 明确设置了值（包括空字符串）则使用该值，否则使用开发环境默认值
+  if (envUrl !== undefined) {
+    return envUrl
+  }
+  return 'http://localhost:8080'
+}
+
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  baseURL: getBaseURL(),
   timeout: 30000,
   withCredentials: true
 })

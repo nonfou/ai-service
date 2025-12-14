@@ -2,8 +2,19 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import router from '../router'
 
+// 获取 API 基础地址
+// 空字符串表示使用相对路径（同源代理），避免 CORS 问题
+const getBaseURL = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  // 明确设置了值（包括空字符串）则使用该值，否则使用开发环境默认值
+  if (envUrl !== undefined) {
+    return envUrl
+  }
+  return '/api'
+}
+
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: getBaseURL(),
   timeout: 15000,
   withCredentials: true
 })
