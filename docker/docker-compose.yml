@@ -207,6 +207,30 @@ services:
     networks:
       - ai-service-network
 
+  # ====================================================
+  # 前端构建服务 (用于 CI/CD 或首次部署)
+  # 使用: docker-compose run --rm frontend-builder
+  # ====================================================
+  frontend-builder:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: ai-api-platform-frontend-builder:latest
+    container_name: ai-service-frontend-builder
+    volumes:
+      - ./nginx/html/user-portal:/output/user-portal
+      - ./nginx/html/admin-portal:/output/admin-portal
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Copying user-portal build..."
+        cp -r /dist/user-portal/* /output/user-portal/
+        echo "Copying admin-portal build..."
+        cp -r /dist/admin-portal/* /output/admin-portal/
+        echo "Frontend build completed!"
+    profiles:
+      - build
+
 volumes:
   mysql_data:
     driver: local
