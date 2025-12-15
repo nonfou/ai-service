@@ -46,86 +46,6 @@
           <span class="stat-label">累计消费</span>
           <span class="stat-value">${{ formatCost(statistics.totalSpent) }}</span>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-label">本月消费</span>
-          <span class="stat-value">${{ formatCost(statistics.monthlySpent) }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 配额区域 -->
-    <div class="quota-section" v-loading="quotaLoading">
-      <div class="quota-card">
-        <div class="quota-header">
-          <span class="quota-title">每日配额</span>
-          <span :class="['quota-status', { exceeded: quota.daily.isExceeded }]">
-            {{ quota.daily.isExceeded ? '已超限' : '正常' }}
-          </span>
-        </div>
-        <div class="quota-ring-container">
-          <svg class="quota-ring" viewBox="0 0 120 120">
-            <circle class="ring-bg" cx="60" cy="60" r="52"/>
-            <circle
-              class="ring-progress"
-              cx="60" cy="60" r="52"
-              :style="{
-                strokeDasharray: `${quota.daily.usagePercentage * 3.267} 326.7`,
-                stroke: getQuotaColor(quota.daily.usagePercentage)
-              }"
-            />
-          </svg>
-          <div class="quota-center">
-            <span class="quota-percent">{{ Math.round(quota.daily.usagePercentage) }}%</span>
-            <span class="quota-label">已使用</span>
-          </div>
-        </div>
-        <div class="quota-details">
-          <div class="quota-row">
-            <span>已用 / 总额</span>
-            <span class="quota-value">${{ formatCost(quota.daily.usedAmount) }} / ${{ formatCost(quota.daily.quotaAmount) }}</span>
-          </div>
-          <div class="quota-row">
-            <span>重置时间</span>
-            <span class="quota-value">{{ formatResetTime(quota.daily.resetAt) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="quota-card">
-        <div class="quota-header">
-          <span class="quota-title">每月配额</span>
-          <span :class="['quota-status', { exceeded: quota.monthly.isExceeded }]">
-            {{ quota.monthly.isExceeded ? '已超限' : '正常' }}
-          </span>
-        </div>
-        <div class="quota-ring-container">
-          <svg class="quota-ring" viewBox="0 0 120 120">
-            <circle class="ring-bg" cx="60" cy="60" r="52"/>
-            <circle
-              class="ring-progress"
-              cx="60" cy="60" r="52"
-              :style="{
-                strokeDasharray: `${quota.monthly.usagePercentage * 3.267} 326.7`,
-                stroke: getQuotaColor(quota.monthly.usagePercentage)
-              }"
-            />
-          </svg>
-          <div class="quota-center">
-            <span class="quota-percent">{{ Math.round(quota.monthly.usagePercentage) }}%</span>
-            <span class="quota-label">已使用</span>
-          </div>
-        </div>
-        <div class="quota-details">
-          <div class="quota-row">
-            <span>已用 / 总额</span>
-            <span class="quota-value">${{ formatCost(quota.monthly.usedAmount) }} / ${{ formatCost(quota.monthly.quotaAmount) }}</span>
-          </div>
-          <div class="quota-row">
-            <span>重置时间</span>
-            <span class="quota-value">{{ formatResetTime(quota.monthly.resetAt) }}</span>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -359,7 +279,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { statisticsAPI, balanceAPI, quotaAPI, type StatsSummary, type HourlyStats, type UserQuota } from '../../api'
+import { statisticsAPI, balanceAPI, type StatsSummary, type HourlyStats } from '../../api'
 import { useUserStore } from '../../stores/user'
 
 let Chart: any = null
@@ -378,7 +298,6 @@ const selectedDays = ref(7)
 
 // 加载状态
 const balanceLoading = ref(false)
-const quotaLoading = ref(false)
 const summaryLoading = ref(false)
 const trendLoading = ref(false)
 const modelLoading = ref(false)
@@ -388,13 +307,7 @@ const hourlyLoading = ref(false)
 const balance = ref(0)
 const statistics = ref({
   totalRecharge: 0,
-  totalSpent: 0,
-  monthlySpent: 0
-})
-
-const quota = ref<UserQuota>({
-  daily: { quotaAmount: 0, usedAmount: 0, remainingAmount: 0, usagePercentage: 0, resetAt: '', isExceeded: false, isEnabled: false },
-  monthly: { quotaAmount: 0, usedAmount: 0, remainingAmount: 0, usagePercentage: 0, resetAt: '', isExceeded: false, isEnabled: false }
+  totalSpent: 0
 })
 
 const summary = ref<StatsSummary>({
@@ -438,29 +351,13 @@ const loadBalance = async () => {
     if (statsRes.data) {
       statistics.value = {
         totalRecharge: statsRes.data.totalRecharge || 0,
-        totalSpent: statsRes.data.totalSpent || 0,
-        monthlySpent: statsRes.data.monthlySpent || 0
+        totalSpent: statsRes.data.totalSpent || 0
       }
     }
   } catch (error) {
     console.error('加载余额失败:', error)
   } finally {
     balanceLoading.value = false
-  }
-}
-
-// 加载配额数据
-const loadQuota = async () => {
-  quotaLoading.value = true
-  try {
-    const res = await quotaAPI.getQuota()
-    if (res.data) {
-      quota.value = res.data
-    }
-  } catch (error) {
-    console.error('加载配额失败:', error)
-  } finally {
-    quotaLoading.value = false
   }
 }
 
@@ -741,26 +638,6 @@ const formatTokens = (tokens: number) => {
   return tokens.toString()
 }
 
-const formatResetTime = (resetAt: string) => {
-  if (!resetAt) return '-'
-  const reset = new Date(resetAt)
-  const now = new Date()
-  const diff = reset.getTime() - now.getTime()
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const days = Math.floor(hours / 24)
-
-  if (days > 0) return `${days}天后`
-  if (hours > 0) return `${hours}小时后`
-  if (diff > 0) return '即将重置'
-  return '已重置'
-}
-
-const getQuotaColor = (percentage: number) => {
-  if (percentage >= 80) return '#ef4444'
-  if (percentage >= 60) return '#f59e0b'
-  return '#10b981'
-}
-
 const calculatePercentage = (cost: number) => {
   const total = modelStats.value.reduce((sum, item) => sum + item.totalCost, 0)
   if (total === 0) return '0.0'
@@ -790,7 +667,6 @@ onMounted(async () => {
     // 并行加载数据
     await Promise.all([
       loadBalance(),
-      loadQuota(),
       loadSummary(),
       loadTrend(),
       loadModelStats(),
@@ -989,118 +865,6 @@ onUnmounted(() => {
   width: 1px;
   height: 40px;
   background: rgba(255, 255, 255, 0.2);
-}
-
-/* 配额区域 */
-.quota-section {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.quota-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f3f4f6;
-}
-
-.quota-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.quota-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1e1b4b;
-}
-
-.quota-status {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: #ecfdf5;
-  color: #10b981;
-}
-
-.quota-status.exceeded {
-  background: #fef2f2;
-  color: #ef4444;
-}
-
-.quota-ring-container {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 20px;
-}
-
-.quota-ring {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.ring-bg {
-  fill: none;
-  stroke: #f3f4f6;
-  stroke-width: 10;
-}
-
-.ring-progress {
-  fill: none;
-  stroke-width: 10;
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.5s ease, stroke 0.3s ease;
-}
-
-.quota-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.quota-percent {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1e1b4b;
-  display: block;
-}
-
-.quota-label {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.quota-details {
-  border-top: 1px solid #f3f4f6;
-  padding-top: 16px;
-}
-
-.quota-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 8px;
-}
-
-.quota-row:last-child {
-  margin-bottom: 0;
-}
-
-.quota-value {
-  font-weight: 500;
-  color: #1e1b4b;
 }
 
 /* 核心统计区 */
@@ -1417,10 +1181,6 @@ onUnmounted(() => {
   .account-right {
     flex-wrap: wrap;
     justify-content: center;
-  }
-
-  .quota-section {
-    grid-template-columns: 1fr;
   }
 
   .stats-grid {

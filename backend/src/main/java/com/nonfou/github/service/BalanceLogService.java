@@ -60,7 +60,7 @@ public class BalanceLogService {
 
         Map<String, BigDecimal> stats = new HashMap<>();
         stats.put("totalRecharge", totalRecharge);
-        stats.put("totalConsume", totalConsume);
+        stats.put("totalSpent", totalConsume);
 
         return stats;
     }
