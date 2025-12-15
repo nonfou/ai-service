@@ -926,8 +926,8 @@ public class ChatWorkflowService {
 
         if (estimatedInputTokens > effectiveLimit) {
             String errorMessage = String.format(
-                    "请求内容过长：估算输入 %d tokens，超过模型 %s 的上下文限制（%d tokens）。请缩短对话内容或清理历史消息后重试。",
-                    estimatedInputTokens, model, maxContextTokens);
+                    "prompt token count of %d exceeds the limit of %d",
+                    estimatedInputTokens, maxContextTokens);
             log.warn("Token 预检测失败: model={}, estimated={}, limit={}",
                     model, estimatedInputTokens, maxContextTokens);
             throw new ChatUpstreamException(400, errorMessage);
@@ -952,8 +952,8 @@ public class ChatWorkflowService {
 
         if (estimatedInputTokens > effectiveLimit) {
             String errorMessage = String.format(
-                    "请求内容过长：估算输入 %d tokens，超过模型 %s 的上下文限制（%d tokens）。请缩短对话内容或清理历史消息后重试。",
-                    estimatedInputTokens, model, maxContextTokens);
+                    "prompt token count of %d exceeds the limit of %d",
+                    estimatedInputTokens, maxContextTokens);
             log.warn("Token 预检测失败: model={}, estimated={}, limit={}",
                     model, estimatedInputTokens, maxContextTokens);
             throw new ChatUpstreamException(400, errorMessage);

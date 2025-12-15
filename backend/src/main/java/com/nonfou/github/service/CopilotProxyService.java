@@ -1084,38 +1084,36 @@ public class CopilotProxyService implements ModelProxy {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode errorNode = root.path("error");
-            String code = safeText(errorNode.get("code"));
             String message = safeText(errorNode.get("message"));
 
+            // 处理嵌套的错误消息
             if (StringUtils.hasText(message) && message.trim().startsWith("{")) {
                 try {
                     JsonNode nested = objectMapper.readTree(message);
                     JsonNode nestedError = nested.path("error");
                     if (!nestedError.isMissingNode()) {
-                        if (!StringUtils.hasText(code)) {
-                            code = safeText(nestedError.get("code"));
-                        }
                         message = safeText(nestedError.get("message"));
                     }
                 } catch (Exception ignored) {
                 }
             }
 
-            if (!errorNode.isMissingNode() && !StringUtils.hasText(message)) {
-                message = responseBody;
+            // 直接返回上游 API 的原始错误消息，不进行翻译
+            if (StringUtils.hasText(message)) {
+                return message;
             }
 
             if (!errorNode.isMissingNode()) {
-                return translateFriendlyMessage(message, code);
+                return responseBody;
             }
 
             if (root.has("message")) {
-                return translateFriendlyMessage(safeText(root.get("message")), null);
+                return safeText(root.get("message"));
             }
 
-            return translateFriendlyMessage(responseBody, null);
+            return responseBody;
         } catch (Exception e) {
-            return translateFriendlyMessage(responseBody, null);
+            return responseBody;
         }
     }
 
