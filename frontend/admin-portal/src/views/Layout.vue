@@ -1,84 +1,96 @@
 <template>
-  <el-container class="admin-layout">
+  <div class="admin-layout">
     <!-- 侧边栏 -->
-    <el-aside width="200px" class="sidebar">
-      <div class="logo">
-        <h2>管理后台</h2>
+    <aside class="sidebar">
+      <!-- Logo 区域 -->
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <span class="logo-text">AI API</span>
       </div>
 
-      <el-menu
-        :default-active="currentRoute"
-        router
-        class="sidebar-menu"
-        background-color="#304156"
-        text-color="#bfcbd9"
-        active-text-color="#409EFF"
-      >
-        <el-menu-item index="/overview">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>数据概览</span>
-        </el-menu-item>
+      <!-- 导航菜单 -->
+      <nav class="sidebar-nav">
+        <router-link
+          v-for="item in menuItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: isActiveRoute(item.path) }"
+        >
+          <component :is="item.icon" class="nav-icon" />
+          <span class="nav-text">{{ item.title }}</span>
+        </router-link>
+      </nav>
 
-        <el-menu-item index="/users">
-          <el-icon><User /></el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
-
-        <el-menu-item index="/models">
-          <el-icon><Cpu /></el-icon>
-          <span>模型管理</span>
-        </el-menu-item>
-
-        <el-menu-item index="/plans">
-          <el-icon><ShoppingCart /></el-icon>
-          <span>套餐管理</span>
-        </el-menu-item>
-
-        <el-menu-item index="/orders">
-          <el-icon><Tickets /></el-icon>
-          <span>订单管理</span>
-        </el-menu-item>
-
-        <el-menu-item index="/tickets">
-          <el-icon><ChatDotRound /></el-icon>
-          <span>工单管理</span>
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
+      <!-- 底部用户信息 -->
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">
+            <UserFilled />
+          </div>
+          <div class="user-details">
+            <span class="user-name">{{ adminStore.adminInfo?.username || '管理员' }}</span>
+            <span class="user-role">超级管理员</span>
+          </div>
+        </div>
+      </div>
+    </aside>
 
     <!-- 主内容区 -->
-    <el-container>
-      <!-- 顶部导航 -->
-      <el-header class="header">
+    <div class="main-wrapper">
+      <!-- 顶部导航栏 -->
+      <header class="header">
         <div class="header-left">
-          <span class="breadcrumb">{{ pageTitle }}</span>
+          <h1 class="page-title">{{ pageTitle }}</h1>
         </div>
 
         <div class="header-right">
-          <el-dropdown @command="handleCommand">
-            <span class="user-dropdown">
-              <el-icon><UserFilled /></el-icon>
-              {{ adminStore.adminInfo?.username || '管理员' }}
-              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-            </span>
+          <!-- 通知图标 -->
+          <button class="header-btn">
+            <Bell />
+          </button>
+
+          <!-- 用户下拉菜单 -->
+          <el-dropdown @command="handleCommand" trigger="click">
+            <div class="user-dropdown">
+              <div class="user-avatar-small">
+                <UserFilled />
+              </div>
+              <span class="user-name-header">{{ adminStore.adminInfo?.username || '管理员' }}</span>
+              <ArrowDown class="dropdown-arrow" />
+            </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="logout">
-                  <el-icon><SwitchButton /></el-icon>
+                <el-dropdown-item command="profile">
+                  <User class="dropdown-icon" />
+                  个人信息
+                </el-dropdown-item>
+                <el-dropdown-item command="settings">
+                  <Setting class="dropdown-icon" />
+                  系统设置
+                </el-dropdown-item>
+                <el-dropdown-item divided command="logout">
+                  <SwitchButton class="dropdown-icon" />
                   退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
-      </el-header>
+      </header>
 
       <!-- 内容区域 -->
-      <el-main class="main-content">
+      <main class="main-content">
         <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+      </main>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -94,7 +106,9 @@ import {
   ChatDotRound,
   UserFilled,
   ArrowDown,
-  SwitchButton
+  SwitchButton,
+  Bell,
+  Setting
 } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin'
 import message from '../utils/message'
@@ -103,18 +117,23 @@ const router = useRouter()
 const route = useRoute()
 const adminStore = useAdminStore()
 
-const currentRoute = computed(() => route.path)
+// 菜单项配置
+const menuItems = [
+  { path: '/overview', title: '数据概览', icon: DataAnalysis },
+  { path: '/users', title: '用户管理', icon: User },
+  { path: '/models', title: '模型管理', icon: Cpu },
+  { path: '/plans', title: '套餐管理', icon: ShoppingCart },
+  { path: '/orders', title: '订单管理', icon: Tickets },
+  { path: '/tickets', title: '工单管理', icon: ChatDotRound }
+]
+
+const isActiveRoute = (path: string) => {
+  return route.path === path || route.path.startsWith(path + '/')
+}
 
 const pageTitle = computed(() => {
-  const titleMap: Record<string, string> = {
-    '/overview': '数据概览',
-    '/users': '用户管理',
-    '/models': '模型管理',
-    '/plans': '套餐管理',
-    '/orders': '订单管理',
-    '/tickets': '工单管理'
-  }
-  return titleMap[route.path] || '管理后台'
+  const item = menuItems.find(m => isActiveRoute(m.path))
+  return item?.title || '管理后台'
 })
 
 const handleCommand = async (command: string) => {
@@ -138,77 +157,254 @@ const handleCommand = async (command: string) => {
 
 <style scoped>
 .admin-layout {
+  display: flex;
   height: 100vh;
+  background-color: var(--bg-secondary);
 }
 
+/* ==================== 侧边栏样式 ==================== */
 .sidebar {
-  background-color: #304156;
-  overflow-x: hidden;
+  width: 240px;
+  background: linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-dark) 100%);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
 }
 
-.logo {
-  height: 60px;
+.sidebar-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #263445;
+  color: white;
 }
 
-.logo h2 {
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+/* 导航菜单 */
+.sidebar-nav {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  transition: all var(--transition-normal);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.nav-item:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+}
+
+.nav-item.active {
+  background-color: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.nav-text {
+  white-space: nowrap;
+}
+
+/* 底部用户信息 */
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-normal);
+}
+
+.user-info:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: white;
   font-size: 18px;
-  margin: 0;
 }
 
-.sidebar-menu {
-  border-right: none;
-}
-
-.sidebar-menu .el-menu-item {
-  height: 50px;
-  line-height: 50px;
-}
-
-.header {
+.user-details {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: white;
-  border-bottom: 1px solid var(--border-color-lighter);
-  padding: 0 20px;
+  flex-direction: column;
 }
 
-.header-left .breadcrumb {
-  font-size: 18px;
+.user-name {
+  color: var(--sidebar-text-active);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.user-role {
+  color: var(--sidebar-text);
+  font-size: 12px;
+}
+
+/* ==================== 主内容区样式 ==================== */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 顶部导航栏 */
+.header {
+  height: 64px;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
+  margin: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 8px;
 }
 
+.header-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background-color: transparent;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.header-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* 用户下拉菜单 */
 .user-dropdown {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  color: var(--text-primary);
-  font-size: 14px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
+  transition: background-color var(--transition-fast);
 }
 
 .user-dropdown:hover {
-  background-color: var(--background-color-base);
+  background-color: var(--bg-tertiary);
 }
 
+.user-avatar-small {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+}
+
+.user-name-header {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.dropdown-arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+}
+
+.dropdown-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+}
+
+/* 主内容区 */
 .main-content {
-  background-color: #f0f2f5;
-  padding: 20px;
+  flex: 1;
+  padding: 24px;
   overflow-y: auto;
+  background-color: var(--bg-secondary);
+}
+
+/* ==================== Element Plus 下拉菜单覆盖 ==================== */
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+:deep(.el-dropdown-menu__item:hover) {
+  background-color: var(--bg-tertiary);
+  color: var(--primary-color);
 }
 </style>

@@ -1,49 +1,71 @@
 <template>
-  <div class="plans-container">
-    <el-card class="action-card">
-      <el-button type="primary" @click="handleCreate">新建套餐</el-button>
-    </el-card>
+  <div class="plans-page">
+    <!-- 页面头部 -->
+    <PageHeader title="套餐管理" description="管理用户订阅套餐和定价方案">
+      <template #actions>
+        <el-button type="primary" @click="handleCreate">
+          <el-icon><Plus /></el-icon>
+          新建套餐
+        </el-button>
+      </template>
+    </PageHeader>
 
-    <el-card class="table-card">
-      <el-table :data="plans" v-loading="loading" stripe style="width: 100%">
+    <!-- 套餐列表 -->
+    <div class="table-container">
+      <el-table :data="plans" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="planName" label="套餐标识" width="150" />
-        <el-table-column prop="displayName" label="显示名称" width="150" />
-        <el-table-column prop="price" label="价格" width="100">
-          <template #default="{ row }">¥{{ row.price }}</template>
-        </el-table-column>
-        <el-table-column prop="quotaAmount" label="额度" width="100">
-          <template #default="{ row }">¥{{ row.quotaAmount }}</template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="planName" label="套餐标识" width="150">
           <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '启用' : '禁用' }}
-            </el-tag>
+            <span class="plan-id">{{ row.planName }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sortOrder" label="排序" width="80" />
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column prop="displayName" label="显示名称" width="150">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button
-              :type="row.status === 1 ? 'warning' : 'success'"
-              size="small"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.status === 1 ? '禁用' : '启用' }}
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <span class="plan-name">{{ row.displayName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="price" label="价格" width="100" align="right">
+          <template #default="{ row }">
+            <span class="price-value">¥{{ row.price }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="quotaAmount" label="额度" width="100" align="right">
+          <template #default="{ row }">
+            <span class="quota-value">¥{{ row.quotaAmount }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <span class="status-badge" :class="row.status === 1 ? 'status-active' : 'status-inactive'">
+              {{ row.status === 1 ? '启用' : '禁用' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sortOrder" label="排序" width="80" align="center" />
+        <el-table-column label="操作" width="240" fixed="right" align="center">
+          <template #default="{ row }">
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button
+                :type="row.status === 1 ? 'warning' : 'success'"
+                size="small"
+                @click="handleToggleStatus(row)"
+              >
+                {{ row.status === 1 ? '禁用' : '启用' }}
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
+    </div>
 
     <!-- 创建/编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="editMode ? '编辑套餐' : '新建套餐'"
-      width="600px"
+      width="560px"
+      class="plan-dialog"
     >
       <el-form :model="planForm" label-width="100px">
         <el-form-item label="套餐标识">
@@ -53,37 +75,46 @@
           <el-input v-model="planForm.displayName" placeholder="如: 体验卡" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="planForm.description" type="textarea" :rows="2" />
+          <el-input v-model="planForm.description" type="textarea" :rows="2" placeholder="套餐描述" />
         </el-form-item>
-        <el-form-item label="原价">
-          <el-input-number v-model="planForm.originalPrice" :precision="2" :step="10" />
-        </el-form-item>
-        <el-form-item label="现价">
-          <el-input-number v-model="planForm.price" :precision="2" :step="10" />
-        </el-form-item>
-        <el-form-item label="额度">
-          <el-input-number v-model="planForm.quotaAmount" :precision="2" :step="10" />
-        </el-form-item>
-        <el-form-item label="功能特性">
-          <div class="features-editor">
-            <div v-for="(_feature, index) in planForm.features" :key="index" class="feature-item">
-              <el-input
-                v-model="planForm.features![index]"
-                placeholder="如: 30天有效期"
-                style="width: calc(100% - 80px)"
-              />
-              <el-button type="danger" size="small" @click="removeFeature(index)" style="margin-left: 10px">
-                删除
-              </el-button>
-            </div>
-            <el-button type="primary" size="small" @click="addFeature" style="margin-top: 10px">
-              + 添加特性
+
+        <el-divider content-position="left">
+          <span class="divider-text">价格设置</span>
+        </el-divider>
+
+        <div class="price-grid">
+          <el-form-item label="原价">
+            <el-input-number v-model="planForm.originalPrice" :precision="2" :step="10" :min="0" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="现价">
+            <el-input-number v-model="planForm.price" :precision="2" :step="10" :min="0" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="额度">
+            <el-input-number v-model="planForm.quotaAmount" :precision="2" :step="10" :min="0" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="排序">
+            <el-input-number v-model="planForm.sortOrder" :min="0" style="width: 100%" />
+          </el-form-item>
+        </div>
+
+        <el-divider content-position="left">
+          <span class="divider-text">功能特性</span>
+        </el-divider>
+
+        <div class="features-editor">
+          <div v-for="(_feature, index) in planForm.features" :key="index" class="feature-item">
+            <el-input
+              v-model="planForm.features![index]"
+              placeholder="如: 30天有效期"
+            />
+            <el-button type="danger" size="small" @click="removeFeature(index)">
+              删除
             </el-button>
           </div>
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number v-model="planForm.sortOrder" :min="0" />
-        </el-form-item>
+          <el-button type="primary" size="small" @click="addFeature" class="add-feature-btn">
+            + 添加特性
+          </el-button>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -96,8 +127,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import { adminAPI, type SubscriptionPlan } from '../api'
 import message from '../utils/message'
+import PageHeader from '../components/PageHeader.vue'
 
 const loading = ref(false)
 const plans = ref<SubscriptionPlan[]>([])
@@ -218,18 +251,82 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.plans-container {
-  padding: 0;
+.plans-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.action-card {
-  margin-bottom: 20px;
+/* 表格容器 */
+.table-container {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
 }
 
-.table-card {
-  margin-bottom: 20px;
+.plan-id {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
+.plan-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.price-value {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.quota-value {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+/* 状态徽章 */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-active {
+  background: var(--success-bg);
+  color: var(--success-color);
+}
+
+.status-inactive {
+  background: var(--danger-bg);
+  color: var(--danger-color);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* 对话框样式 */
+.divider-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 24px;
+}
+
+/* 功能特性编辑器 */
 .features-editor {
   width: 100%;
 }
@@ -237,6 +334,21 @@ onMounted(() => {
 .feature-item {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.feature-item .el-input {
+  flex: 1;
+}
+
+.add-feature-btn {
+  margin-top: 8px;
+}
+
+@media (max-width: 600px) {
+  .price-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -9,6 +9,30 @@
         <el-table-column prop="priceMultiplier" label="价格倍率" width="100">
           <template #default="{ row }">{{ row.priceMultiplier }}x</template>
         </el-table-column>
+        <el-table-column label="输入价格" width="100">
+          <template #default="{ row }">
+            <span v-if="row.inputTokenPrice != null">${{ row.inputTokenPrice }}</span>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="输出价格" width="100">
+          <template #default="{ row }">
+            <span v-if="row.outputTokenPrice != null">${{ row.outputTokenPrice }}</span>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="缓存读取" width="100">
+          <template #default="{ row }">
+            <span v-if="row.cacheReadTokenPrice != null">${{ row.cacheReadTokenPrice }}</span>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="缓存写入" width="100">
+          <template #default="{ row }">
+            <span v-if="row.cacheWriteTokenPrice != null">${{ row.cacheWriteTokenPrice }}</span>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -35,9 +59,9 @@
     <el-dialog
       v-model="dialogVisible"
       title="编辑模型"
-      width="500px"
+      width="600px"
     >
-      <el-form :model="modelForm" label-width="100px">
+      <el-form :model="modelForm" label-width="120px">
         <el-form-item label="模型名称">
           <el-input v-model="modelForm.modelName" disabled />
         </el-form-item>
@@ -50,6 +74,44 @@
         <el-form-item label="价格倍率">
           <el-input-number v-model="modelForm.priceMultiplier" :precision="2" :step="0.1" :min="0" />
         </el-form-item>
+        <el-divider content-position="left">Token 价格配置（每百万 Token / USD）</el-divider>
+        <el-form-item label="输入价格">
+          <el-input-number
+            v-model="modelForm.inputTokenPrice"
+            :precision="4"
+            :step="0.1"
+            :min="0"
+            placeholder="输入token价格"
+          />
+        </el-form-item>
+        <el-form-item label="输出价格">
+          <el-input-number
+            v-model="modelForm.outputTokenPrice"
+            :precision="4"
+            :step="0.1"
+            :min="0"
+            placeholder="输出token价格"
+          />
+        </el-form-item>
+        <el-form-item label="缓存读取价格">
+          <el-input-number
+            v-model="modelForm.cacheReadTokenPrice"
+            :precision="4"
+            :step="0.01"
+            :min="0"
+            placeholder="缓存读取价格（可选）"
+          />
+        </el-form-item>
+        <el-form-item label="缓存写入价格">
+          <el-input-number
+            v-model="modelForm.cacheWriteTokenPrice"
+            :precision="4"
+            :step="0.01"
+            :min="0"
+            placeholder="缓存写入价格（可选）"
+          />
+        </el-form-item>
+        <el-divider />
         <el-form-item label="描述">
           <el-input v-model="modelForm.description" type="textarea" :rows="3" />
         </el-form-item>
@@ -77,6 +139,10 @@ const modelForm = reactive<Partial<Model>>({
   displayName: '',
   provider: '',
   priceMultiplier: 1.0,
+  inputTokenPrice: undefined,
+  outputTokenPrice: undefined,
+  cacheReadTokenPrice: undefined,
+  cacheWriteTokenPrice: undefined,
   description: ''
 })
 
@@ -131,5 +197,9 @@ onMounted(() => {
 
 .table-card {
   margin-bottom: 20px;
+}
+
+.text-gray {
+  color: #909399;
 }
 </style>

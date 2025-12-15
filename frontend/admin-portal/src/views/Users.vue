@@ -1,34 +1,40 @@
 <template>
   <div class="users-page">
+    <!-- 页面头部 -->
+    <PageHeader title="用户管理" description="管理平台用户账户、余额和使用情况" />
+
     <!-- 筛选条件 -->
-    <el-card style="margin-bottom: 20px">
-      <el-form :inline="true">
-        <el-form-item label="用户ID">
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-item">
+          <label class="filter-label">用户ID</label>
           <el-input
             v-model="userIdFilter"
             placeholder="请输入用户ID"
             clearable
-            style="width: 150px"
+            style="width: 160px"
           />
-        </el-form-item>
+        </div>
 
-        <el-form-item label="用户名">
+        <div class="filter-item">
+          <label class="filter-label">用户名</label>
           <el-input
             v-model="usernameFilter"
             placeholder="请输入用户名"
             clearable
-            style="width: 150px"
+            style="width: 160px"
           />
-        </el-form-item>
+        </div>
 
-        <el-form-item label="状态">
+        <div class="filter-item">
+          <label class="filter-label">状态</label>
           <el-select v-model="statusFilter" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="正常" :value="1" />
             <el-option label="禁用" :value="0" />
           </el-select>
-        </el-form-item>
+        </div>
 
-        <el-form-item>
+        <div class="filter-actions">
           <el-button type="primary" @click="handleSearch">
             <el-icon><Search /></el-icon>
             查询
@@ -37,22 +43,24 @@
             <el-icon><RefreshLeft /></el-icon>
             重置
           </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+        </div>
+      </div>
+    </div>
 
     <!-- 用户列表 -->
-    <el-card>
-      <el-table :data="users" v-loading="loading" border>
+    <div class="table-container">
+      <el-table :data="users" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" width="150" />
+        <el-table-column prop="username" label="用户名" width="150">
+          <template #default="{ row }">
+            <span class="user-name-cell">{{ row.username }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="email" label="邮箱" width="200" />
 
         <el-table-column prop="balance" label="余额" width="120" align="right">
           <template #default="{ row }">
-            <span style="color: var(--success-color); font-weight: 600">
-              ¥{{ row.balance }}
-            </span>
+            <span class="balance-value">¥{{ row.balance }}</span>
           </template>
         </el-table-column>
 
@@ -64,9 +72,9 @@
 
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
+            <span class="status-badge" :class="row.status === 1 ? 'status-active' : 'status-inactive'">
               {{ row.status === 1 ? '正常' : '禁用' }}
-            </el-tag>
+            </span>
           </template>
         </el-table-column>
 
@@ -77,135 +85,163 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="300" fixed="right" align="center">
+        <el-table-column label="操作" width="280" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button size="small" @click="viewUser(row)">
-              <el-icon><View /></el-icon>
-              详情
-            </el-button>
-            <el-button size="small" type="primary" @click="adjustBalance(row)">
-              调整余额
-            </el-button>
-            <el-button
-              size="small"
-              :type="row.status === 1 ? 'danger' : 'success'"
-              @click="toggleUserStatus(row)"
-            >
-              {{ row.status === 1 ? '禁用' : '启用' }}
-            </el-button>
+            <div class="action-buttons">
+              <el-button size="small" @click="viewUser(row)">
+                <el-icon><View /></el-icon>
+                详情
+              </el-button>
+              <el-button size="small" type="primary" @click="adjustBalance(row)">
+                调整余额
+              </el-button>
+              <el-button
+                size="small"
+                :type="row.status === 1 ? 'danger' : 'success'"
+                @click="toggleUserStatus(row)"
+              >
+                {{ row.status === 1 ? '禁用' : '启用' }}
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 20px; justify-content: flex-end"
-        @current-change="fetchUsers"
-        @size-change="fetchUsers"
-      />
-    </el-card>
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="fetchUsers"
+          @size-change="fetchUsers"
+        />
+      </div>
+    </div>
 
-    <!-- 用户详情对话框 - 多Tab结构 -->
+    <!-- 用户详情对话框 -->
     <el-dialog
       v-model="detailDialogVisible"
       title="用户详细信息"
       width="90%"
       :close-on-click-modal="false"
+      class="user-detail-dialog"
     >
       <el-tabs v-model="activeTab" @tab-change="handleTabChange" v-if="currentUser">
         <!-- Tab 1: 基础信息 -->
         <el-tab-pane label="基础信息" name="basic">
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="用户ID">{{ currentUser.id }}</el-descriptions-item>
-            <el-descriptions-item label="用户名">{{ currentUser.username }}</el-descriptions-item>
-            <el-descriptions-item label="邮箱">{{ currentUser.email }}</el-descriptions-item>
-            <el-descriptions-item label="状态">
-              <el-tag :type="currentUser.status === 1 ? 'success' : 'danger'">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">用户ID</span>
+              <span class="info-value">{{ currentUser.id }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">用户名</span>
+              <span class="info-value">{{ currentUser.username }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">邮箱</span>
+              <span class="info-value">{{ currentUser.email }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">状态</span>
+              <span class="status-badge" :class="currentUser.status === 1 ? 'status-active' : 'status-inactive'">
                 {{ currentUser.status === 1 ? '正常' : '禁用' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="余额">
-              <span style="color: var(--el-color-success); font-weight: 600">
-                ¥{{ currentUser.balance }}
               </span>
-            </el-descriptions-item>
-            <el-descriptions-item label="累计充值">¥{{ currentUser.totalRecharge || 0 }}</el-descriptions-item>
-            <el-descriptions-item label="注册时间">{{ currentUser.createdAt }}</el-descriptions-item>
-            <el-descriptions-item label="最后登录">{{ currentUser.lastLoginAt || '-' }}</el-descriptions-item>
-          </el-descriptions>
+            </div>
+            <div class="info-item">
+              <span class="info-label">余额</span>
+              <span class="info-value balance-value">¥{{ currentUser.balance }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">累计充值</span>
+              <span class="info-value">¥{{ currentUser.totalRecharge || 0 }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">注册时间</span>
+              <span class="info-value">{{ currentUser.createdAt }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">最后登录</span>
+              <span class="info-value">{{ currentUser.lastLoginAt || '-' }}</span>
+            </div>
+          </div>
         </el-tab-pane>
 
         <!-- Tab 2: 订单记录 -->
         <el-tab-pane label="订单记录" name="orders">
-          <el-table :data="userOrders" v-loading="ordersLoading" border>
+          <el-table :data="userOrders" v-loading="ordersLoading" stripe>
             <el-table-column prop="orderNo" label="订单号" width="200" />
             <el-table-column prop="amount" label="金额" width="120" align="right">
               <template #default="{ row }">¥{{ row.amount }}</template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.status === 1 ? 'success' : row.status === 0 ? 'warning' : 'danger'">
-                  {{ row.status === 1 ? '已支付' : row.status === 0 ? '待支付' : '已取消' }}
-                </el-tag>
+                <span class="status-badge" :class="getOrderStatusClass(row.status)">
+                  {{ getOrderStatusText(row.status) }}
+                </span>
               </template>
             </el-table-column>
             <el-table-column prop="payMethod" label="支付方式" width="120" />
             <el-table-column prop="createdAt" label="创建时间" width="180" />
             <el-table-column prop="payTime" label="支付时间" width="180" />
           </el-table>
-          <el-pagination
-            v-model:current-page="ordersPagination.page"
-            v-model:page-size="ordersPagination.pageSize"
-            :total="ordersPagination.total"
-            layout="prev, pager, next"
-            style="margin-top: 16px; justify-content: flex-end"
-            @current-change="loadUserOrders"
-          />
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="ordersPagination.page"
+              v-model:page-size="ordersPagination.pageSize"
+              :total="ordersPagination.total"
+              layout="prev, pager, next"
+              @current-change="loadUserOrders"
+            />
+          </div>
         </el-tab-pane>
 
         <!-- Tab 3: Token消耗 -->
         <el-tab-pane label="Token消耗" name="tokens">
-          <el-row :gutter="20" style="margin-bottom: 20px">
-            <el-col :span="6">
-              <el-statistic title="总消耗Token" :value="tokenStats.totalTokens" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="今日消耗" :value="tokenStats.todayTokens" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="总费用" :value="tokenStats.totalCost" prefix="¥" :precision="2" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="今日费用" :value="tokenStats.todayCost" prefix="¥" :precision="2" />
-            </el-col>
-          </el-row>
+          <div class="stats-grid">
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">{{ tokenStats.totalTokens.toLocaleString() }}</div>
+              <div class="mini-stat-label">总消耗Token</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">{{ tokenStats.todayTokens.toLocaleString() }}</div>
+              <div class="mini-stat-label">今日消耗</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">¥{{ tokenStats.totalCost.toFixed(2) }}</div>
+              <div class="mini-stat-label">总费用</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">¥{{ tokenStats.todayCost.toFixed(2) }}</div>
+              <div class="mini-stat-label">今日费用</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">{{ tokenStats.totalCalls.toLocaleString() }}</div>
+              <div class="mini-stat-label">总调用次数</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">{{ tokenStats.todayCalls.toLocaleString() }}</div>
+              <div class="mini-stat-label">今日调用</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">{{ tokenStats.totalInputTokens.toLocaleString() }}</div>
+              <div class="mini-stat-label">输入Token</div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-value">{{ tokenStats.totalOutputTokens.toLocaleString() }}</div>
+              <div class="mini-stat-label">输出Token</div>
+            </div>
+          </div>
 
-          <el-row :gutter="20" style="margin-bottom: 20px">
-            <el-col :span="6">
-              <el-statistic title="总调用次数" :value="tokenStats.totalCalls" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="今日调用" :value="tokenStats.todayCalls" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="输入Token" :value="tokenStats.totalInputTokens" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="输出Token" :value="tokenStats.totalOutputTokens" />
-            </el-col>
-          </el-row>
-
-          <div ref="tokenTrendChartRef" style="height: 400px; margin-top: 20px"></div>
+          <div ref="tokenTrendChartRef" class="chart-container"></div>
         </el-tab-pane>
 
         <!-- Tab 4: 模型使用 -->
         <el-tab-pane label="模型使用" name="models">
-          <el-table :data="modelStats" v-loading="modelStatsLoading" border>
+          <el-table :data="modelStats" v-loading="modelStatsLoading" stripe>
             <el-table-column prop="displayName" label="模型" width="200" />
             <el-table-column prop="calls" label="调用次数" width="120" align="right" />
             <el-table-column prop="successRate" label="成功率" width="100" align="right">
@@ -219,12 +255,12 @@
             <el-table-column prop="lastUsedAt" label="最后使用" width="180" />
           </el-table>
 
-          <div ref="modelPieChartRef" style="height: 400px; margin-top: 20px"></div>
+          <div ref="modelPieChartRef" class="chart-container"></div>
         </el-tab-pane>
 
         <!-- Tab 5: API调用日志 -->
         <el-tab-pane label="调用日志" name="logs">
-          <el-table :data="apiCallLogs" v-loading="logsLoading" border>
+          <el-table :data="apiCallLogs" v-loading="logsLoading" stripe>
             <el-table-column prop="model" label="模型" width="180" />
             <el-table-column prop="inputTokens" label="输入Token" width="120" align="right" />
             <el-table-column prop="outputTokens" label="输出Token" width="120" align="right" />
@@ -234,36 +270,37 @@
             <el-table-column prop="duration" label="耗时(ms)" width="100" align="right" />
             <el-table-column prop="status" label="状态" width="80" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.status === 1 ? 'success' : 'danger'">
+                <span class="status-badge" :class="row.status === 1 ? 'status-active' : 'status-inactive'">
                   {{ row.status === 1 ? '成功' : '失败' }}
-                </el-tag>
+                </span>
               </template>
             </el-table-column>
             <el-table-column prop="createdAt" label="时间" width="180" />
           </el-table>
-          <el-pagination
-            v-model:current-page="logsPagination.page"
-            v-model:page-size="logsPagination.pageSize"
-            :total="logsPagination.total"
-            layout="prev, pager, next"
-            style="margin-top: 16px; justify-content: flex-end"
-            @current-change="loadApiCallLogs"
-          />
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="logsPagination.page"
+              v-model:page-size="logsPagination.pageSize"
+              :total="logsPagination.total"
+              layout="prev, pager, next"
+              @current-change="loadApiCallLogs"
+            />
+          </div>
         </el-tab-pane>
 
         <!-- Tab 6: 余额日志 -->
         <el-tab-pane label="余额日志" name="balance">
-          <el-table :data="balanceLogs" v-loading="balanceLogsLoading" border>
+          <el-table :data="balanceLogs" v-loading="balanceLogsLoading" stripe>
             <el-table-column prop="type" label="类型" width="120">
               <template #default="{ row }">
-                <el-tag :type="row.amount > 0 ? 'success' : 'warning'">
+                <span class="status-badge" :class="row.amount > 0 ? 'status-active' : 'status-warning'">
                   {{ row.type }}
-                </el-tag>
+                </span>
               </template>
             </el-table-column>
             <el-table-column prop="amount" label="变动金额" width="150" align="right">
               <template #default="{ row }">
-                <span :style="{ color: row.amount > 0 ? 'var(--el-color-success)' : 'var(--el-color-warning)' }">
+                <span :class="row.amount > 0 ? 'text-success' : 'text-warning'">
                   {{ row.amount > 0 ? '+' : '' }}¥{{ row.amount }}
                 </span>
               </template>
@@ -274,28 +311,27 @@
             <el-table-column prop="remark" label="备注" />
             <el-table-column prop="createdAt" label="时间" width="180" />
           </el-table>
-          <el-pagination
-            v-model:current-page="balanceLogsPagination.page"
-            v-model:page-size="balanceLogsPagination.pageSize"
-            :total="balanceLogsPagination.total"
-            layout="prev, pager, next"
-            style="margin-top: 16px; justify-content: flex-end"
-            @current-change="loadBalanceLogs"
-          />
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="balanceLogsPagination.page"
+              v-model:page-size="balanceLogsPagination.pageSize"
+              :total="balanceLogsPagination.total"
+              layout="prev, pager, next"
+              @current-change="loadBalanceLogs"
+            />
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-dialog>
 
     <!-- 调整余额对话框 -->
-    <el-dialog v-model="balanceDialogVisible" title="调整用户余额" width="500px">
+    <el-dialog v-model="balanceDialogVisible" title="调整用户余额" width="480px" class="balance-dialog">
       <el-form :model="balanceForm" label-width="100px" v-if="currentUser">
         <el-form-item label="用户名">
-          <span>{{ currentUser.username }}</span>
+          <span class="form-text">{{ currentUser.username }}</span>
         </el-form-item>
         <el-form-item label="当前余额">
-          <span style="color: var(--success-color); font-weight: 600">
-            ¥{{ currentUser.balance }}
-          </span>
+          <span class="balance-value">¥{{ currentUser.balance }}</span>
         </el-form-item>
         <el-form-item label="调整类型">
           <el-radio-group v-model="balanceForm.type">
@@ -321,7 +357,7 @@
           />
         </el-form-item>
         <el-form-item label="调整后余额">
-          <span style="color: var(--warning-color); font-weight: 600">
+          <span class="text-warning" style="font-weight: 600">
             ¥{{ calculatedBalance }}
           </span>
         </el-form-item>
@@ -344,6 +380,7 @@ import { Search, RefreshLeft, View } from '@element-plus/icons-vue'
 import { adminAPI, type User, type UserTokenStatsResponse, type ModelStatsResponse, type RechargeOrder, type ApiCall, type BalanceLog } from '../api'
 import * as echarts from 'echarts'
 import message from '../utils/message'
+import PageHeader from '../components/PageHeader.vue'
 
 const loading = ref(false)
 const adjusting = ref(false)
@@ -412,6 +449,18 @@ const calculatedBalance = computed(() => {
   const amount = balanceForm.value.amount || 0
   return balanceForm.value.type === 'add' ? current + amount : current - amount
 })
+
+const getOrderStatusClass = (status: number) => {
+  if (status === 1) return 'status-active'
+  if (status === 0) return 'status-warning'
+  return 'status-inactive'
+}
+
+const getOrderStatusText = (status: number) => {
+  if (status === 1) return '已支付'
+  if (status === 0) return '待支付'
+  return '已取消'
+}
 
 const fetchUsers = async () => {
   try {
@@ -575,7 +624,12 @@ const renderTokenTrendChart = (data: any[]) => {
   const option = {
     title: {
       text: 'Token消耗趋势 (最近7天)',
-      left: 'center'
+      left: 'center',
+      textStyle: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: '#0f172a'
+      }
     },
     tooltip: {
       trigger: 'axis',
@@ -590,7 +644,8 @@ const renderTokenTrendChart = (data: any[]) => {
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '10%',
+      bottom: '15%',
+      top: '15%',
       containLabel: true
     },
     xAxis: {
@@ -616,21 +671,21 @@ const renderTokenTrendChart = (data: any[]) => {
         type: 'line',
         data: data.map(item => item.inputTokens),
         smooth: true,
-        itemStyle: { color: '#5470c6' }
+        itemStyle: { color: '#6366f1' }
       },
       {
         name: '输出Token',
         type: 'line',
         data: data.map(item => item.outputTokens),
         smooth: true,
-        itemStyle: { color: '#91cc75' }
+        itemStyle: { color: '#10b981' }
       },
       {
         name: '费用',
         type: 'bar',
         yAxisIndex: 1,
         data: data.map(item => item.cost),
-        itemStyle: { color: '#fac858' }
+        itemStyle: { color: '#f59e0b' }
       }
     ]
   }
@@ -650,7 +705,12 @@ const renderModelPieChart = (data: ModelStatsResponse[]) => {
   const option = {
     title: {
       text: '模型使用占比',
-      left: 'center'
+      left: 'center',
+      textStyle: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: '#0f172a'
+      }
     },
     tooltip: {
       trigger: 'item',
@@ -661,6 +721,7 @@ const renderModelPieChart = (data: ModelStatsResponse[]) => {
       left: 'left',
       top: 'middle'
     },
+    color: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'],
     series: [
       {
         name: '调用次数',
@@ -765,10 +826,202 @@ onMounted(() => {
 
 <style scoped>
 .users-page {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-:deep(.el-pagination) {
+/* 筛选栏 */
+.filter-bar {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  border: 1px solid var(--border-light);
+}
+
+.filter-row {
   display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* 表格容器 */
+.table-container {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.user-name-cell {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.balance-value {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.pagination-wrapper {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-light);
+}
+
+/* 状态徽章 */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-active {
+  background: var(--success-bg);
+  color: var(--success-color);
+}
+
+.status-inactive {
+  background: var(--danger-bg);
+  color: var(--danger-color);
+}
+
+.status-warning {
+  background: var(--warning-bg);
+  color: var(--warning-color);
+}
+
+/* 文本颜色 */
+.text-success {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.text-warning {
+  color: var(--warning-color);
+  font-weight: 600;
+}
+
+/* 信息网格 */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.info-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.info-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 统计网格 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.mini-stat-card {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.mini-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.mini-stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 图表容器 */
+.chart-container {
+  height: 400px;
+  margin-top: 24px;
+}
+
+/* 表单文本 */
+.form-text {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+    margin-top: 12px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

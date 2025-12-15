@@ -1,26 +1,31 @@
 <template>
   <div class="orders-page">
+    <!-- 页面头部 -->
+    <PageHeader title="订单管理" description="管理用户充值订单、退款和支付状态" />
+
     <!-- 筛选条件 -->
-    <el-card style="margin-bottom: 20px">
-      <el-form :inline="true">
-        <el-form-item label="订单号">
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-item">
+          <label class="filter-label">订单号</label>
           <el-input
             v-model="orderNoFilter"
             placeholder="请输入订单号"
             clearable
             style="width: 200px"
           />
-        </el-form-item>
+        </div>
 
-        <el-form-item label="状态">
+        <div class="filter-item">
+          <label class="filter-label">状态</label>
           <el-select v-model="statusFilter" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="待支付" :value="0" />
             <el-option label="已支付" :value="1" />
             <el-option label="已取消" :value="2" />
           </el-select>
-        </el-form-item>
+        </div>
 
-        <el-form-item>
+        <div class="filter-actions">
           <el-button type="primary" @click="handleSearch">
             <el-icon><Search /></el-icon>
             查询
@@ -29,35 +34,37 @@
             <el-icon><RefreshLeft /></el-icon>
             重置
           </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+        </div>
+      </div>
+    </div>
 
     <!-- 订单列表 -->
-    <el-card>
-      <el-table :data="orders" v-loading="loading" border>
+    <div class="table-container">
+      <el-table :data="orders" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="orderNo" label="订单号" width="200" />
+        <el-table-column prop="orderNo" label="订单号" width="200">
+          <template #default="{ row }">
+            <span class="order-no">{{ row.orderNo }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="amount" label="金额" width="120" align="right">
           <template #default="{ row }">
-            <span style="color: var(--success-color); font-weight: 600">
-              ¥{{ row.amount }}
-            </span>
+            <span class="amount-value">¥{{ row.amount }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="payMethod" label="支付方式" width="120">
           <template #default="{ row }">
-            {{ getPayMethodText(row.payMethod) }}
+            <span class="pay-method-badge">{{ getPayMethodText(row.payMethod) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
+            <span class="status-badge" :class="getStatusClass(row.status)">
               {{ getStatusText(row.status) }}
-            </el-tag>
+            </span>
           </template>
         </el-table-column>
 
@@ -70,72 +77,90 @@
 
         <el-table-column label="操作" width="260" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button size="small" @click="viewOrder(row)">
-              <el-icon><View /></el-icon>
-              详情
-            </el-button>
-            <el-button
-              v-if="row.status === 0"
-              size="small"
-              type="success"
-              @click="completeOrder(row)"
-            >
-              完成订单
-            </el-button>
-            <el-button
-              v-if="row.status === 1"
-              size="small"
-              type="danger"
-              @click="refundOrder(row)"
-            >
-              退款
-            </el-button>
+            <div class="action-buttons">
+              <el-button size="small" @click="viewOrder(row)">
+                <el-icon><View /></el-icon>
+                详情
+              </el-button>
+              <el-button
+                v-if="row.status === 0"
+                size="small"
+                type="success"
+                @click="completeOrder(row)"
+              >
+                完成订单
+              </el-button>
+              <el-button
+                v-if="row.status === 1"
+                size="small"
+                type="danger"
+                @click="refundOrder(row)"
+              >
+                退款
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 20px; justify-content: flex-end"
-        @current-change="fetchOrders"
-        @size-change="fetchOrders"
-      />
-    </el-card>
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="fetchOrders"
+          @size-change="fetchOrders"
+        />
+      </div>
+    </div>
 
     <!-- 订单详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="订单详情" width="600px">
-      <el-descriptions :column="2" border v-if="currentOrder">
-        <el-descriptions-item label="订单ID">{{ currentOrder.id }}</el-descriptions-item>
-        <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
-        <el-descriptions-item label="金额">¥{{ currentOrder.amount }}</el-descriptions-item>
-        <el-descriptions-item label="支付方式">
-          {{ getPayMethodText(currentOrder.payMethod) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <el-tag :type="getStatusType(currentOrder.status)">
+    <el-dialog v-model="detailDialogVisible" title="订单详情" width="560px">
+      <div class="info-grid" v-if="currentOrder">
+        <div class="info-item">
+          <span class="info-label">订单ID</span>
+          <span class="info-value">{{ currentOrder.id }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">订单号</span>
+          <span class="info-value order-no">{{ currentOrder.orderNo }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">金额</span>
+          <span class="info-value amount-value">¥{{ currentOrder.amount }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">支付方式</span>
+          <span class="info-value">{{ getPayMethodText(currentOrder.payMethod) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">状态</span>
+          <span class="status-badge" :class="getStatusClass(currentOrder.status)">
             {{ getStatusText(currentOrder.status) }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ currentOrder.createdAt }}</el-descriptions-item>
-        <el-descriptions-item label="支付时间">{{ currentOrder.paidAt || '-' }}</el-descriptions-item>
-      </el-descriptions>
+          </span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">创建时间</span>
+          <span class="info-value">{{ currentOrder.createdAt }}</span>
+        </div>
+        <div class="info-item full-width">
+          <span class="info-label">支付时间</span>
+          <span class="info-value">{{ currentOrder.paidAt || '-' }}</span>
+        </div>
+      </div>
     </el-dialog>
 
     <!-- 完成订单对话框 -->
-    <el-dialog v-model="completeDialogVisible" title="完成订单" width="500px">
+    <el-dialog v-model="completeDialogVisible" title="完成订单" width="480px">
       <el-form :model="completeForm" label-width="100px">
         <el-form-item label="订单号">
-          <span>{{ currentOrder?.orderNo }}</span>
+          <span class="form-text order-no">{{ currentOrder?.orderNo }}</span>
         </el-form-item>
         <el-form-item label="金额">
-          <span style="color: var(--success-color); font-weight: 600">
-            ¥{{ currentOrder?.amount }}
-          </span>
+          <span class="amount-value">¥{{ currentOrder?.amount }}</span>
         </el-form-item>
         <el-form-item label="交易流水号">
           <el-input
@@ -154,15 +179,13 @@
     </el-dialog>
 
     <!-- 退款对话框 -->
-    <el-dialog v-model="refundDialogVisible" title="订单退款" width="500px">
+    <el-dialog v-model="refundDialogVisible" title="订单退款" width="480px">
       <el-form :model="refundForm" label-width="100px">
         <el-form-item label="订单号">
-          <span>{{ currentOrder?.orderNo }}</span>
+          <span class="form-text order-no">{{ currentOrder?.orderNo }}</span>
         </el-form-item>
         <el-form-item label="退款金额">
-          <span style="color: var(--danger-color); font-weight: 600">
-            ¥{{ currentOrder?.amount }}
-          </span>
+          <span class="refund-amount">¥{{ currentOrder?.amount }}</span>
         </el-form-item>
         <el-form-item label="退款原因">
           <el-input
@@ -190,6 +213,7 @@ import { ElMessageBox } from 'element-plus'
 import { Search, RefreshLeft, View } from '@element-plus/icons-vue'
 import { adminAPI, type RechargeOrder } from '../api'
 import message from '../utils/message'
+import PageHeader from '../components/PageHeader.vue'
 
 const loading = ref(false)
 const completing = ref(false)
@@ -217,13 +241,13 @@ const refundForm = ref({
   reason: ''
 })
 
-const getStatusType = (status: number) => {
-  const typeMap: Record<number, any> = {
-    0: 'warning',
-    1: 'success',
-    2: 'info'
+const getStatusClass = (status: number) => {
+  const classMap: Record<number, string> = {
+    0: 'status-warning',
+    1: 'status-active',
+    2: 'status-muted'
   }
-  return typeMap[status] || 'info'
+  return classMap[status] || 'status-muted'
 }
 
 const getStatusText = (status: number) => {
@@ -348,10 +372,171 @@ onMounted(() => {
 
 <style scoped>
 .orders-page {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-:deep(.el-pagination) {
+/* 筛选栏 */
+.filter-bar {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  border: 1px solid var(--border-light);
+}
+
+.filter-row {
   display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* 表格容器 */
+.table-container {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.order-no {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.amount-value {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.refund-amount {
+  color: var(--danger-color);
+  font-weight: 600;
+}
+
+.pay-method-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 状态徽章 */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-active {
+  background: var(--success-bg);
+  color: var(--success-color);
+}
+
+.status-warning {
+  background: var(--warning-bg);
+  color: var(--warning-color);
+}
+
+.status-muted {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.pagination-wrapper {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-light);
+}
+
+/* 信息网格 */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.info-item.full-width {
+  grid-column: span 2;
+}
+
+.info-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.info-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-text {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+    margin-top: 12px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-item.full-width {
+    grid-column: span 1;
+  }
 }
 </style>
