@@ -80,6 +80,12 @@ public class Model {
     private Integer sortOrder;
 
     /**
+     * 最大上下文 Token 数（包括输入和输出）
+     * 用于在发送请求前检测是否超过模型限制
+     */
+    private Integer maxContextTokens;
+
+    /**
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)

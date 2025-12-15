@@ -49,6 +49,7 @@ public class ChatWorkflowService {
     private final CopilotProxyProperties copilotProxyProperties;
     private final TokenEstimator tokenEstimator;
     private final UsageMetricsService usageMetricsService;
+    private final ModelService modelService;
     private final Map<String, ModelProxy> proxyLookup;
 
     public ChatWorkflowService(ApiKeyService apiKeyService,
@@ -57,13 +58,15 @@ public class ChatWorkflowService {
                                CopilotProxyProperties copilotProxyProperties,
                                TokenEstimator tokenEstimator,
                                List<ModelProxy> modelProxies,
-                               @Nullable UsageMetricsService usageMetricsService) {
+                               @Nullable UsageMetricsService usageMetricsService,
+                               ModelService modelService) {
         this.apiKeyService = apiKeyService;
         this.balanceService = balanceService;
         this.routingProperties = routingProperties;
         this.copilotProxyProperties = copilotProxyProperties;
         this.tokenEstimator = tokenEstimator;
         this.usageMetricsService = usageMetricsService;
+        this.modelService = modelService;
         this.proxyLookup = modelProxies.stream()
                 .collect(Collectors.toMap(
                         proxy -> proxy.getProvider().toLowerCase(),
@@ -74,6 +77,9 @@ public class ChatWorkflowService {
         ChatContext context = authenticate(authorization);
         LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(false);
+
+        // Token 预检测：在发送请求前检查是否超过模型限制
+        validateInputTokens(request);
 
         ModelProxy proxy = selectProxy(request.getModel());
         try {
@@ -95,6 +101,10 @@ public class ChatWorkflowService {
         ChatContext context = authenticate(authorization);
         LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(true);
+
+        // Token 预检测：在发送请求前检查是否超过模型限制
+        validateInputTokens(request);
+
         ModelProxy proxy = selectProxy(request.getModel());
 
         // 创建计费回调
@@ -110,6 +120,10 @@ public class ChatWorkflowService {
         ChatContext context = authenticate(authorization);
         LocalDateTime requestTime = LocalDateTime.now();
         request.setStream(true);
+
+        // Token 预检测：在发送请求前检查是否超过模型限制
+        validateInputTokens(request);
+
         ModelProxy proxy = selectProxy(request.getModel());
 
         // 创建计费回调
@@ -132,6 +146,9 @@ public class ChatWorkflowService {
 
         // 热身请求优化：检测 Claude Code 热身请求并使用小模型
         applyWarmupModelOptimization(request);
+
+        // Token 预检测：在发送请求前检查是否超过模型限制
+        validateClaudeInputTokens(request);
 
         CopilotProxyService copilotProxy = getCopilotProxy();
         try {
@@ -160,6 +177,9 @@ public class ChatWorkflowService {
 
         // 热身请求优化：检测 Claude Code 热身请求并使用小模型
         applyWarmupModelOptimization(request);
+
+        // Token 预检测：在发送请求前检查是否超过模型限制
+        validateClaudeInputTokens(request);
 
         CopilotProxyService copilotProxy = getCopilotProxy();
         // 创建计费回调
@@ -882,6 +902,107 @@ public class ChatWorkflowService {
         if (usageMetricsService != null) {
             usageMetricsService.recordUsage(apiKeyId, apiCall);
         }
+    }
+
+    // ============================================================
+    // Token 预检测方法
+    // ============================================================
+
+    /**
+     * 检测 ChatRequest 的输入 token 是否超过模型限制
+     * 如果超过限制，抛出 ChatUpstreamException
+     */
+    private void validateInputTokens(ChatRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return;
+        }
+
+        String model = request.getModel();
+        int maxContextTokens = modelService.getMaxContextTokens(model);
+        int estimatedInputTokens = estimateRequestInputTokens(request);
+
+        // 预留 10% 的缓冲空间用于输出
+        int effectiveLimit = (int) (maxContextTokens * 0.9);
+
+        if (estimatedInputTokens > effectiveLimit) {
+            String errorMessage = String.format(
+                    "请求内容过长：估算输入 %d tokens，超过模型 %s 的上下文限制（%d tokens）。请缩短对话内容或清理历史消息后重试。",
+                    estimatedInputTokens, model, maxContextTokens);
+            log.warn("Token 预检测失败: model={}, estimated={}, limit={}",
+                    model, estimatedInputTokens, maxContextTokens);
+            throw new ChatUpstreamException(400, errorMessage);
+        }
+    }
+
+    /**
+     * 检测 ClaudeRequest 的输入 token 是否超过模型限制
+     * 如果超过限制，抛出 ChatUpstreamException
+     */
+    private void validateClaudeInputTokens(ClaudeRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return;
+        }
+
+        String model = request.getModel();
+        int maxContextTokens = modelService.getMaxContextTokens(model);
+        int estimatedInputTokens = estimateClaudeRequestInputTokens(request);
+
+        // 预留 10% 的缓冲空间用于输出
+        int effectiveLimit = (int) (maxContextTokens * 0.9);
+
+        if (estimatedInputTokens > effectiveLimit) {
+            String errorMessage = String.format(
+                    "请求内容过长：估算输入 %d tokens，超过模型 %s 的上下文限制（%d tokens）。请缩短对话内容或清理历史消息后重试。",
+                    estimatedInputTokens, model, maxContextTokens);
+            log.warn("Token 预检测失败: model={}, estimated={}, limit={}",
+                    model, estimatedInputTokens, maxContextTokens);
+            throw new ChatUpstreamException(400, errorMessage);
+        }
+    }
+
+    /**
+     * 估算 ChatRequest 的输入 token 数
+     */
+    private int estimateRequestInputTokens(ChatRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return 0;
+        }
+        return request.getMessages().stream()
+                .map(ChatRequest.Message::getContent)
+                .mapToInt(content -> tokenEstimator.estimateTextTokens(content != null ? content.toString() : ""))
+                .sum();
+    }
+
+    /**
+     * 估算 ClaudeRequest 的输入 token 数
+     */
+    private int estimateClaudeRequestInputTokens(ClaudeRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return 0;
+        }
+        int tokens = request.getMessages().stream()
+                .map(ClaudeRequest.Message::getContent)
+                .mapToInt(content -> tokenEstimator.estimateTextTokens(content != null ? content.toString() : ""))
+                .sum();
+
+        // 加上 system prompt 的 token
+        if (request.getSystem() != null) {
+            tokens += tokenEstimator.estimateTextTokens(request.getSystem().toString());
+        }
+
+        // 加上 tools 的 token（工具定义也会占用上下文）
+        if (request.getTools() != null && !request.getTools().isEmpty()) {
+            for (ClaudeRequest.Tool tool : request.getTools()) {
+                if (tool.getDescription() != null) {
+                    tokens += tokenEstimator.estimateTextTokens(tool.getDescription());
+                }
+                if (tool.getInputSchema() != null) {
+                    tokens += tokenEstimator.estimateTextTokens(tool.getInputSchema().toString());
+                }
+            }
+        }
+
+        return tokens;
     }
 
 }

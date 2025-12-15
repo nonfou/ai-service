@@ -1121,14 +1121,35 @@ public class CopilotProxyService implements ModelProxy {
 
     private String translateFriendlyMessage(String rawMessage, String code) {
         String fallback = "上游模型服务暂不可用，请稍后重试";
-        if (StringUtils.hasText(code) && "model_not_supported".equalsIgnoreCase(code)) {
-            return "该模型暂未开放，请在控制台更换其他模型";
+        if (StringUtils.hasText(code)) {
+            String lowerCode = code.toLowerCase(Locale.ROOT);
+            if ("model_not_supported".equals(lowerCode)) {
+                return "该模型暂未开放，请在控制台更换其他模型";
+            }
+            if ("model_max_prompt_tokens_exceeded".equals(lowerCode)) {
+                return "请求内容过长，超过模型的上下文限制。请缩短对话内容或清理历史消息后重试。";
+            }
         }
         if (StringUtils.hasText(rawMessage)) {
             String text = rawMessage.trim();
             String lower = text.toLowerCase(Locale.ROOT);
             if (lower.contains("model") && lower.contains("not supported")) {
                 return "该模型暂未开放，请在控制台更换其他模型";
+            }
+            // 处理 prompt token 超限错误
+            if (lower.contains("prompt") && lower.contains("token") && lower.contains("exceed")) {
+                return "请求内容过长，超过模型的上下文限制。请缩短对话内容或清理历史消息后重试。";
+            }
+            if (lower.contains("max_prompt_tokens_exceeded") || lower.contains("model_max_prompt_tokens_exceeded")) {
+                return "请求内容过长，超过模型的上下文限制。请缩短对话内容或清理历史消息后重试。";
+            }
+            // 处理上下文长度超限错误
+            if (lower.contains("context") && lower.contains("length") && lower.contains("exceed")) {
+                return "请求内容过长，超过模型的上下文限制。请缩短对话内容或清理历史消息后重试。";
+            }
+            // 处理 rate limit 错误
+            if (lower.contains("rate") && lower.contains("limit")) {
+                return "请求过于频繁，请稍后重试。";
             }
             return text;
         }
