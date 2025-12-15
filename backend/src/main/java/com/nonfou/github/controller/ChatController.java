@@ -348,25 +348,19 @@ public class ChatController {
             return chatWorkflowService.handleClaudeStreamRequest(authorization, request);
         } catch (ChatAuthorizationException e) {
             log.warn("Claude 流式请求鉴权失败: {}", e.getMessage());
-            // 返回带有正确 HTTP 状态码的错误响应
-            return ResponseEntity.status(e.getStatusCode())
-                    .body(ClaudeErrorResponse.fromStatusCode(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage())));
+            return buildClaudeErrorEmitter(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
         } catch (BusinessException e) {
             log.warn("Claude 流式请求业务异常: {}", e.getMessage());
-            return ResponseEntity.status(e.getCode())
-                    .body(ClaudeErrorResponse.fromStatusCode(e.getCode(), friendlyMessage(e.getCode(), e.getMessage())));
+            return buildClaudeErrorEmitter(e.getCode(), friendlyMessage(e.getCode(), e.getMessage()));
         } catch (ChatUpstreamException e) {
             log.warn("Claude 流式请求上游异常: {}", e.getMessage());
-            return ResponseEntity.status(e.getStatusCode())
-                    .body(ClaudeErrorResponse.fromStatusCode(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage())));
+            return buildClaudeErrorEmitter(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));
         } catch (ChatProcessingException e) {
             log.error("Claude 流式请求处理异常: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ClaudeErrorResponse.fromStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage()));
+            return buildClaudeErrorEmitter(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage());
         } catch (Exception e) {
             log.error("Claude 流式API调用失败: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ClaudeErrorResponse.fromStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务暂时不可用，请稍后重试"));
+            return buildClaudeErrorEmitter(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务暂时不可用，请稍后重试");
         }
     }
 
