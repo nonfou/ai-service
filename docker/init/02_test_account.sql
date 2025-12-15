@@ -11,13 +11,13 @@ SET NAMES utf8mb4;
 -- ============================================
 -- 密码: test123456 (使用 BCrypt 加密)
 INSERT INTO users (email, password, balance, status) VALUES
-('test@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 500.0000, 1)
+('79667276@qq.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 500.0000, 1)
 ON DUPLICATE KEY UPDATE
     balance = 500.0000,
     status = 1;
 
 -- 获取用户ID
-SET @test_user_id = (SELECT id FROM users WHERE email = 'test@example.com');
+SET @test_user_id = (SELECT id FROM users WHERE email = '79667276@qq.com');
 
 -- ============================================
 -- 2. 创建默认 API Key
@@ -42,10 +42,10 @@ INSERT INTO recharge_orders (user_id, order_no, amount, status, pay_method, trad
 -- ============================================
 -- 完成提示
 -- ============================================
-SELECT '✅ 测试账户创建成功！' AS message;
+SELECT '测试账户创建成功！' AS message;
 SELECT
-    '📋 账户信息：' AS info,
-    'test@example.com' AS 邮箱,
+    '账户信息：' AS info,
+    '79667276@qq.com' AS 邮箱,
     'test123456' AS 密码,
     '500.00 元' AS 余额,
     'sk-test-1234567890abcdef1234567890abcdef' AS API密钥;

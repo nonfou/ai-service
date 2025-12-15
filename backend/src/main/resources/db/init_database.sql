@@ -1,7 +1,8 @@
 -- ============================================
 -- AI API Platform - 完整数据库初始化脚本
--- 版本: 2.0.0
+-- 版本: 2.1.0
 -- 创建时间: 2025-11-09
+-- 更新时间: 2025-12-15
 -- 说明: 包含所有表结构、索引、默认数据及迁移内容
 -- ============================================
 
@@ -142,6 +143,7 @@ CREATE TABLE IF NOT EXISTS models (
     cache_write_token_price DECIMAL(20, 10) NULL COMMENT '缓存写入 token 价格（每百万 token 的美元价格）',
     supports_streaming BOOLEAN DEFAULT TRUE COMMENT '是否支持流式输出',
     max_tokens INT DEFAULT 4096 COMMENT '最大token数',
+    max_context_tokens INT DEFAULT 128000 COMMENT '最大上下文Token数（输入+输出）',
     status TINYINT DEFAULT 1 COMMENT '状态：1-启用，0-禁用',
     description TEXT COMMENT '模型说明',
     tags JSON COMMENT '模型标签列表,格式: ["推荐", "低价", "新品"]',
@@ -372,30 +374,38 @@ GROUP BY u.id, u.email, u.balance, u.status, u.created_at;
 -- ============================================
 -- 18. 插入默认数据 - 模型配置
 -- ============================================
-INSERT INTO models (model_name, display_name, provider, price_multiplier, input_token_price, output_token_price, status, description, tags, sort_order) VALUES
+INSERT INTO models (model_name, display_name, provider, price_multiplier, input_token_price, output_token_price, max_context_tokens, status, description, tags, sort_order) VALUES
 -- OpenAI GPT-5.1 系列 (最新)
-('gpt-5.1', 'GPT-5.1', 'OpenAI', 1.00, 8.00, 25.00, 1, 'OpenAI GPT-5.1 模型 - 最新旗舰模型', JSON_ARRAY('推荐', '最新'), 10),
-('gpt-5.1-codex', 'GPT-5.1 Codex', 'OpenAI', 0.90, 10.00, 25.00, 1, 'OpenAI GPT-5.1 Codex 最新编程模型', JSON_ARRAY('推荐'), 20),
-('gpt-5.1-codex-mini', 'GPT-5.1 Codex Mini', 'OpenAI', 0.30, 5.00, 20.00, 1, 'OpenAI GPT-5.1 Codex Mini - 经济高效', JSON_ARRAY('推荐', '低价'), 30),
-('gpt-5.1-codex-max', 'GPT-5.1 Codex Max', 'OpenAI', 1.50, 15.00, 40.00, 1, 'OpenAI GPT-5.1 Codex Max - 超强编程', JSON_ARRAY('高级'), 40),
+('gpt-5.1', 'GPT-5.1', 'OpenAI', 1.00, 8.00, 25.00, 128000, 1, 'OpenAI GPT-5.1 模型 - 最新旗舰模型', JSON_ARRAY('推荐', '最新'), 10),
+('gpt-5.1-codex', 'GPT-5.1 Codex', 'OpenAI', 0.90, 10.00, 25.00, 128000, 1, 'OpenAI GPT-5.1 Codex 最新编程模型', JSON_ARRAY('推荐'), 20),
+('gpt-5.1-codex-mini', 'GPT-5.1 Codex Mini', 'OpenAI', 0.30, 5.00, 20.00, 128000, 1, 'OpenAI GPT-5.1 Codex Mini - 经济高效', JSON_ARRAY('推荐', '低价'), 30),
+('gpt-5.1-codex-max', 'GPT-5.1 Codex Max', 'OpenAI', 1.50, 15.00, 40.00, 128000, 1, 'OpenAI GPT-5.1 Codex Max - 超强编程', JSON_ARRAY('高级'), 40),
 
 -- OpenAI GPT-5 系列
-('gpt-5', 'GPT-5', 'OpenAI', 0.80, 6.00, 20.00, 1, 'OpenAI GPT-5 模型', JSON_ARRAY(), 50),
-('gpt-5-mini', 'GPT-5 Mini', 'OpenAI', 0.30, 3.00, 10.00, 1, 'OpenAI GPT-5 Mini - 轻量快速', JSON_ARRAY('低价'), 60),
-('gpt-5-codex', 'GPT-5 Codex', 'OpenAI', 0.70, 8.00, 22.00, 1, 'OpenAI GPT-5 Codex 编程模型', JSON_ARRAY(), 70),
+('gpt-5', 'GPT-5', 'OpenAI', 0.80, 6.00, 20.00, 128000, 1, 'OpenAI GPT-5 模型', JSON_ARRAY(), 50),
+('gpt-5-mini', 'GPT-5 Mini', 'OpenAI', 0.30, 3.00, 10.00, 128000, 1, 'OpenAI GPT-5 Mini - 轻量快速', JSON_ARRAY('低价'), 60),
+('gpt-5-codex', 'GPT-5 Codex', 'OpenAI', 0.70, 8.00, 22.00, 128000, 1, 'OpenAI GPT-5 Codex 编程模型', JSON_ARRAY(), 70),
 
 -- Claude 系列
-('claude-opus-4.5', 'Claude Opus 4.5', 'Anthropic', 2.00, 15.00, 75.00, 1, 'Anthropic Claude Opus 4.5 - 最强模型', JSON_ARRAY('高级'), 80),
-('claude-sonnet-4.5', 'Claude Sonnet 4.5', 'Anthropic', 1.20, 10.00, 30.00, 1, 'Anthropic Claude Sonnet 4.5 编程模型', JSON_ARRAY('推荐'), 90),
-('claude-sonnet-4', 'Claude Sonnet 4', 'Anthropic', 1.00, 8.00, 24.00, 1, 'Anthropic Claude Sonnet 4', JSON_ARRAY(), 100),
-('claude-opus-41', 'Claude Opus 4.1', 'Anthropic', 1.80, 12.00, 60.00, 1, 'Anthropic Claude Opus 4.1', JSON_ARRAY('高级'), 85),
-('claude-haiku-4.5', 'Claude Haiku 4.5', 'Anthropic', 0.30, 3.00, 10.00, 1, 'Anthropic Claude Haiku 4.5 - 快速轻量', JSON_ARRAY('低价'), 110)
+('claude-opus-4.5', 'Claude Opus 4.5', 'Anthropic', 2.00, 15.00, 75.00, 128000, 1, 'Anthropic Claude Opus 4.5 - 最强模型', JSON_ARRAY('高级'), 80),
+('claude-opus-41', 'Claude Opus 4.1', 'Anthropic', 1.80, 12.00, 60.00, 128000, 1, 'Anthropic Claude Opus 4.1', JSON_ARRAY('高级'), 85),
+('claude-sonnet-4.5', 'Claude Sonnet 4.5', 'Anthropic', 1.20, 10.00, 30.00, 128000, 1, 'Anthropic Claude Sonnet 4.5 编程模型', JSON_ARRAY('推荐'), 90),
+('claude-sonnet-4', 'Claude Sonnet 4', 'Anthropic', 1.00, 8.00, 24.00, 128000, 1, 'Anthropic Claude Sonnet 4', JSON_ARRAY(), 100),
+('claude-haiku-4.5', 'Claude Haiku 4.5', 'Anthropic', 0.30, 3.00, 10.00, 128000, 1, 'Anthropic Claude Haiku 4.5 - 快速轻量', JSON_ARRAY('低价'), 110),
+
+-- Google Gemini 系列
+('gemini-2.5-pro', 'Gemini 2.5 Pro', 'Google', 0.30, 7.00, 21.00, 128000, 1, 'Google Gemini 2.5 Pro', JSON_ARRAY(), 120),
+('gemini-3-pro-preview', 'Gemini 3.0 Pro Preview', 'Google', 0.80, 10.00, 30.00, 128000, 1, 'Google Gemini 3.0 Pro 预览版 - 最强编程', JSON_ARRAY('推荐', '最新'), 130),
+
+-- xAI Grok 系列
+('grok-code-fast-1', 'Grok Code Fast', 'xAI', 0.50, 5.00, 15.00, 128000, 1, 'xAI Grok Code Fast - 快速编程模型', JSON_ARRAY(), 140)
 
 ON DUPLICATE KEY UPDATE
                      display_name = VALUES(display_name),
                      provider = VALUES(provider),
                      input_token_price = VALUES(input_token_price),
                      output_token_price = VALUES(output_token_price),
+                     max_context_tokens = VALUES(max_context_tokens),
                      tags = VALUES(tags);
 
 -- ============================================
