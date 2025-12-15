@@ -154,6 +154,56 @@ export interface ModelUsage {
   percentage: number
 }
 
+// ==================== 配额相关类型 ====================
+export interface QuotaInfo {
+  quotaAmount: number
+  usedAmount: number
+  remainingAmount: number
+  usagePercentage: number
+  resetAt: string
+  isExceeded: boolean
+  isEnabled: boolean
+}
+
+export interface UserQuota {
+  daily: QuotaInfo
+  monthly: QuotaInfo
+}
+
+// ==================== 增强统计类型 ====================
+export interface StatsSummary {
+  today: {
+    calls: number
+    cost: number
+    inputTokens: number
+    outputTokens: number
+    cacheReadTokens: number
+    cacheWriteTokens: number
+  }
+  total: {
+    calls: number
+    cost: number
+    inputTokens: number
+    outputTokens: number
+    cacheReadTokens: number
+    cacheWriteTokens: number
+  }
+}
+
+export interface HourlyStats {
+  hour: number
+  calls: number
+  cost: number
+}
+
+export interface TokenTrend {
+  date: string
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+}
+
 // ==================== 模型相关类型 ====================
 export interface Model {
   id: number
@@ -382,6 +432,29 @@ export const statisticsAPI = {
   // 获取模型使用统计
   getModelUsage: () => {
     return request.get<any, { data: ModelUsage[] }>('/api/statistics/model-usage')
+  },
+
+  // 获取综合统计（今日+总计+Token分类）
+  getSummary: () => {
+    return request.get<any, { data: StatsSummary }>('/api/statistics/summary')
+  },
+
+  // 获取按小时统计（24小时分布）
+  getHourlyStats: () => {
+    return request.get<any, { data: HourlyStats[] }>('/api/statistics/hourly')
+  },
+
+  // 获取Token趋势统计
+  getTokenTrend: (days: number = 7) => {
+    return request.get<any, { data: TokenTrend[] }>(`/api/statistics/token-trend?days=${days}`)
+  }
+}
+
+// ==================== 配额管理 ====================
+export const quotaAPI = {
+  // 获取用户配额信息
+  getQuota: () => {
+    return request.get<any, { data: UserQuota }>('/api/user/quota')
   }
 }
 

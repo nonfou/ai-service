@@ -82,4 +82,47 @@ public class StatisticsController {
         return Result.success(stats);
     }
 
+    /**
+     * 获取综合统计（今日+总计+Token分类）
+     */
+    @GetMapping("/statistics/summary")
+    public Result<Map<String, Object>> getSummaryStatistics() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            return Result.error(401, "未授权");
+        }
+
+        Map<String, Object> stats = apiCallLogService.getSummaryStatistics(userId);
+        return Result.success(stats);
+    }
+
+    /**
+     * 获取按小时统计（24小时分布）
+     */
+    @GetMapping("/statistics/hourly")
+    public Result<List<Map<String, Object>>> getHourlyStatistics() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            return Result.error(401, "未授权");
+        }
+
+        List<Map<String, Object>> stats = apiCallLogService.getHourlyStatistics(userId);
+        return Result.success(stats);
+    }
+
+    /**
+     * 获取Token趋势统计（按天分类Token）
+     */
+    @GetMapping("/statistics/token-trend")
+    public Result<List<Map<String, Object>>> getTokenTrend(
+            @RequestParam(defaultValue = "7") int days) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            return Result.error(401, "未授权");
+        }
+
+        List<Map<String, Object>> trend = apiCallLogService.getTokenTrend(userId, days);
+        return Result.success(trend);
+    }
+
 }

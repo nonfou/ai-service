@@ -169,4 +169,114 @@ public class ApiCallLogService {
 
         return stats;
     }
+
+    /**
+     * 获取综合统计（今日+总计+Token分类）
+     */
+    public Map<String, Object> getSummaryStatistics(Long userId) {
+        // 今日统计
+        LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+        LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
+
+        LambdaQueryWrapper<ApiCall> todayWrapper = new LambdaQueryWrapper<>();
+        todayWrapper.eq(ApiCall::getUserId, userId)
+                .between(ApiCall::getCreatedAt, startOfDay, endOfDay);
+        List<ApiCall> todayCalls = apiCallMapper.selectList(todayWrapper);
+
+        // 总计统计
+        LambdaQueryWrapper<ApiCall> totalWrapper = new LambdaQueryWrapper<>();
+        totalWrapper.eq(ApiCall::getUserId, userId);
+        List<ApiCall> allCalls = apiCallMapper.selectList(totalWrapper);
+
+        Map<String, Object> result = new HashMap<>();
+
+        // 今日数据
+        Map<String, Object> today = new HashMap<>();
+        today.put("calls", todayCalls.size());
+        today.put("cost", todayCalls.stream().map(ApiCall::getCost).reduce(BigDecimal.ZERO, BigDecimal::add));
+        today.put("inputTokens", todayCalls.stream().mapToLong(c -> c.getInputTokens() != null ? c.getInputTokens() : 0).sum());
+        today.put("outputTokens", todayCalls.stream().mapToLong(c -> c.getOutputTokens() != null ? c.getOutputTokens() : 0).sum());
+        today.put("cacheReadTokens", todayCalls.stream().mapToLong(c -> c.getCacheReadTokens() != null ? c.getCacheReadTokens() : 0).sum());
+        today.put("cacheWriteTokens", todayCalls.stream().mapToLong(c -> c.getCacheWriteTokens() != null ? c.getCacheWriteTokens() : 0).sum());
+        result.put("today", today);
+
+        // 总计数据
+        Map<String, Object> total = new HashMap<>();
+        total.put("calls", allCalls.size());
+        total.put("cost", allCalls.stream().map(ApiCall::getCost).reduce(BigDecimal.ZERO, BigDecimal::add));
+        total.put("inputTokens", allCalls.stream().mapToLong(c -> c.getInputTokens() != null ? c.getInputTokens() : 0).sum());
+        total.put("outputTokens", allCalls.stream().mapToLong(c -> c.getOutputTokens() != null ? c.getOutputTokens() : 0).sum());
+        total.put("cacheReadTokens", allCalls.stream().mapToLong(c -> c.getCacheReadTokens() != null ? c.getCacheReadTokens() : 0).sum());
+        total.put("cacheWriteTokens", allCalls.stream().mapToLong(c -> c.getCacheWriteTokens() != null ? c.getCacheWriteTokens() : 0).sum());
+        result.put("total", total);
+
+        return result;
+    }
+
+    /**
+     * 获取按小时统计（24小时分布）
+     */
+    public List<Map<String, Object>> getHourlyStatistics(Long userId) {
+        LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+        LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
+
+        LambdaQueryWrapper<ApiCall> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ApiCall::getUserId, userId)
+                .between(ApiCall::getCreatedAt, startOfDay, endOfDay);
+        List<ApiCall> calls = apiCallMapper.selectList(wrapper);
+
+        // 按小时分组
+        Map<Integer, List<ApiCall>> groupedByHour = calls.stream()
+                .collect(Collectors.groupingBy(call -> call.getCreatedAt().getHour()));
+
+        // 生成24小时数据
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            Map<String, Object> hourStats = new HashMap<>();
+            hourStats.put("hour", hour);
+
+            List<ApiCall> hourCalls = groupedByHour.getOrDefault(hour, java.util.Collections.emptyList());
+            hourStats.put("calls", hourCalls.size());
+            hourStats.put("cost", hourCalls.stream().map(ApiCall::getCost).reduce(BigDecimal.ZERO, BigDecimal::add));
+
+            result.add(hourStats);
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取Token趋势统计（按天分类Token）
+     */
+    public List<Map<String, Object>> getTokenTrend(Long userId, int days) {
+        LocalDateTime startDate = LocalDateTime.now().minusDays(days);
+
+        LambdaQueryWrapper<ApiCall> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ApiCall::getUserId, userId)
+                .ge(ApiCall::getCreatedAt, startDate)
+                .orderByAsc(ApiCall::getCreatedAt);
+
+        List<ApiCall> calls = apiCallMapper.selectList(wrapper);
+
+        // 按日期分组
+        Map<LocalDate, List<ApiCall>> groupedByDate = calls.stream()
+                .collect(Collectors.groupingBy(call -> call.getCreatedAt().toLocalDate()));
+
+        return groupedByDate.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    LocalDate date = entry.getKey();
+                    List<ApiCall> dayCalls = entry.getValue();
+
+                    Map<String, Object> dayStats = new HashMap<>();
+                    dayStats.put("date", date);
+                    dayStats.put("inputTokens", dayCalls.stream().mapToLong(c -> c.getInputTokens() != null ? c.getInputTokens() : 0).sum());
+                    dayStats.put("outputTokens", dayCalls.stream().mapToLong(c -> c.getOutputTokens() != null ? c.getOutputTokens() : 0).sum());
+                    dayStats.put("cacheReadTokens", dayCalls.stream().mapToLong(c -> c.getCacheReadTokens() != null ? c.getCacheReadTokens() : 0).sum());
+                    dayStats.put("cacheWriteTokens", dayCalls.stream().mapToLong(c -> c.getCacheWriteTokens() != null ? c.getCacheWriteTokens() : 0).sum());
+
+                    return dayStats;
+                })
+                .collect(Collectors.toList());
+    }
 }
