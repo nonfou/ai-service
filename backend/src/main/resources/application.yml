@@ -201,7 +201,7 @@ backend:
       # SSE 超时：整个流式响应的最大持续时间（30分钟）
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
       # Claude Code 热身请求使用的小模型（减少高级模型配额消耗）
-      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}
+      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:gpt-5-mini}
 
   # 调度策略
   scheduler:
