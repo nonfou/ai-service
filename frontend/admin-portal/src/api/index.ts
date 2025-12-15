@@ -128,6 +128,10 @@ export interface Model {
   displayName: string
   provider: string
   priceMultiplier: number
+  inputTokenPrice?: number      // 输入token价格（每百万USD）
+  outputTokenPrice?: number     // 输出token价格（每百万USD）
+  cacheReadTokenPrice?: number  // 缓存读取token价格（可选）
+  cacheWriteTokenPrice?: number // 缓存写入token价格（可选）
   status: number  // 0-禁用, 1-启用
   description?: string
   createdAt?: string
