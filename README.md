@@ -1,83 +1,184 @@
-# AI API Platform
+# xCoder — AI API 聚合服务平台
 
-基于 GitHub Copilot 的 AI API 聚合服务平台
+基于 GitHub Copilot 的 AI API 中继服务平台，对外提供 OpenAI / Anthropic / Codex 兼容的统一 API 接口，支持多后端账户池、智能调度、Token 计费。
 
-## 项目简介
+## 核心功能
 
-本项目是一个完整的 AI API 中转服务平台，对外提供统一的 OpenAI 兼容 API 接口，支持对接多种 AI API（如 GitHub Copilot API 等），采用 Token 计费模式。
+### API 协议兼容
 
-### 核心功能
+| 协议 | 端点 | 说明 |
+|------|------|------|
+| OpenAI Chat | `POST /v1/chat/completions` | 聊天补全，支持流式 (SSE) |
+| OpenAI Models | `GET /v1/models` | 可用模型列表 |
+| OpenAI Embeddings | `POST /v1/embeddings` | 文本向量化 |
+| OpenAI Codex | `POST /v1/responses` | Codex Responses API |
+| Anthropic Claude | `POST /v1/messages` | Claude Messages API，支持流式 |
+| Claude Token Count | `POST /v1/messages/count_tokens` | Token 计数 |
 
-#### 用户端功能
-- **用户认证系统** - 邮箱验证码登录/注册，JWT Token 认证
-- **多 API 密钥管理** - 支持创建多个 API 密钥，独立启用/禁用，查看使用情况
-- **余额充值系统** - 支持支付宝/微信支付（当前为模拟支付）
-- **订阅套餐系统** - 购买套餐获取额度，支持多种套餐方案
-- **API 调用统计** - 实时查看调用次数、Token 消耗、费用统计
-- **余额日志** - 完整的余额变动记录，支持筛选查询
-- **工单系统** - 创建工单、查看工单状态、与管理员对话
-- **AI 聊天接口** - OpenAI 兼容的聊天接口，支持多种 AI 模型
+- 支持 OpenAI SDK / Anthropic SDK / Claude Code / Codex CLI 直接接入
+- 自动模型别名映射（如 `claude-sonnet-4-5` → `claude-sonnet-4.5`）
 
-#### 管理端功能
-- **用户管理** - 查看用户列表、启用/禁用用户、查看用户详情
-- **平台统计** - 总用户数、总收入、总调用次数、今日数据
-- **模型管理** - 配置 AI 模型、设置价格倍率、启用/禁用模型
-- **订单管理** - 查看充值订单、订阅记录
-- **工单处理** - 处理用户工单、回复消息
+### 多账户中继系统
 
-### 技术栈
+- 支持多个上游 Provider（Copilot、OpenRouter）
+- 5 种调度策略：轮询 (ROUND_ROBIN)、最少使用 (LEAST_USED)、优先级 (PRIORITY)、成本优化 (COST_OPTIMIZED)、混合 (HYBRID)
+- 会话粘性：同一对话路由到同一后端账户，Redis + MySQL 双存储
+- 健康检查 + 熔断器（CLOSED / OPEN / HALF_OPEN 三态）
+- AES-256 加密存储上游 Access Token
 
-**前端**
-- Vue 3 + TypeScript + Vite
-- TailwindCSS + HeadlessUI
-- Vue Router + Pinia
-- Axios + ECharts
+### 成本与计费
 
-**后端**
-- Spring Boot 3.x
-- JWT 认证
-- MyBatis-Plus + MySQL 8.0
-- Redis (可选)
+- 三层倍率加价：全局倍率 × 模型倍率 × 账户倍率
+- 分项 Token 计价：输入 / 输出 / Cache 读取 / Cache 写入
+- 用户配额管理：每日 / 每月限额，超限告警
 
-**基础设施**
-- Docker + Docker Compose (可选)
-- 外部 AI API 服务（可配置）
+### 用户端功能
 
-### 项目统计
+- **邮箱验证码登录** — HttpOnly Cookie 认证，JWT 无状态
+- **多 API 密钥管理** — 创建、启用/禁用、重新生成
+- **Stripe 充值** — 信用卡支付，余额管理
+- **订阅套餐** — 购买套餐获取额度
+- **API 调用统计** — Token 消耗、费用趋势、模型分布、24h 时段分布
+- **余额日志** — 完整变动记录
+- **工单系统** — 创建工单、与管理员对话、邮件通知
+- **快速开始向导** — Claude Code / Codex 安装配置指引
 
-- **数据库表**: 12 个表
-- **API 接口**: 42 个端点
-- **代码量**: 3000+ 行
-- **功能模块**: 8 个主要模块
+### 管理端功能
+
+- **平台统计** — 总用户数、总收入、总调用次数
+- **用户管理** — 启用/禁用、余额调整、配额设置
+- **模型管理** — 配置模型价格倍率、启用/禁用
+- **订阅套餐管理** — CRUD 套餐方案
+- **后端账户管理** — Copilot / OpenRouter 账户池 CRUD、健康检查
+- **工单处理** — 回复、优先级调整
+- **订单管理** — 订单查看、退款
+
+## 技术栈
+
+### 后端
+
+| 技术 | 版本 | 说明 |
+|------|------|------|
+| Java | 21 | JDK 21 |
+| Spring Boot | 3.2.5 | Web + Security + AOP + Validation |
+| Spring Data Redis | — | Lettuce 客户端 |
+| MyBatis-Plus | 3.5.7 | ORM |
+| MySQL | 9.0 | 主数据库 |
+| JWT | jjwt 0.12.3 | 认证 |
+| Apache HttpClient | 5 | HTTP 连接池 |
+| Hutool | 5.8.24 | 工具类 |
+| Spring Boot Mail + Thymeleaf | — | 邮件发送 |
+
+### 前端
+
+| 技术 | 说明 |
+|------|------|
+| Vue 3.5 + TypeScript 5.9 | Composition API |
+| Vite 7.1 | 构建工具 |
+| Element Plus 2.11 | UI 组件库 |
+| Pinia 3.0 | 状态管理 |
+| ECharts 5.5 / Chart.js 4.5 | 图表 |
+| Stripe.js | 支付集成 |
+| pnpm Workspace | Monorepo（user-portal + admin-portal） |
+
+### 基础设施
+
+- Docker + Docker Compose（6 个服务）
+- Nginx 反向代理（API 网关 + 前端静态资源）
+- Redis 7（缓存、限流、验证码、会话粘性、使用量聚合）
+
+## 项目统计
+
+| 指标 | 数量 |
+|------|------|
+| 数据库表 | 16 个 + 1 视图 |
+| API 接口 | 85+ |
+| Controller | 16 个 |
+| Service | 28 个 |
+| Java 文件 | 159 个 |
+| 预置模型 | 15+ |
+| 调度策略 | 5 种 |
+
+## 项目结构
+
+```
+ai-service/
+├── backend/                          # Spring Boot 后端
+│   ├── src/main/java/com/nonfou/github/
+│   │   ├── config/                   # 配置类（JWT、CORS、Security、Properties）
+│   │   ├── controller/               # 控制器（16 个）
+│   │   ├── service/                  # 业务逻辑（28 个）
+│   │   ├── entity/                   # 实体类（14 个）
+│   │   ├── mapper/                   # MyBatis Mapper（15 个）
+│   │   ├── dto/                      # 请求/响应/SSE 事件 DTO
+│   │   ├── component/                # 熔断器组件
+│   │   ├── filter/                   # 限流过滤器
+│   │   ├── interceptor/              # 管理端安全拦截器
+│   │   ├── security/                 # Spring Security 处理器
+│   │   ├── enums/                    # 枚举类型
+│   │   ├── exception/                # 异常体系
+│   │   ├── annotation/               # 自定义注解（@RequireAdmin）
+│   │   ├── aspect/                   # AOP 切面
+│   │   └── util/                     # 工具类（加密、JWT、日志脱敏等）
+│   ├── src/main/resources/
+│   │   ├── db/init_database.sql      # 数据库初始化脚本
+│   │   ├── templates/email/          # 邮件模板
+│   │   ├── application.yml           # 主配置
+│   │   ├── application-dev.yml       # 开发环境
+│   │   ├── application-prod.yml      # 生产环境
+│   │   └── application-example.yml   # 配置示例
+│   └── pom.xml
+├── frontend/                         # pnpm Monorepo
+│   ├── user-portal/                  # 用户端（端口 5173）
+│   │   └── src/
+│   │       ├── api/                  # API 封装
+│   │       ├── views/                # 页面组件
+│   │       ├── components/           # 通用组件
+│   │       ├── stores/               # Pinia Store
+│   │       ├── router/               # 路由配置
+│   │       └── utils/                # 工具函数
+│   ├── admin-portal/                 # 管理端（端口 5174）
+│   │   └── src/
+│   │       ├── api/                  # 管理 API 封装
+│   │       ├── views/admin/          # 管理页面
+│   │       ├── components/           # 通用组件
+│   │       └── stores/               # Pinia Store
+│   └── package.json                  # Workspace 配置
+└── docker/                           # Docker 部署
+    ├── docker-compose.yml            # 6 个服务编排
+    ├── .env                          # 环境变量
+    ├── nginx/                        # Nginx 配置
+    ├── init/                         # 数据库初始化 SQL
+    └── conf/                         # MySQL 配置
+```
 
 ## 快速开始
 
-详细的部署指南请参考 [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-
 ### 前置要求
 
-- Java 17 或更高版本
+- Java 21+
 - Maven 3.6+
 - MySQL 8.0+
 - Node.js 18+
-- Redis 6.0+ (可选)
+- pnpm 9+
+- Redis 6.0+
 
 ### 数据库初始化
 
 ```bash
-# 登录 MySQL
 mysql -u root -p
-
-# 全新安装
-source backend/src/main/resources/db/schema.sql
-
-# 从旧版本升级
-source backend/src/main/resources/db/migration_v1_to_v2.sql
+source backend/src/main/resources/db/init_database.sql
 ```
 
 ### 后端配置
 
-编辑 `backend/src/main/resources/application.yml`:
+复制配置模板并填写必要参数：
+
+```bash
+cp backend/src/main/resources/application-example.yml backend/src/main/resources/application-local.yml
+```
+
+编辑 `application-local.yml`，至少配置以下项：
 
 ```yaml
 spring:
@@ -87,8 +188,14 @@ spring:
     password: your_password
 
 jwt:
-  secret: your-secret-key-change-this-in-production
-  expiration: 86400000
+  secret: your-secret-key
+  issuer: xcoder-local
+
+verify-code:
+  secret: your-verify-code-secret
+
+encryption:
+  key: your-encryption-key
 ```
 
 ### 启动服务
@@ -103,83 +210,50 @@ mvn clean spring-boot:run
 **前端**
 ```bash
 cd frontend
-npm install
-npm run dev
-# 访问: http://localhost:5173
+pnpm install
+# 同时启动用户端和管理端
+pnpm dev:all
+# 用户端: http://localhost:5173
+# 管理端: http://localhost:5174
 ```
 
 ### 默认账号
 
-**管理员账号**
-- 用户名: `admin`
-- 密码: `admin123`
-- 登录地址: `http://localhost:5173/admin`
+**管理员**
+- 用户名: `admin` / 密码: `admin123`
+- 登录地址: `http://localhost:5174`
 
-**测试验证码**
-- 如未配置 Redis，系统使用固定验证码: `123456`
+**用户验证码**
+- 未配置 Redis 或邮件服务时，使用固定验证码: `123456`
 
-## 数据库设计
-
-### 数据库表清单
-
-| 表名 | 说明 | 主要字段 |
-|-----|------|---------|
-| users | 用户表 | id, email, balance, status |
-| api_keys | API密钥表 | id, user_id, key_name, api_key, status |
-| recharge_orders | 充值订单表 | id, user_id, amount, pay_method, status |
-| balance_log | 余额变动日志 | id, user_id, amount, type, remark |
-| api_calls | API调用日志 | id, user_id, model, tokens, cost |
-| models | 模型配置表 | id, model_name, provider, price_multiplier |
-| system_config | 系统配置表 | id, config_key, config_value |
-| admins | 管理员表 | id, username, password |
-| subscription_plans | 订阅套餐表 | id, plan_name, price, quota_amount |
-| subscriptions | 订阅记录表 | id, user_id, plan_id, start_date, end_date |
-| tickets | 工单表 | id, user_id, subject, status, priority |
-| ticket_messages | 工单消息表 | id, ticket_id, sender_type, message |
-
-## API 接口
-
-完整的 API 文档请参考 [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
-
-### API 接口统计
-
-- **用户认证**: 2 个接口 (发送验证码、登录)
-- **用户信息**: 3 个接口 (获取信息、余额、统计)
-- **API 密钥管理**: 5 个接口 (CRUD + 重新生成)
-- **充值订单**: 3 个接口 (创建、列表、详情)
-- **余额管理**: 3 个接口 (余额、日志、统计)
-- **API 调用统计**: 4 个接口 (日志、今日统计、趋势、模型使用)
-- **订阅套餐**: 4 个接口 (套餐列表、订阅、历史、取消)
-- **工单系统**: 5 个接口 (创建、列表、详情、回复、关闭)
-- **AI 聊天**: 3 个接口 (聊天、OpenAI 兼容、模型列表)
-- **管理后台**: 7 个接口 (登录、用户管理、统计、模型管理)
-
-### 使用示例
+## Docker 部署
 
 ```bash
-# 1. 登录获取 Token (测试环境验证码: 123456)
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","code":"123456"}'
+cd docker
 
-# 2. 创建 API 密钥
-curl -X POST http://localhost:8080/api/user/api-keys \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"keyName":"生产环境密钥"}'
+# 编辑 .env 文件，填写必要的环境变量
+# 必填: JWT_SECRET, ENCRYPTION_KEY, VERIFY_CODE_SECRET
 
-# 3. 调用 AI 接口 (支持多种格式)
+docker-compose up -d --build
+```
 
-## 方式一: 使用统一接口
-curl -X POST http://localhost:8080/api-chat \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "你好"}]
-  }'
+### 服务列表
 
-## 方式二: 使用 OpenAI 兼容接口
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| backend | 8080 | Spring Boot 后端 |
+| mysql | 3306 | MySQL 9.0 数据库 |
+| redis | 6379 | Redis 7 缓存 |
+| nginx | 9000 | API 反向代理网关 |
+| user-portal | 80 | 用户端前端 |
+| admin-portal | 9001 | 管理端前端 |
+
+## API 使用示例
+
+### OpenAI 兼容接口
+
+```bash
+# 聊天补全（非流式）
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
@@ -189,159 +263,92 @@ curl -X POST http://localhost:8080/v1/chat/completions \
     "stream": false
   }'
 
-## 方式三: 使用 Claude 兼容接口
-curl -X POST http://localhost:8080/v1/messages \
-  -H "x-api-key: YOUR_API_KEY" \
+# 聊天补全（流式）
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-3-5-sonnet-20241022",
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": true
+  }'
+```
+
+### Anthropic Claude 兼容接口
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024,
     "messages": [{"role": "user", "content": "你好"}]
   }'
 ```
 
-### API 兼容性
+### Codex Responses 接口
 
-本服务作为**通用 AI API 代理服务器**,兼容多种主流 AI API 格式:
-
-#### OpenAI 兼容端点
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/v1/chat/completions` | POST | 创建聊天完成响应 |
-| `/v1/models` | GET | 列出可用模型 |
-
-#### Anthropic Claude 兼容端点
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/v1/messages` | POST | 创建消息响应 |
-
-#### 统一端点
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api-chat` | POST | 统一聊天接口 |
-| `/api/models` | GET | 获取模型列表 |
-
-**特性支持**:
-- ✅ 流式响应 (SSE)
-- ✅ 非流式响应
-- ✅ OpenAI SDK 直接接入
-- ✅ Anthropic SDK 直接接入
-- ✅ 自定义 API Key 认证
-- ✅ 多后端账户池管理
-- ✅ 智能调度与负载均衡
-
-## 项目结构
-
-```
-cc-web/
-├── frontend/                    # 前端项目
-│   ├── src/
-│   │   ├── api/                # API 接口封装
-│   │   ├── components/         # 可复用组件
-│   │   ├── router/             # 路由配置
-│   │   ├── stores/             # Pinia 状态管理
-│   │   ├── types/              # TypeScript 类型定义
-│   │   └── views/              # 页面组件
-│   │       ├── auth/           # 登录/注册页面
-│   │       ├── dashboard/      # 用户控制台
-│   │       ├── admin/          # 管理后台
-│   │       ├── subscription/   # 订阅套餐
-│   │       └── ticket/         # 工单系统
-│   ├── Dockerfile
-│   └── nginx.conf
-├── backend/                     # 后端项目
-│   ├── src/main/
-│   │   ├── java/com/nonfou/github/
-│   │   │   ├── config/         # 配置类 (JWT, CORS, MyBatis)
-│   │   │   ├── controller/     # 控制器层 (7个主要 Controller)
-│   │   │   ├── dto/            # 数据传输对象
-│   │   │   ├── entity/         # 实体类 (12个表对应实体)
-│   │   │   ├── mapper/         # MyBatis Mapper
-│   │   │   ├── service/        # 业务逻辑层
-│   │   │   ├── exception/      # 异常处理
-│   │   │   └── util/           # 工具类
-│   │   └── resources/
-│   │       ├── db/             # 数据库脚本
-│   │       │   ├── schema.sql         # 完整数据库脚本
-│   │       │   └── migration_v1_to_v2.sql   # 迁移脚本
-│   │       └── application.yml # 应用配置
-│   ├── pom.xml
-│   └── Dockerfile
-├── DEPLOYMENT_GUIDE.md          # 部署指南
-├── API_DOCUMENTATION.md         # API 接口文档
-├── IMPLEMENTATION_SUMMARY.md    # 实现总结
-├── docker-compose.yml           # Docker Compose 配置
-├── .env.example                 # 环境变量示例
-└── README.md                    # 项目文档
+```bash
+curl -X POST http://localhost:8080/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.1-codex",
+    "input": "写一个 Hello World"
+  }'
 ```
 
-## 功能特性
+### 模型列表
 
-### 安全性
-- JWT Token 认证机制
-- BCrypt 密码加密
-- API 密钥安全存储
-- 数据脱敏显示（API 密钥列表只显示部分字符）
-- CORS 跨域配置
-- 全局异常处理
+```bash
+curl http://localhost:8080/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
 
-### 性能优化
-- Redis 缓存支持（可选）
-- 数据库索引优化
-- 分页查询支持
-- 懒加载和按需加载
+## 数据库设计
 
-### 业务功能
-- 多 API 密钥管理（每个用户可创建多个密钥）
-- 模拟支付系统（支持支付宝/微信支付流程）
-- 订阅套餐系统（购买套餐获取额度）
-- 完整的余额变动日志
-- 详细的 API 调用统计
-- 工单系统（支持用户与管理员对话）
-- OpenAI 兼容 API 接口
+| 表名 | 说明 |
+|------|------|
+| users | 用户账户 |
+| api_keys | API 密钥（多密钥） |
+| recharge_orders | 充值订单 |
+| balance_log | 余额变动日志 |
+| api_calls | API 调用日志（含 Token、费用、会话） |
+| models | 模型配置（含分项 Token 价格） |
+| subscription_plans | 订阅套餐 |
+| subscriptions | 用户订阅记录 |
+| tickets | 工单 |
+| ticket_messages | 工单消息 |
+| system_config | 系统配置 |
+| admins | 管理员账户 |
+| backend_accounts | 后端账户池（Copilot / OpenRouter） |
+| user_account_bindings | 用户-账户绑定 |
+| session_mappings | 会话粘性映射 |
+| user_quotas | 用户配额（每日/每月） |
+| v_user_stats | 用户统计视图 |
 
-## 计费规则
+## 安全机制
 
-默认计费规则（可在管理后台调整）:
-- 输入 tokens: ¥4.1 / 1,000,000 tokens
-- 输出 tokens: ¥16.4 / 1,000,000 tokens
-- 支持模型价格倍率设置
+- **用户认证**: 邮箱验证码登录，HttpOnly Cookie 存储 JWT（SameSite=Strict）
+- **管理端认证**: 用户名密码登录，localStorage 存储 Token
+- **API 认证**: Bearer Token / x-api-key 自定义密钥
+- **数据加密**: AES-256/GCM 加密后端账户 Access Token
+- **密码安全**: BCrypt 哈希
+- **限流**: Redis 滑动窗口限流（普通 60 RPM，API 30 RPM）
+- **管理端安全**: IP 白名单、登录失败锁定、请求频率限制
+- **日志脱敏**: 邮箱等敏感信息自动遮蔽
 
-## 文档索引
+## 健康检查
 
-- [部署指南](DEPLOYMENT_GUIDE.md) - 详细的安装和配置说明
-- [API 文档](API_DOCUMENTATION.md) - 完整的 API 接口参考
-- [实现总结](IMPLEMENTATION_SUMMARY.md) - 技术实现细节和架构设计
+Kubernetes 风格探针：
 
-## 常见问题
-
-### 数据库连接失败
-检查 MySQL 是否启动，用户名密码是否正确，防火墙是否开放 3306 端口
-
-### 验证码发送失败
-如未配置 Redis 或邮件服务，系统会自动使用固定验证码 `123456`
-
-### API 密钥验证失败
-确保密钥状态为启用，用户状态为正常，密钥格式正确
-
-### 前端无法连接后端
-检查 CORS 配置，确保允许前端域名跨域请求
-
-## 更新日志
-
-### v2.0.0 (2025-11-08)
-- ✨ 新增多 API 密钥管理功能
-- ✨ 新增订阅套餐系统
-- ✨ 新增工单系统
-- ✨ 新增详细的 API 调用统计
-- ✨ 新增余额变动日志
-- ✨ 新增管理后台功能
-- 🔧 优化数据库设计
-- 📝 完善 API 文档
-- 📝 新增部署指南
-
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
+| 端点 | 说明 |
+|------|------|
+| `GET /health` / `/api/health` | 存活探针 |
+| `GET /live` / `/api/live` | 存活探针（别名） |
+| `GET /ready` / `/api/ready` | 就绪探针（检查 MySQL + Redis 连接） |
 
 ## 许可证
 
