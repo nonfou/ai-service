@@ -20,6 +20,28 @@ public class TokenEstimator {
     private static final long MAX_ESTIMATED_TOKENS = 200_000L;
 
     /**
+     * 根据请求与流式字符计数器估算 token 使用情况。
+     */
+    public CostCalculatorService.TokenUsage estimateUsage(ChatRequest request, StreamingCharCounter charCounter) {
+        int inputTokens = 0;
+        if (request != null && request.getMessages() != null) {
+            inputTokens = request.getMessages().stream()
+                    .map(ChatRequest.Message::getContent)
+                    .mapToInt(this::estimateContentTokens)
+                    .sum();
+        }
+
+        int outputTokens = charCounter.estimateTokens();
+
+        return CostCalculatorService.TokenUsage.builder()
+                .inputTokens(inputTokens)
+                .outputTokens(outputTokens)
+                .cacheReadTokens(0)
+                .cacheWriteTokens(0)
+                .build();
+    }
+
+    /**
      * 根据请求与模型响应内容估算 token 使用情况。
      */
     public CostCalculatorService.TokenUsage estimateUsage(ChatRequest request, String responseText) {
@@ -73,6 +95,42 @@ public class TokenEstimator {
                 || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
                 || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
                 || block == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION;
+    }
+
+    /**
+     * 流式字符计数器，增量统计 ASCII/CJK 字符数以估算 token，
+     * 避免累积完整响应文本。
+     */
+    public static class StreamingCharCounter {
+        private long asciiChars;
+        private long cjkChars;
+
+        public void append(String text) {
+            if (text == null) return;
+            for (int i = 0; i < text.length(); i++) {
+                char ch = text.charAt(i);
+                if (isCjk(ch)) {
+                    cjkChars++;
+                } else if (!Character.isWhitespace(ch)) {
+                    asciiChars++;
+                }
+            }
+        }
+
+        public int estimateTokens() {
+            double estimated = (asciiChars / ASCII_CHARS_PER_TOKEN) + (cjkChars / CJK_CHARS_PER_TOKEN);
+            long rounded = Math.min(Math.round(Math.ceil(estimated)), MAX_ESTIMATED_TOKENS);
+            return (int) rounded;
+        }
+
+        private static boolean isCjk(char ch) {
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(ch);
+            return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
+                    || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION;
+        }
     }
 
     /**

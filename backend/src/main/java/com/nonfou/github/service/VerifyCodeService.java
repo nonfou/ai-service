@@ -13,6 +13,7 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.springframework.scheduling.annotation.Scheduled;
 
 /**
  * 验证码存储与限流服务。
@@ -51,6 +52,21 @@ public class VerifyCodeService {
     private final Map<String, LocalCodeRecord> localCodes = new ConcurrentHashMap<>();
     private final Map<String, Long> localCooldown = new ConcurrentHashMap<>();
     private final Map<String, LocalRateRecord> localHourly = new ConcurrentHashMap<>();
+
+    /**
+     * 定期清理本地回退 Map 中的过期条目（仅 Redis 不可用时生效）。
+     */
+    @Scheduled(fixedDelayString = "${auth.verify-code.cleanup-interval-ms:300000}")
+    public void cleanupExpiredLocalEntries() {
+        if (redisService != null) {
+            return;
+        }
+        Instant now = Instant.now();
+        long nowMs = System.currentTimeMillis();
+        localCodes.entrySet().removeIf(e -> e.getValue().expiresAt().isBefore(now));
+        localCooldown.entrySet().removeIf(e -> e.getValue() <= nowMs);
+        localHourly.entrySet().removeIf(e -> e.getValue().isExpired(nowMs));
+    }
 
     /**
      * 发送验证码前检查限流。

@@ -213,7 +213,7 @@ public class OpenRouterProxyService implements ModelProxy {
 
         streamTaskExecutor.execute(() -> {
             AtomicReference<TokenUsage> usageRef = new AtomicReference<>();
-            StringBuilder contentBuilder = new StringBuilder();
+            TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
 
             try {
                 String decryptedToken = backendAccountService.getDecryptedToken(account.getId());
@@ -246,10 +246,10 @@ public class OpenRouterProxyService implements ModelProxy {
                     }
 
                     emitter.send(SseEmitter.event().data(data));
-                    handleStreamChunk(data, contentBuilder, usageRef);
+                    handleStreamChunk(data, charCounter, usageRef);
                 }
 
-                finalizeOpenRouterStream(request, apiKey, account, sessionHash, contentBuilder.toString(), usageRef.get());
+                finalizeOpenRouterStream(request, apiKey, account, sessionHash, charCounter, usageRef.get());
                 emitter.complete();
             } catch (Exception e) {
                 log.error("OpenRouter streaming loop failed", e);
@@ -259,145 +259,6 @@ public class OpenRouterProxyService implements ModelProxy {
                 closeResources(resources);
             }
         });
-
-        return emitter;
-    }
-
-    /**
-     * 以底层账号调用 OpenRouter API。
-     *
-     * @param account     已选中的后端账号
-     * @param requestBody OpenRouter 请求参数
-     * @param stream      是否开启流式返回
-     * @return 非流式返回响应 Map，流式返回 SseEmitter
-     */
-    public Object chat(BackendAccount account, Map<String, Object> requestBody, boolean stream) {
-        String decryptedKey = backendAccountService.getDecryptedToken(account.getId());
-        if (decryptedKey == null) {
-            throw new RuntimeException("OpenRouter API key is missing");
-        }
-
-        try {
-            if (stream) {
-                return chatStream(decryptedKey, requestBody);
-            } else {
-                return chatNonStream(decryptedKey, requestBody);
-            }
-        } catch (Exception e) {
-            log.error("OpenRouter request failed for accountId={}, error={}", account.getId(), e.getMessage(), e);
-            backendAccountService.incrementErrorCount(account.getId(), e.getMessage());
-            throw new RuntimeException("OpenRouter request failed: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * 构建访问 OpenRouter 所需的通用请求头。
-     */
-    /**
-     * 调用 OpenRouter 非流式聊天接口。
-     */
-    private Map<String, Object> chatNonStream(String apiKey, Map<String, Object> requestBody) throws Exception {
-        HttpHeaders headers = createHeaders(apiKey);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        String url = baseUrl + "/chat/completions";
-        log.debug("OpenRouter request url={}", url);
-
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-
-        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-            log.debug("OpenRouter responded successfully");
-            return response.getBody();
-        } else {
-            throw new RuntimeException("OpenRouter request failed: " + response.getStatusCode());
-        }
-    }
-
-    /**
-     * 调用 OpenRouter 非流式聊天接口。
-     */
-    /**
-     * 调用 OpenRouter 流式聊天接口。
-     */
-    private SseEmitter chatStream(String apiKey, Map<String, Object> requestBody) throws Exception {
-        SseEmitter emitter = new SseEmitter(300000L); // 5 分钟超时，和上游保持一致
-
-        // OpenRouter SSE 需要显式打开 stream
-        requestBody.put("stream", true);
-
-        // 使用独立线程持续读取 SSE，避免阻塞调用方
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            BufferedReader reader = null;
-
-            try {
-                String url = baseUrl + "/chat/completions";
-                URL urlObj = new URL(url);
-                connection = (HttpURLConnection) urlObj.openConnection();
-
-                // 设置 HTTP 请求头
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Content-Type", "application/json");
-                connection.setRequestProperty("Authorization", "Bearer " + apiKey);
-                connection.setRequestProperty("HTTP-Referer", appUrl);
-                connection.setRequestProperty("X-Title", appName);
-                connection.setDoOutput(true);
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(300000);
-
-                // 写入请求体
-                String requestBodyJson = objectMapper.writeValueAsString(requestBody);
-                connection.getOutputStream().write(requestBodyJson.getBytes(StandardCharsets.UTF_8));
-                connection.getOutputStream().flush();
-
-                // 检查 HTTP 响应码
-                int responseCode = connection.getResponseCode();
-                if (responseCode != 200) {
-                    String errorMessage = "OpenRouter returned HTTP " + responseCode;
-                    log.error(errorMessage);
-                    emitter.completeWithError(new RuntimeException(errorMessage));
-                    return;
-                }
-
-                reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-                String line;
-
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("data: ")) {
-                        String data = line.substring(6);
-
-                        // 读取结束标记
-                        if ("[DONE]".equals(data.trim())) {
-                            emitter.send(SseEmitter.event().data("[DONE]"));
-                            break;
-                        }
-
-                        // 透传 SSE 数据
-                        try {
-                            // 确保数据是合法 JSON
-                            objectMapper.readTree(data);
-                            emitter.send(SseEmitter.event().data(data));
-                        } catch (Exception e) {
-                            log.warn("Invalid SSE payload {}", data);
-                        }
-                    }
-                }
-
-                emitter.complete();
-                log.debug("OpenRouter streaming connection closed");
-
-            } catch (Exception e) {
-                log.error("OpenRouter streaming request failed", e);
-                emitter.completeWithError(e);
-            } finally {
-                try {
-                    if (reader != null) reader.close();
-                    if (connection != null) connection.disconnect();
-                } catch (Exception e) {
-                    log.warn("Failed to close streaming connection", e);
-                }
-            }
-        }).start();
 
         return emitter;
     }
@@ -517,7 +378,7 @@ public class OpenRouterProxyService implements ModelProxy {
     }
 
     private void handleStreamChunk(String data,
-                                   StringBuilder contentBuilder,
+                                   TokenEstimator.StreamingCharCounter charCounter,
                                    AtomicReference<TokenUsage> usageRef) {
         try {
             JsonNode node = objectMapper.readTree(data);
@@ -533,7 +394,7 @@ public class OpenRouterProxyService implements ModelProxy {
                     if (delta != null) {
                         JsonNode contentNode = delta.get("content");
                         if (contentNode != null && !contentNode.isNull()) {
-                            contentBuilder.append(contentNode.asText(""));
+                            charCounter.append(contentNode.asText(""));
                         }
                     }
                 }
@@ -547,10 +408,10 @@ public class OpenRouterProxyService implements ModelProxy {
                                           ApiKey apiKey,
                                           BackendAccount account,
                                           String sessionHash,
-                                          String fullContent,
+                                          TokenEstimator.StreamingCharCounter charCounter,
                                           TokenUsage usage) {
         try {
-            TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, fullContent);
+            TokenUsage finalUsage = usage != null ? usage : tokenEstimator.estimateUsage(request, charCounter);
             if (finalUsage == null) {
                 log.warn("OpenRouter usage record missing account={}, model={}",
                         account.getAccountName(), request.getModel());

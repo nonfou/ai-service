@@ -170,9 +170,7 @@ public class CopilotProxyService implements ModelProxy {
         int outputTokens = 0;
         int cacheReadTokens = 0;
         int cacheWriteTokens = 0;
-        StringBuilder contentBuilder = new StringBuilder();
-
-        // 预先估算输入 token（基于请求消息）
+        TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
         int estimatedInputTokens = estimateInputTokens(request);
 
         try {
@@ -221,7 +219,7 @@ public class CopilotProxyService implements ModelProxy {
                         JsonNode delta = choices.get(0).path("delta");
                         String content = safeText(delta.get("content"));
                         if (StringUtils.hasText(content)) {
-                            contentBuilder.append(content);
+                            charCounter.append(content);
                         }
                     }
                     JsonNode usage = chunk.path("usage");
@@ -256,7 +254,7 @@ public class CopilotProxyService implements ModelProxy {
 
             // 使用上游返回的 token 数，如果没有则使用估算值
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
-            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : charCounter.estimateTokens();
 
             TokenUsage tokenUsage = TokenUsage.builder()
                     .inputTokens(finalInputTokens)
@@ -284,7 +282,7 @@ public class CopilotProxyService implements ModelProxy {
         BufferedReader reader = null;
         String chatCompletionId = "chatcmpl-" + System.currentTimeMillis();
         String model = request.getModel();
-        StringBuilder contentBuilder = new StringBuilder();
+        TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
         int inputTokens = 0;
         int outputTokens = 0;
         int cacheReadTokens = 0;
@@ -363,7 +361,7 @@ public class CopilotProxyService implements ModelProxy {
                         if ("text_delta".equals(deltaType)) {
                             String content = safeText(delta.get("text"));
                             if (StringUtils.hasText(content)) {
-                                contentBuilder.append(content);
+                                charCounter.append(content);
                                 // 发送 OpenAI 格式的流式响应
                                 sendOpenAiStreamChunk(emitter, chatCompletionId, model, content, null);
                             }
@@ -420,7 +418,7 @@ public class CopilotProxyService implements ModelProxy {
 
             // 计算 token 使用
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
-            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : charCounter.estimateTokens();
 
             TokenUsage tokenUsage = TokenUsage.builder()
                     .inputTokens(finalInputTokens)
@@ -645,7 +643,7 @@ public class CopilotProxyService implements ModelProxy {
         BufferedReader reader = null;
         String messageId = "msg_" + System.currentTimeMillis();
         String model = request.getModel();
-        StringBuilder contentBuilder = new StringBuilder();
+        TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
         int inputTokens = 0;
         int outputTokens = 0;
         int cacheReadTokens = 0;
@@ -701,7 +699,7 @@ public class CopilotProxyService implements ModelProxy {
                         JsonNode delta = choices.get(0).path("delta");
                         String content = safeText(delta.get("content"));
                         if (StringUtils.hasText(content)) {
-                            contentBuilder.append(content);
+                            charCounter.append(content);
                             sendClaudeContentBlockDelta(emitter, content);
                         }
                     }
@@ -746,7 +744,7 @@ public class CopilotProxyService implements ModelProxy {
 
             // 使用上游返回的 token 数，如果没有则使用估算值
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
-            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : charCounter.estimateTokens();
 
             TokenUsage tokenUsage = TokenUsage.builder()
                     .inputTokens(finalInputTokens)
@@ -1360,7 +1358,7 @@ public class CopilotProxyService implements ModelProxy {
     private void executeClaudeMessagesStream(ClaudeRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
-        StringBuilder contentBuilder = new StringBuilder();
+        TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
         int inputTokens = 0;
         int outputTokens = 0;
         int cacheReadTokens = 0;
@@ -1438,7 +1436,7 @@ public class CopilotProxyService implements ModelProxy {
                     // 使用类型化方法收集文本内容用于估算 token
                     String textContent = event.getTextContent();
                     if (StringUtils.hasText(textContent)) {
-                        contentBuilder.append(textContent);
+                        charCounter.append(textContent);
                     }
 
                     // 使用类型化方法提取 usage 信息
@@ -1475,7 +1473,7 @@ public class CopilotProxyService implements ModelProxy {
 
             // 使用上游返回的 token 数，如果没有则使用估算值
             int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
-            int finalOutputTokens = outputTokens > 0 ? outputTokens : tokenEstimator.estimateTextTokens(contentBuilder.toString());
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : charCounter.estimateTokens();
 
             TokenUsage tokenUsage = TokenUsage.builder()
                     .inputTokens(finalInputTokens)
