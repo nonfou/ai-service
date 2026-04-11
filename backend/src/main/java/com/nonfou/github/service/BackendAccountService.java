@@ -135,6 +135,23 @@ public class BackendAccountService {
     }
 
     /**
+     * 查询所有 Copilot 账户
+     */
+    public List<BackendAccount> listAccounts(String status) {
+        LambdaQueryWrapper<BackendAccount> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BackendAccount::getProvider, "copilot");
+
+        if (status != null && !status.isEmpty()) {
+            wrapper.eq(BackendAccount::getStatus, status);
+        }
+
+        wrapper.orderByAsc(BackendAccount::getPriority)
+               .orderByDesc(BackendAccount::getLastUsedAt);
+
+        return backendAccountMapper.selectList(wrapper);
+    }
+
+    /**
      * 更新账户最后使用时间
      */
     @Transactional

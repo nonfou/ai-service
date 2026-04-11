@@ -45,8 +45,11 @@ Thumbs.db
 
 # 数据库文件
 *.db
+*.mv.db
+*.trace.db
 *.sqlite
 *.sqlite3
+data/
 
 # 其他
 !.mvn/wrapper/maven-wrapper.jar

@@ -1,104 +1,60 @@
-# AI API Platform - Docker 部署
+# Docker 部署
 
-## 目录结构
+当前仓库保留两套部署入口:
 
-```
-docker/
-├── docker-compose.yml   # Docker Compose 配置
-├── .env.example         # 环境变量示例
-├── .env                 # 实际环境变量 (需创建)
-├── conf/
-│   └── my.cnf           # MySQL 配置
-├── init/                # MySQL 初始化脚本
-│   └── *.sql
-└── README.md            # 本文档
+- `docker-compose.copilot.yml`: 开发/最小部署，使用内存 H2
+- `docker-compose.yml`: 生产部署，使用文件型 H2 持久化
 
-backend/
-└── Dockerfile           # 后端服务镜像构建
-```
-
-## 快速开始
-
-### 1. 配置环境变量
+## 1. 开发/最小部署
 
 ```bash
 cd docker
-cp .env .env
-
-# 编辑配置文件，填写实际值
-vim .env
+cp .env.copilot.example .env.copilot
 ```
 
-**必须配置的变量：**
-- `MYSQL_ROOT_PASSWORD` - MySQL root 密码
-- `MYSQL_PASSWORD` - 应用数据库密码
-- `JWT_SECRET` - JWT 签名密钥 (至少32字符)
-- `VERIFY_CODE_SECRET` - 验证码加密密钥
-- `ENCRYPTION_KEY` - 数据加密密钥 (16/24/32 字节)
+至少修改以下配置：
 
-### 2. 启动服务
+- `COPILOT_PROXY_BASE_URL`：指向你的 Copilot Relay，例如 `http://127.0.0.1:4141/v1`
+- `COPILOT_PROXY_API_KEY`：如果上游需要额外鉴权则填写，否则留空
+
+启动:
 
 ```bash
-# 构建并启动所有服务
-docker-compose up -d --build
-
-# 查看日志
-docker-compose logs -f backend
-
-# 查看服务状态
-docker-compose ps
+docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --build
 ```
 
-### 3. 停止服务
+说明:
+
+- 默认 `dev` profile
+- 默认内存 H2，重启后数据会重建
+- 适合只验证代理链路
+
+## 2. 生产部署
+
+准备生产环境变量:
 
 ```bash
-# 停止服务
-docker-compose down
-
-# 停止并删除数据卷 (会清除所有数据!)
-docker-compose down -v
+cd docker
+# 编辑 .env，设置安全密钥与 DB_PATH
 ```
 
-## 服务说明
-
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| backend | 8080 | Spring Boot 后端 API |
-| mysql | 3306 | MySQL 9.0 数据库 |
-| redis | 6379 | Redis 7 缓存 |
-
-## 健康检查
+生产启动:
 
 ```bash
-# 检查后端健康状态
-curl http://localhost:8080/actuator/health
-
-# 检查 MySQL
-docker exec ai-service-mysql mysqladmin ping -h localhost -u root -p
-
-# 检查 Redis
-docker exec ai-service-redis redis-cli ping
+docker compose --env-file .env -f docker-compose.yml up -d --build
 ```
 
-## 数据持久化
+说明:
 
-数据通过 Docker volumes 持久化：
-- `mysql_data` - MySQL 数据
-- `redis_data` - Redis 数据
+- 默认 `prod` profile
+- 数据通过 `./data:/app/data` 挂载到文件型 H2
+- `DB_PATH` 默认为 `/app/data/ai_api_platform`
 
-## 生产环境建议
+## 3. 验证
 
-1. **安全配置**
-   - 修改所有默认密码
-   - 使用强密钥 (`openssl rand -base64 32`)
-   - 设置 `COOKIE_SECURE=true`
-   - 配置 HTTPS 反向代理
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/v1/models
+```
 
-2. **性能调优**
-   - 根据服务器配置调整 `JAVA_OPTS`
-   - 调整 MySQL 和 Redis 内存限制
-   - 配置连接池参数
-
-3. **备份策略**
-   - 定期备份 MySQL 数据
-   - 备份 Redis 数据 (可选)
+若你的 Copilot Relay 不带 `/v1` 前缀，请把 `COPILOT_PROXY_BASE_URL` 配成完整实际地址。

@@ -17,45 +17,32 @@ spring:
   session:
     store-type: none
 
-  # 数据库配置 - 具体值由环境配置提供
+  # H2 嵌入式数据库配置
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    driver-class-name: org.h2.Driver
 
-    # HikariCP 连接池配置 (Spring Boot 默认连接池)
+    # HikariCP 连接池配置
     hikari:
-      # 连接池大小
-      minimum-idle: ${DB_HIKARI_MIN_IDLE:5}  # 最小空闲连接数
-      maximum-pool-size: ${DB_HIKARI_MAX_POOL:15}  # 最大连接数
-
-      # 超时配置
-      connection-timeout: ${DB_HIKARI_CONN_TIMEOUT:20000}  # 连接超时(20秒)
-      idle-timeout: ${DB_HIKARI_IDLE_TIMEOUT:300000}  # 空闲连接超时(5分钟)
-      max-lifetime: ${DB_HIKARI_MAX_LIFETIME:1800000}  # 连接最大生命周期(30分钟)
-
-      # 连接池命名
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 20000
       pool-name: HikariPool-AIService
+      auto-commit: true
 
-      # 其他配置
-      auto-commit: true  # 自动提交
-      read-only: false  # 非只读
+  # H2 控制台（可选，用于调试）
+  h2:
+    console:
+      enabled: ${H2_CONSOLE_ENABLED:false}
+      path: /h2-console
+      settings:
+        web-allow-others: ${H2_CONSOLE_ALLOW_OTHERS:false}
 
-  # Redis 配置 - 具体值由环境配置提供
-  data:
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      database: ${REDIS_DATABASE:0}
-      timeout: 5000ms
-      lettuce:
-        pool:
-          max-active: 8
-          max-wait: -1ms
-          max-idle: 8
-          min-idle: 0
+  # 数据库初始化
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema_h2.sql
+      continue-on-error: false
 
   # 邮件配置 - 具体值由环境配置提供
   mail:
@@ -185,15 +172,10 @@ backend:
     queue-capacity: ${BACKEND_STREAM_QUEUE:500}
     keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
 
-  # 请求路由配置
-  routing:
-    # 默认提供商: copilot 或 openrouter
-    default-provider: ${BACKEND_DEFAULT_PROVIDER:copilot}
-
   # Copilot 配置（直连 & Relay）
   copilot:
     proxy:
-      base-url: ${COPILOT_PROXY_BASE_URL:http://23.252.106.80:2235}
+      base-url: ${COPILOT_PROXY_BASE_URL:http://127.0.0.1:4141/v1}
       api-key: ${COPILOT_PROXY_API_KEY:}
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
       # 读超时：两次数据块之间的最大等待时间（10分钟，适用于 Claude 大模型长时间思考）
@@ -201,7 +183,7 @@ backend:
       # SSE 超时：整个流式响应的最大持续时间（30分钟）
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
       # Claude Code 热身请求使用的小模型（减少高级模型配额消耗）
-      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:gpt-5-mini}
+      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}
 
   # 调度策略
   scheduler:
@@ -240,21 +222,6 @@ backend:
     enforce: ${QUOTA_ENFORCE:true}  # 是否强制执行配额限制
     alert-threshold: ${QUOTA_ALERT_THRESHOLD:80.0}  # 告警阈值（百分比）
 
-  # OpenRouter 配置
-  openrouter:
-    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
-    fetch-realtime-pricing: ${OPENROUTER_FETCH_REALTIME_PRICING:true}  # 是否从 OpenRouter 获取实时价格
-    # 可选：从配置文件加载账户（也可以从数据库管理）
-    accounts:
-      - name: ${OPENROUTER_ACCOUNT_1_NAME:openrouter-1}
-        api-key: ${OPENROUTER_ACCOUNT_1_KEY:}
-        priority: 1
-        enabled: ${OPENROUTER_ACCOUNT_1_ENABLED:false}
-      - name: ${OPENROUTER_ACCOUNT_2_NAME:openrouter-2}
-        api-key: ${OPENROUTER_ACCOUNT_2_KEY:}
-        priority: 2
-        enabled: ${OPENROUTER_ACCOUNT_2_ENABLED:false}
-
 # Token 使用统计与计费事件配置
 usage:
   metrics:
@@ -266,8 +233,6 @@ usage:
     usage-record-limit: ${USAGE_METRICS_RECORD_LIMIT:200}
     enable-aggregation: ${USAGE_METRICS_ENABLE_AGGREGATION:true}
     enable-billing-events: ${USAGE_METRICS_ENABLE_BILLING:false}
-    billing-stream-key: ${USAGE_METRICS_BILLING_STREAM:billing:events}
-    billing-stream-max-length: ${USAGE_METRICS_BILLING_MAXLEN:100000}
 
 # ====================================================
 # Cookie 配置 (用于Token存储)

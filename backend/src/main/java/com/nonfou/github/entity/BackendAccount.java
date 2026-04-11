@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * 后端账户实体
- * 存储 GitHub Copilot 和 OpenRouter 的账户配置信息
+ * 存储 GitHub Copilot 的账户配置信息
  */
 @Data
 @TableName(value = "backend_accounts", autoResultMap = true)
@@ -28,7 +28,7 @@ public class BackendAccount {
     private String accountName;
 
     /**
-     * 提供商类型：copilot, openrouter
+     * 提供商类型：copilot
      */
     private String provider;
 

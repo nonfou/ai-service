@@ -253,37 +253,27 @@ export interface RechargeOrder {
 export interface BackendAccount {
   id: number
   accountName: string
-  provider: 'copilot' | 'openrouter'
+  provider: 'copilot'
   accessToken: string  // 前端显示时会脱敏
   priority: number
   status: 'active' | 'disabled' | 'error'
-  dailyLimit?: number
-  monthlyLimit?: number
-  currentDailyUsage?: number
-  currentMonthlyUsage?: number
   lastUsedAt?: string
-  healthStatus?: string
   errorCount: number
-  lastErrorMsg?: string
+  lastErrorMessage?: string
   createdAt: string
   updatedAt: string
 }
 
 export interface CreateBackendAccountRequest {
   accountName: string
-  provider: 'copilot' | 'openrouter'
   accessToken: string
   priority: number
-  dailyLimit?: number
-  monthlyLimit?: number
 }
 
 export interface UpdateBackendAccountRequest {
   accountName?: string
   accessToken?: string
   priority?: number
-  dailyLimit?: number
-  monthlyLimit?: number
 }
 
 export interface UserQuota {
@@ -540,32 +530,32 @@ export const adminAPI = {
   // ========== 后端账户管理 ==========
   // 获取所有后端账户
   getBackendAccounts: () => {
-    return request.get<ApiResponse<BackendAccount[]>>('/admin/backend-accounts')
+    return request.get<BackendAccount[]>('/admin/backend-accounts')
   },
 
   // 创建后端账户
   createBackendAccount: (data: CreateBackendAccountRequest) => {
-    return request.post<ApiResponse<BackendAccount>>('/admin/backend-accounts', data)
+    return request.post('/admin/backend-accounts', data)
   },
 
   // 更新后端账户
   updateBackendAccount: (accountId: number, data: UpdateBackendAccountRequest) => {
-    return request.put<ApiResponse<null>>(`/admin/backend-accounts/${accountId}`, data)
+    return request.put(`/admin/backend-accounts/${accountId}`, data)
   },
 
   // 删除后端账户
   deleteBackendAccount: (accountId: number) => {
-    return request.delete<ApiResponse<null>>(`/admin/backend-accounts/${accountId}`)
+    return request.delete(`/admin/backend-accounts/${accountId}`)
   },
 
   // 启用/禁用后端账户
   toggleBackendAccount: (accountId: number, enabled: boolean) => {
-    return request.put<ApiResponse<null>>(`/admin/backend-accounts/${accountId}/enable`, { enabled })
+    return request.put(`/admin/backend-accounts/${accountId}/${enabled ? 'enable' : 'disable'}`)
   },
 
   // 健康检查后端账户
   healthCheckBackendAccount: (accountId: number) => {
-    return request.post<ApiResponse<{ healthy: boolean }>>(`/admin/backend-accounts/${accountId}/health-check`)
+    return request.post<{ healthy: boolean; status: string; accountId: number }>(`/admin/backend-accounts/${accountId}/health-check`)
   },
 
   // ========== 用户配额管理 ==========

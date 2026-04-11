@@ -36,7 +36,7 @@ public class ApiCall {
     private String model;
 
     /**
-     * 提供方（copilot/openrouter 等）
+     * 提供方（如 copilot）
      */
     private String provider;
 

@@ -46,6 +46,10 @@ coverage/
 # Database
 *.sqlite
 *.db
+*.mv.db
+*.trace.db
+/backend/data/
+/docker/data/
 
 # Docker
 .dockerignore

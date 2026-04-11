@@ -3,12 +3,12 @@ package com.nonfou.github.interceptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonfou.github.common.Result;
 import com.nonfou.github.config.AdminSecurityConfig;
+import com.nonfou.github.service.InMemoryCacheService;
 import com.nonfou.github.util.LogMaskUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -25,7 +25,7 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
     private AdminSecurityConfig adminSecurityConfig;
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private InMemoryCacheService cacheService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -119,19 +119,17 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
     private boolean checkRateLimit(String clientIp) {
         String key = "admin:ratelimit:" + clientIp;
 
-        // 获取当前计数
-        String countStr = redisTemplate.opsForValue().get(key);
+        String countStr = cacheService.get(key);
         int count = countStr != null ? Integer.parseInt(countStr) : 0;
 
         if (count >= adminSecurityConfig.getRateLimit()) {
             return false;
         }
 
-        // 递增计数
         if (count == 0) {
-            redisTemplate.opsForValue().set(key, "1", 1, TimeUnit.MINUTES);
+            cacheService.set(key, "1", 1, TimeUnit.MINUTES);
         } else {
-            redisTemplate.opsForValue().increment(key);
+            cacheService.increment(key);
         }
 
         return true;

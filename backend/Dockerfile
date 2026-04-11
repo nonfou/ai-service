@@ -19,8 +19,8 @@ WORKDIR /app
 # 安装必要工具
 RUN apk add --no-cache curl
 
-# 创建日志目录
-RUN mkdir -p /app/logs
+# 创建日志和数据目录
+RUN mkdir -p /app/logs /app/data
 
 # 复制 jar 文件
 COPY --from=builder /app/target/*.jar app.jar

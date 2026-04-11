@@ -87,7 +87,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ChatResponse> response = restTemplate.exchange(
-                    baseUrl() + ApiEndpoint.CHAT_COMPLETIONS.getPath(),
+                    buildProxyUrl(ApiEndpoint.CHAT_COMPLETIONS.getPath()),
                     HttpMethod.POST,
                     entity,
                     ChatResponse.class
@@ -1162,7 +1162,7 @@ public class CopilotProxyService implements ModelProxy {
 
     private void validateApiKey(ApiKey apiKey) {
         if (apiKey == null) {
-            throw new ChatAuthorizationException(HttpStatus.UNAUTHORIZED.value(), "API Key 无效");
+            return;
         }
         if (apiKey.getStatus() != null && apiKey.getStatus() == 0) {
             throw new ChatAuthorizationException(HttpStatus.FORBIDDEN.value(), "API Key 已被禁用");
@@ -1197,6 +1197,19 @@ public class CopilotProxyService implements ModelProxy {
         return normalized;
     }
 
+    private String buildProxyUrl(String path) {
+        String base = baseUrl();
+        if (!StringUtils.hasText(path) || "/".equals(path)) {
+            return base;
+        }
+
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        if (base.endsWith("/v1") && normalizedPath.startsWith("/v1/")) {
+            normalizedPath = normalizedPath.substring(3);
+        }
+        return base + normalizedPath;
+    }
+
     // ============================================================
     // Models API 支持
     // ============================================================
@@ -1209,7 +1222,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ModelsResponse> response = restTemplate.exchange(
-                    baseUrl() + ApiEndpoint.MODELS.getPath(),
+                    buildProxyUrl(ApiEndpoint.MODELS.getPath()),
                     HttpMethod.GET,
                     entity,
                     ModelsResponse.class
@@ -1244,7 +1257,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<EmbeddingsResponse> response = restTemplate.exchange(
-                    baseUrl() + ApiEndpoint.EMBEDDINGS.getPath(),
+                    buildProxyUrl(ApiEndpoint.EMBEDDINGS.getPath()),
                     HttpMethod.POST,
                     entity,
                     EmbeddingsResponse.class
@@ -1314,7 +1327,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ClaudeResponse> response = restTemplate.exchange(
-                    baseUrl() + ApiEndpoint.MESSAGES.getPath(),
+                    buildProxyUrl(ApiEndpoint.MESSAGES.getPath()),
                     HttpMethod.POST,
                     entity,
                     ClaudeResponse.class
@@ -1625,7 +1638,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             ResponseEntity<ResponsesResponse> response = restTemplate.exchange(
-                    baseUrl() + ApiEndpoint.RESPONSES.getPath(),
+                    buildProxyUrl(ApiEndpoint.RESPONSES.getPath()),
                     HttpMethod.POST,
                     entity,
                     ResponsesResponse.class
@@ -1814,7 +1827,7 @@ public class CopilotProxyService implements ModelProxy {
     }
 
     private HttpURLConnection openStreamingConnection(String path, Map<String, String> additionalHeaders) throws Exception {
-        URL url = new URL(baseUrl() + path);
+        URL url = new URL(buildProxyUrl(path));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);

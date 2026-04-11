@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -27,13 +29,15 @@ public class AccountSchedulerService {
     private final UserAccountBindingMapper userAccountBindingMapper;
     private final SessionStickinessService sessionStickinessService;
     private final ModelService modelService;
-    private final RedisService redisService;
 
     @Value("${backend.scheduler.strategy:HYBRID}")
     private String schedulerStrategy;
 
     // 轮询索引
     private final AtomicInteger roundRobinIndex = new AtomicInteger(0);
+
+    // 账户使用计数（内存版）
+    private final ConcurrentHashMap<Long, AtomicLong> accountUsageCounts = new ConcurrentHashMap<>();
 
     /**
      * 选择账户的主入口方法
@@ -111,8 +115,8 @@ public class AccountSchedulerService {
         if (lowerModel.contains("copilot") || lowerModel.startsWith("github-")) {
             return "copilot";
         }
-        // 默认使用 openrouter
-        return "openrouter";
+        // 最小化代理模式下默认走 copilot
+        return "copilot";
     }
 
     /**
@@ -219,15 +223,17 @@ public class AccountSchedulerService {
     }
 
     /**
-     * 获取账户使用次数（从 Redis）
+     * 获取账户使用次数（内存版）
      */
     private long getUsageCount(BackendAccount account) {
-        try {
-            String key = "usage:" + account.getId();
-            String value = redisService.get(key);
-            return value != null ? Long.parseLong(value) : 0;
-        } catch (Exception e) {
-            return 0;
-        }
+        AtomicLong counter = accountUsageCounts.get(account.getId());
+        return counter != null ? counter.get() : 0;
+    }
+
+    /**
+     * 记录账户使用（由外部调用）
+     */
+    public void recordAccountUsage(Long accountId) {
+        accountUsageCounts.computeIfAbsent(accountId, k -> new AtomicLong(0)).incrementAndGet();
     }
 }

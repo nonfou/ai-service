@@ -10,7 +10,6 @@ import com.nonfou.github.util.JwtUtil;
 import com.nonfou.github.util.LogMaskUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +43,7 @@ public class AdminService {
     private com.nonfou.github.config.AdminSecurityConfig adminSecurityConfig;
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private InMemoryCacheService cacheService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -55,7 +54,7 @@ public class AdminService {
         // 检查是否被锁定
         if (adminSecurityConfig.isEnableLoginLock()) {
             String lockKey = "admin:login:lock:" + username;
-            String locked = redisTemplate.opsForValue().get(lockKey);
+            String locked = cacheService.get(lockKey);
             if ("1".equals(locked)) {
                 throw new RuntimeException("账号已被锁定,请" + adminSecurityConfig.getLockDuration() + "分钟后重试");
             }
@@ -85,7 +84,7 @@ public class AdminService {
         // 登录成功,清除失败记录
         clearLoginFailure(username);
 
-        // 生成token (管理员统一使用ADMIN角色,确保与Spring Security的hasRole("ADMIN")匹配)
+        // 生成token
         String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
 
         Map<String, Object> result = new HashMap<>();
@@ -110,15 +109,13 @@ public class AdminService {
         String failKey = "admin:login:fail:" + username;
         String lockKey = "admin:login:lock:" + username;
 
-        // 递增失败次数
-        Long failCount = redisTemplate.opsForValue().increment(failKey);
+        Long failCount = cacheService.increment(failKey);
         if (failCount == 1) {
-            redisTemplate.expire(failKey, adminSecurityConfig.getLockDuration(), TimeUnit.MINUTES);
+            cacheService.expire(failKey, adminSecurityConfig.getLockDuration(), TimeUnit.MINUTES);
         }
 
-        // 超过最大次数,锁定账号
         if (failCount >= adminSecurityConfig.getMaxLoginAttempts()) {
-            redisTemplate.opsForValue().set(lockKey, "1", adminSecurityConfig.getLockDuration(), TimeUnit.MINUTES);
+            cacheService.set(lockKey, "1", adminSecurityConfig.getLockDuration(), TimeUnit.MINUTES);
             log.warn("管理员账号已锁定: username={}, 失败次数={}", LogMaskUtil.mask(username, 2, 1), failCount);
         }
     }
@@ -134,8 +131,8 @@ public class AdminService {
         String failKey = "admin:login:fail:" + username;
         String lockKey = "admin:login:lock:" + username;
 
-        redisTemplate.delete(failKey);
-        redisTemplate.delete(lockKey);
+        cacheService.delete(failKey);
+        cacheService.delete(lockKey);
     }
 
     /**
@@ -193,10 +190,8 @@ public class AdminService {
         }
 
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
-            // 增加余额
             balanceService.addBalance(userId, amount, "admin_adjust", userId, remark);
         } else if (amount.compareTo(BigDecimal.ZERO) < 0) {
-            // 扣减余额
             balanceService.deductBalance(userId, amount.abs(), "admin_adjust", userId, remark);
         }
 
@@ -207,20 +202,16 @@ public class AdminService {
      * 获取平台统计数据
      */
     public Map<String, Object> getPlatformStatistics() {
-        // 用户总数
         Long totalUsers = userMapper.selectCount(null);
 
-        // 活跃用户数(状态为1)
         LambdaQueryWrapper<User> activeWrapper = new LambdaQueryWrapper<>();
         activeWrapper.eq(User::getStatus, 1);
         Long activeUsers = userMapper.selectCount(activeWrapper);
 
-        // 今日注册用户数
         LambdaQueryWrapper<User> todayWrapper = new LambdaQueryWrapper<>();
         todayWrapper.ge(User::getCreatedAt, LocalDateTime.now().toLocalDate().atStartOfDay());
         Long todayRegistrations = userMapper.selectCount(todayWrapper);
 
-        // 用户总余额
         BigDecimal totalBalance = userMapper.selectList(null).stream()
                 .map(User::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -235,7 +226,7 @@ public class AdminService {
     }
 
     /**
-     * 重置管理员密码 (临时接口,仅用于开发测试)
+     * 重置管理员密码
      */
     public Map<String, Object> resetAdminPassword(String username, String newPassword) {
         LambdaQueryWrapper<Admin> wrapper = new LambdaQueryWrapper<>();

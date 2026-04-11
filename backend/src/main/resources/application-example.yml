@@ -1,224 +1,92 @@
 # ====================================================
-# AI API Platform - 环境变量配置示例
+# AI API Platform - H2 配置示例
 # ====================================================
 #
 # 说明:
-# 1. 这是一个配置模板文件,展示了所有需要通过环境变量设置的配置项
-# 2. 请将此文件复制为 .env 文件,或直接设置系统环境变量
-# 3. 标注 [必需] 的配置项必须设置,否则应用无法启动
-# 4. 标注 [敏感] 的配置项包含敏感信息,请妥善保管
-# 5. 标注 [可选] 的配置项有默认值,可根据需要调整
-#
-# 快速开始:
-#   开发环境: 大部分配置有默认值,只需设置密钥即可
-#   生产环境: 必须设置所有 [必需] 配置项
+# 1. 开发环境默认使用内存 H2，无需额外数据库配置
+# 2. 生产环境使用文件型 H2，请通过 DB_PATH 指定持久化目录
+# 3. 请将此文件复制为 .env 或直接设置系统环境变量
+# 4. 标注 [必需] 的配置项必须设置，否则应用无法启动
 #
 # ====================================================
 
 # ----------------------------------------------------
-# 数据库配置 (MySQL)
+# 数据库配置 (H2)
 # ----------------------------------------------------
 
-# [必需] 数据库连接地址
-# 开发环境示例: jdbc:mysql://localhost:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
-# 生产环境示例: jdbc:mysql://your-db-host:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=true&requireSSL=true&serverTimezone=Asia/Shanghai&cachePrepStmts=true&prepStmtCacheSize=250
-DB_URL=jdbc:mysql://localhost:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+# [可选] 生产环境 H2 文件路径
+# 开发环境默认使用内存 H2，无需设置
+# 生产环境示例:
+DB_PATH=/app/data/ai_api_platform
 
-# [必需] 数据库用户名
-DB_USERNAME=root
+# [可选] H2 用户名
+DB_USERNAME=sa
 
-# [必需][敏感] 数据库密码
-DB_PASSWORD=your_database_password
+# [可选][敏感] H2 密码
+DB_PASSWORD=
 
-
-# ----------------------------------------------------
-# Redis 配置
-# ----------------------------------------------------
-
-# [可选] Redis 主机地址 (默认: localhost)
-REDIS_HOST=localhost
-
-# [可选] Redis 端口 (默认: 6379)
-REDIS_PORT=6379
-
-# [可选][敏感] Redis 密码 (如未设置密码则留空)
-REDIS_PASSWORD=
+# [可选] 开发环境是否启用 H2 Console
+H2_CONSOLE_ENABLED=true
 
 
 # ----------------------------------------------------
 # 邮件服务配置
 # ----------------------------------------------------
 
-# [必需] SMTP 服务器地址
-# 常见邮箱服务器:
-#   - QQ邮箱: smtp.qq.com
-#   - 腾讯企业邮箱: smtp.exmail.qq.com
-#   - 网易邮箱: smtp.163.com
-#   - Gmail: smtp.gmail.com
-MAIL_HOST=smtp.exmail.qq.com
-
-# [必需] SMTP 端口
-# SSL: 465, TLS: 587
-MAIL_PORT=465
-
-# [必需] 邮箱账号
-MAIL_USERNAME=support@example.com
-
-# [必需][敏感] 邮箱密码或授权码
-# 注意: 某些邮箱服务需要使用"授权码"而非登录密码
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=service@example.com
 MAIL_PASSWORD=your_mail_password_or_auth_code
+MAIL_SSL_ENABLE=false
+MAIL_STARTTLS_ENABLE=true
 
 
 # ----------------------------------------------------
 # 安全密钥配置
 # ----------------------------------------------------
 
-# [必需][敏感] JWT Token 签名密钥
-# 要求: 至少32字符的随机字符串
-# 生成方法: openssl rand -base64 32
-# 示例:
 JWT_SECRET=your_jwt_secret_key_at_least_32_characters_long
-
-# [可选] JWT Token 有效期 (毫秒)
-# 默认: 604800000 (7天)
 JWT_EXPIRATION=604800000
-
-# [必需][敏感] 数据加密密钥
-# 要求: 32字节(64位十六进制)
-# 生成方法: openssl rand -hex 32
-# 示例:
-ENCRYPTION_KEY=your_32_bytes_hex_encryption_key_64_characters
-
-# [必需][敏感] 验证码加密密钥
-# 要求: 至少16字符的随机字符串
-# 生成方法: openssl rand -base64 16
-# 示例:
+ENCRYPTION_KEY=your_32_chars_encryption_key
 VERIFY_CODE_SECRET=your_verify_code_secret_key
 
 
 # ----------------------------------------------------
-# 支付宝配置
+# Copilot Relay 配置
 # ----------------------------------------------------
 
-# [可选][敏感] 支付宝 AppID
-ALIPAY_APP_ID=your_alipay_app_id
-
-# [可选][敏感] 支付宝应用私钥
-# 注意: 这是一个很长的字符串,请完整复制
-ALIPAY_PRIVATE_KEY=your_alipay_private_key
-
-# [可选][敏感] 支付宝公钥
-ALIPAY_PUBLIC_KEY=your_alipay_public_key
-
-
-# ----------------------------------------------------
-# 微信支付配置
-# ----------------------------------------------------
-
-# [可选][敏感] 微信 AppID
-WECHAT_APP_ID=your_wechat_app_id
-
-# [可选][敏感] 微信商户号
-WECHAT_MCH_ID=your_wechat_mch_id
-
-# [可选][敏感] 微信 API v3 密钥
-WECHAT_API_V3_KEY=your_wechat_api_v3_key
+COPILOT_PROXY_BASE_URL=http://127.0.0.1:4141/v1
+COPILOT_PROXY_API_KEY=
+COPILOT_PROXY_CONNECT_TIMEOUT_MS=10000
+COPILOT_PROXY_READ_TIMEOUT_MS=600000
+COPILOT_PROXY_STREAM_TIMEOUT_MS=1800000
+COPILOT_PROXY_WARMUP_MODEL=claude-haiku-4.5
 
 
 # ----------------------------------------------------
 # 管理后台安全配置
 # ----------------------------------------------------
 
-# [可选] 是否启用 IP 白名单 (默认: false)
-# 生产环境建议启用
 ADMIN_ENABLE_IP_WHITELIST=false
-
-# [可选] 是否启用请求频率限制 (默认: true)
-# 用于防止暴力破解
 ADMIN_ENABLE_RATE_LIMIT=true
-
-# [可选] 请求频率限制 - 每分钟最大请求数 (默认: 60)
 ADMIN_RATE_LIMIT=60
-
-# [可选] 是否启用登录失败锁定 (默认: true)
 ADMIN_ENABLE_LOGIN_LOCK=true
-
-# [可选] 登录失败锁定 - 最大失败次数 (默认: 5)
 ADMIN_MAX_LOGIN_ATTEMPTS=5
-
-# [可选] 登录失败锁定 - 锁定时长(分钟) (默认: 30)
 ADMIN_LOCK_DURATION=30
 
 
 # ====================================================
-# 快速配置指南
+# 最小配置指南
 # ====================================================
 #
-# ## 最小配置 (开发环境)
+# 开发环境:
+# 1. 使用默认 dev profile
+# 2. 只需设置 JWT_SECRET / ENCRYPTION_KEY / VERIFY_CODE_SECRET
+# 3. 如需联调上游，再设置 COPILOT_PROXY_BASE_URL
 #
-# 以下配置可让应用快速启动(使用默认值):
-#
-# DB_PASSWORD=root123
-# JWT_SECRET=$(openssl rand -base64 32)
-# ENCRYPTION_KEY=$(openssl rand -hex 32)
-# VERIFY_CODE_SECRET=$(openssl rand -base64 16)
-# MAIL_PASSWORD=your_mail_password
-#
-# ## 完整配置 (生产环境)
-#
-# 生产环境必须配置所有 [必需] 项,并使用强密钥:
-#
-# 1. 数据库配置: DB_URL, DB_USERNAME, DB_PASSWORD
-# 2. Redis 配置: REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
-# 3. 邮件配置: MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
-# 4. 安全密钥: JWT_SECRET, ENCRYPTION_KEY, VERIFY_CODE_SECRET
-# 5. 支付配置: (如需使用支付功能)
-#
-# ## 密钥生成命令
-#
-# # JWT 密钥 (Base64, 32字节)
-# openssl rand -base64 32
-#
-# # 加密密钥 (Hex, 32字节)
-# openssl rand -hex 32
-#
-# # 验证码密钥 (Base64, 16字节)
-# openssl rand -base64 16
-#
-# ## 环境变量设置方法
-#
-# ### Linux/macOS (.bashrc 或 .zshrc)
-# export DB_PASSWORD="your_password"
-# export JWT_SECRET="your_secret"
-#
-# ### Windows (命令行)
-# set DB_PASSWORD=your_password
-# set JWT_SECRET=your_secret
-#
-# ### Windows (PowerShell)
-# $env:DB_PASSWORD="your_password"
-# $env:JWT_SECRET="your_secret"
-#
-# ### Docker Compose (docker-compose.yml)
-# environment:
-#   - DB_PASSWORD=your_password
-#   - JWT_SECRET=your_secret
-#
-# ### Kubernetes (Secret)
-# kubectl create secret generic app-secrets \
-#   --from-literal=DB_PASSWORD=your_password \
-#   --from-literal=JWT_SECRET=your_secret
-#
-# ====================================================
-# 安全建议
-# ====================================================
-#
-# 1. ⚠️ 请勿将包含真实密码的配置文件提交到版本控制系统
-# 2. ⚠️ 生产环境必须使用强密码和随机生成的密钥
-# 3. ⚠️ 定期轮换密钥和密码
-# 4. ⚠️ 使用密钥管理服务(如 AWS Secrets Manager, Azure Key Vault)
-# 5. ⚠️ 限制环境变量的访问权限
-# 6. ⚠️ 生产环境必须启用数据库 SSL/TLS 连接
-# 7. ⚠️ 生产环境必须启用管理后台安全防护(速率限制、登录锁定)
+# 生产环境:
+# 1. 设置 SPRING_PROFILES_ACTIVE=prod
+# 2. 设置 DB_PATH 指向持久化目录
+# 3. 设置所有安全密钥与邮件配置
 #
 # ====================================================

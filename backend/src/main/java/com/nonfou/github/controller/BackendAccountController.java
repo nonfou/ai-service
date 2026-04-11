@@ -1,6 +1,5 @@
 package com.nonfou.github.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nonfou.github.entity.BackendAccount;
 import com.nonfou.github.service.BackendAccountService;
 import lombok.Data;
@@ -9,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,18 +26,13 @@ public class BackendAccountController {
      * 分页查询账户列表
      */
     @GetMapping
-    public ResponseEntity<Page<BackendAccount>> list(
-            @RequestParam(defaultValue = "1") int current,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String status) {
-
-        Page<BackendAccount> page = backendAccountService.getAccountPage(current, size, provider, status);
+    public ResponseEntity<List<BackendAccount>> list(@RequestParam(required = false) String status) {
+        List<BackendAccount> accounts = backendAccountService.listAccounts(status);
 
         // 隐藏敏感的 access_token
-        page.getRecords().forEach(account -> account.setAccessToken("***"));
+        accounts.forEach(account -> account.setAccessToken("***"));
 
-        return ResponseEntity.ok(page);
+        return ResponseEntity.ok(accounts);
     }
 
     /**
@@ -63,7 +58,7 @@ public class BackendAccountController {
     public ResponseEntity<Map<String, Object>> create(@RequestBody CreateAccountRequest request) {
         BackendAccount account = new BackendAccount();
         account.setAccountName(request.getAccountName());
-        account.setProvider(request.getProvider());
+        account.setProvider("copilot");
         account.setAccessToken(request.getAccessToken());
         account.setPriority(request.getPriority());
         account.setStatus(request.getStatus() != null ? request.getStatus() : "active");
@@ -180,12 +175,9 @@ public class BackendAccountController {
         boolean isHealthy = backendAccountService.healthCheck(id);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("data", Map.of(
-                "accountId", id,
-                "isHealthy", isHealthy,
-                "status", isHealthy ? "healthy" : "unhealthy"
-        ));
+        result.put("healthy", isHealthy);
+        result.put("status", isHealthy ? "healthy" : "unhealthy");
+        result.put("accountId", id);
 
         return ResponseEntity.ok(result);
     }
@@ -225,7 +217,6 @@ public class BackendAccountController {
     @Data
     public static class CreateAccountRequest {
         private String accountName;
-        private String provider;  // copilot, openrouter
         private String accessToken;
         private Integer priority;
         private String status;

@@ -12,7 +12,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public interface ModelProxy {
 
     /**
-     * 提供方标识，例如 copilot、openrouter
+     * 提供方标识，例如 copilot
      */
     String getProvider();
 

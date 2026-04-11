@@ -1,7 +1,7 @@
 <template>
   <div class="backend-accounts-page">
     <!-- 页面头部 -->
-    <PageHeader title="后端账户管理" description="管理 API 提供商账户和访问凭证">
+    <PageHeader title="后端账户管理" description="管理 Copilot 账户和访问凭证">
       <template #actions>
         <el-button type="primary" @click="showCreateDialog">
           <el-icon><Plus /></el-icon>
@@ -25,8 +25,8 @@
         </el-table-column>
         <el-table-column prop="provider" label="提供商" width="120">
           <template #default="{ row }">
-            <span class="provider-badge" :class="row.provider === 'copilot' ? 'provider-copilot' : 'provider-openrouter'">
-              {{ row.provider === 'copilot' ? 'Copilot' : 'OpenRouter' }}
+            <span class="provider-badge provider-copilot">
+              Copilot
             </span>
           </template>
         </el-table-column>
@@ -91,12 +91,6 @@
         <el-form-item label="账户名称" prop="accountName">
           <el-input v-model="accountForm.accountName" placeholder="例如: copilot-account-1" />
         </el-form-item>
-        <el-form-item label="提供商" prop="provider">
-          <el-select v-model="accountForm.provider" :disabled="isEdit" style="width: 100%">
-            <el-option label="GitHub Copilot" value="copilot" />
-            <el-option label="OpenRouter" value="openrouter" />
-          </el-select>
-        </el-form-item>
         <el-form-item label="访问令牌" prop="accessToken">
           <el-input
             v-model="accountForm.accessToken"
@@ -109,35 +103,6 @@
           <el-input-number v-model="accountForm.priority" :min="1" :max="100" />
           <div class="form-tip">数字越小优先级越高，建议1-10</div>
         </el-form-item>
-
-        <el-divider content-position="left">
-          <span class="divider-text">使用限额</span>
-        </el-divider>
-
-        <div class="limit-grid">
-          <el-form-item label="每日限额">
-            <el-input-number
-              v-model="accountForm.dailyLimit"
-              :precision="2"
-              :step="100"
-              :min="0"
-              placeholder="不限制"
-              style="width: 100%"
-            />
-            <div class="form-tip">0表示不限制</div>
-          </el-form-item>
-          <el-form-item label="每月限额">
-            <el-input-number
-              v-model="accountForm.monthlyLimit"
-              :precision="2"
-              :step="1000"
-              :min="0"
-              placeholder="不限制"
-              style="width: 100%"
-            />
-            <div class="form-tip">0表示不限制</div>
-          </el-form-item>
-        </div>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -168,20 +133,14 @@ const healthCheckLoading = ref<Record<number, boolean>>({})
 const formRef = ref<FormInstance>()
 const accountForm = reactive<Partial<CreateBackendAccountRequest>>({
   accountName: '',
-  provider: 'copilot',
   accessToken: '',
-  priority: 1,
-  dailyLimit: 0,
-  monthlyLimit: 0
+  priority: 1
 })
 
 const formRules: FormRules = {
   accountName: [
     { required: true, message: '请输入账户名称', trigger: 'blur' },
     { min: 2, max: 100, message: '长度在 2 到 100 个字符', trigger: 'blur' }
-  ],
-  provider: [
-    { required: true, message: '请选择提供商', trigger: 'change' }
   ],
   accessToken: [
     {
@@ -204,7 +163,7 @@ const loadAccounts = async () => {
   loading.value = true
   try {
     const res = await adminAPI.getBackendAccounts()
-    accounts.value = res.data
+    accounts.value = res
   } catch (error: any) {
     message.error(error.response?.data?.message || '加载账户列表失败')
   } finally {
@@ -221,11 +180,8 @@ const showCreateDialog = () => {
 const resetForm = () => {
   Object.assign(accountForm, {
     accountName: '',
-    provider: 'copilot',
     accessToken: '',
-    priority: 1,
-    dailyLimit: 0,
-    monthlyLimit: 0
+    priority: 1
   })
   formRef.value?.clearValidate()
 }
@@ -235,11 +191,8 @@ const handleEdit = (row: BackendAccount) => {
   currentAccountId.value = row.id
   Object.assign(accountForm, {
     accountName: row.accountName,
-    provider: row.provider,
     accessToken: '',
-    priority: row.priority,
-    dailyLimit: row.dailyLimit || 0,
-    monthlyLimit: row.monthlyLimit || 0
+    priority: row.priority
   })
   dialogVisible.value = true
 }
@@ -255,9 +208,7 @@ const handleSubmit = async () => {
       if (isEdit.value) {
         const updateData: UpdateBackendAccountRequest = {
           accountName: accountForm.accountName,
-          priority: accountForm.priority,
-          dailyLimit: accountForm.dailyLimit,
-          monthlyLimit: accountForm.monthlyLimit
+          priority: accountForm.priority
         }
         if (accountForm.accessToken) {
           updateData.accessToken = accountForm.accessToken
@@ -293,7 +244,7 @@ const handleHealthCheck = async (row: BackendAccount) => {
   healthCheckLoading.value[row.id] = true
   try {
     const res = await adminAPI.healthCheckBackendAccount(row.id)
-    if (res.data.healthy) {
+    if (res.healthy) {
       message.success('健康检查通过')
     } else {
       message.warning('健康检查失败')
@@ -400,11 +351,6 @@ onMounted(() => {
   color: var(--primary-color);
 }
 
-.provider-openrouter {
-  background: var(--success-bg);
-  color: var(--success-color);
-}
-
 /* 状态徽章 */
 .status-badge {
   display: inline-flex;
@@ -446,28 +392,9 @@ onMounted(() => {
   justify-content: center;
 }
 
-/* 对话框样式 */
-.divider-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.limit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0 24px;
-}
-
 .form-tip {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 4px;
-}
-
-@media (max-width: 600px) {
-  .limit-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

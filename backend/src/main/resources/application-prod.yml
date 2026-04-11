@@ -11,40 +11,24 @@ spring:
   application:
     name: ai-api-platform
 
-  # 数据库配置 - 生产环境
+  # H2 数据库配置 - 生产环境
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    # ⚠️ 生产环境建议启�� SSL: useSSL=true&requireSSL=true
-    url: ${DB_URL}  # 必须设置,示例: jdbc:mysql://your-db-host:3306/ai_api_platform?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=Asia/Shanghai
-    username: ${DB_USERNAME}  # 必须设置
-    password: ${DB_PASSWORD}  # 必须设置
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:file:${DB_PATH:/app/data/ai_api_platform};MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
 
-    # 连接池配置 (生产环境优化)
+    # 连接池配置
     hikari:
-      minimum-idle: 10  # 生产环境保持更多空闲连接
-      maximum-pool-size: 30  # 根据并发量调整
-      connection-timeout: 20000  # 连接超时 20秒
-      idle-timeout: 300000  # 空闲连接超时 5分钟
-      max-lifetime: 1800000  # 连接最大生命周期 30分钟
-      leak-detection-threshold: 60000  # ✅ 连接泄漏检测 60秒
-      pool-name: HikariPool-AIService-Prod  # 便于监控识别
-      register-mbeans: true  # ✅ 启用 JMX 监控
-      # 注意: connection-test-query 已移除,HikariCP 自动使用 JDBC4 isValid()
+      minimum-idle: 5
+      maximum-pool-size: 15
+      connection-timeout: 20000
+      pool-name: HikariPool-AIService-Prod
 
-  # Redis 配置 - 生产环境
-  data:
-    redis:
-      host: ${REDIS_HOST}  # 必须设置
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}  # 必须设置(如Redis启用了密码)
-      database: ${REDIS_DATABASE:0}
-      timeout: 5000ms
-      lettuce:
-        pool:
-          max-active: 16
-          max-wait: -1ms
-          max-idle: 8
-          min-idle: 2
+  # H2 控制台 - 生产环境关闭
+  h2:
+    console:
+      enabled: false
 
   # 邮件配置 - 生产环境
   mail:
@@ -76,7 +60,6 @@ mybatis-plus:
   type-aliases-package: com.nonfou.github.entity
   configuration:
     map-underscore-to-camel-case: true
-    # ✅ 生产环境使用 Slf4j 而非 StdOut
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
@@ -87,9 +70,9 @@ mybatis-plus:
 
 # JWT 配置 - 生产环境
 jwt:
-  secret: ${JWT_SECRET}  # ⚠️ 必须设置,长度>=32字符,使用: openssl rand -base64 32
-  expiration: ${JWT_EXPIRATION:604800000}  # 7天
-  issuer: ${JWT_ISSUER}  # ⚠️ 必须设置，生产环境使用实际域名如: api.example.com
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:604800000}
+  issuer: ${JWT_ISSUER}
 
 # 认证配置 - 生产环境
 auth:
@@ -97,7 +80,7 @@ auth:
     ttl-seconds: ${AUTH_VERIFY_CODE_TTL_SECONDS:300}
     min-interval-seconds: ${AUTH_VERIFY_CODE_MIN_INTERVAL:60}
     max-per-hour: ${AUTH_VERIFY_CODE_MAX_PER_HOUR:10}
-    hash-secret: ${VERIFY_CODE_SECRET}  # ⚠️ 必须设置
+    hash-secret: ${VERIFY_CODE_SECRET}
 
 # 系统配置缓存
 system-config:
@@ -105,45 +88,40 @@ system-config:
 
 # 支付宝配置 - 生产环境
 alipay:
-  app-id: ${ALIPAY_APP_ID}  # 必须设置
-  private-key: ${ALIPAY_PRIVATE_KEY}  # 必须设置
-  public-key: ${ALIPAY_PUBLIC_KEY}  # 必须设置
-  gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipay.com/gateway.do}  # 生产网关
-  notify-url: ${ALIPAY_NOTIFY_URL}  # ⚠️ 必须使用 HTTPS
-  return-url: ${ALIPAY_RETURN_URL}  # ⚠️ 必须使用 HTTPS
+  app-id: ${ALIPAY_APP_ID}
+  private-key: ${ALIPAY_PRIVATE_KEY}
+  public-key: ${ALIPAY_PUBLIC_KEY}
+  gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipay.com/gateway.do}
+  notify-url: ${ALIPAY_NOTIFY_URL}
+  return-url: ${ALIPAY_RETURN_URL}
   sign-type: RSA2
   charset: UTF-8
   format: json
 
 # 微信支付配置 - 生产环境
 wechat:
-  app-id: ${WECHAT_APP_ID}  # 必须设置
-  mch-id: ${WECHAT_MCH_ID}  # 必须设置
-  api-v3-key: ${WECHAT_API_V3_KEY}  # 必须设置
-  merchant-serial-number: ${WECHAT_MERCHANT_SERIAL_NUMBER}  # 必须设置
+  app-id: ${WECHAT_APP_ID}
+  mch-id: ${WECHAT_MCH_ID}
+  api-v3-key: ${WECHAT_API_V3_KEY}
+  merchant-serial-number: ${WECHAT_MERCHANT_SERIAL_NUMBER}
   private-key-path: ${WECHAT_PRIVATE_KEY_PATH:classpath:apiclient_key.pem}
-  notify-url: ${WECHAT_NOTIFY_URL}  # ⚠️ 必须使用 HTTPS
+  notify-url: ${WECHAT_NOTIFY_URL}
 
 # 管理后台安全配置 - 生产环境
 admin:
   security:
-    # IP白名单
     enable-ip-whitelist: ${ADMIN_ENABLE_IP_WHITELIST:false}
-    ip-whitelist: ${ADMIN_IP_WHITELIST:}  # 逗号分隔的IP列表
-
-    # ✅ 生产环境强制启用请求频率限制
+    ip-whitelist: ${ADMIN_IP_WHITELIST:}
     enable-rate-limit: true
-    rate-limit: ${ADMIN_RATE_LIMIT:60}  # 每分钟最大请求数
-
-    # ✅ 生产环境强制启用登录失败锁定
+    rate-limit: ${ADMIN_RATE_LIMIT:60}
     enable-login-lock: true
-    max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}  # 最大失败次数
-    lock-duration: ${ADMIN_LOCK_DURATION:30}  # 锁定时长(分钟)
+    max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}
+    lock-duration: ${ADMIN_LOCK_DURATION:30}
 
 # 加密配置 - 生产环境
 encryption:
-  key: ${ENCRYPTION_KEY}  # ⚠️ 必须设置,32字节随机hex: openssl rand -hex 32
-  iv: ${ENCRYPTION_IV:}  # 已弃用,仅为兼容保留
+  key: ${ENCRYPTION_KEY}
+  iv: ${ENCRYPTION_IV:}
 
 # 后端账户调度配置 - 生产环境
 backend:
@@ -173,19 +151,14 @@ backend:
     queue-capacity: ${BACKEND_STREAM_QUEUE:500}
     keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
 
-  routing:
-    default-provider: ${BACKEND_DEFAULT_PROVIDER:copilot}
-
   copilot:
-    base-url: ${COPILOT_BASE_URL:https://api.githubcopilot.com}
     proxy:
-      base-url: ${COPILOT_PROXY_BASE_URL:https://api.githubcopilot.com/v1}
+      base-url: ${COPILOT_PROXY_BASE_URL:http://127.0.0.1:4141/v1}
       api-key: ${COPILOT_PROXY_API_KEY:}
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
-      # 读超时：两次数据块之间的最大等待时间（10分钟，适用于 Claude 大模型长时间思考）
       read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:600000}
-      # SSE 超时：整个流式响应的最大持续时间（30分钟）
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
+      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}
 
   scheduler:
     strategy: ${BACKEND_SCHEDULER_STRATEGY:HYBRID}
@@ -217,20 +190,7 @@ backend:
     enforce: ${QUOTA_ENFORCE:true}
     alert-threshold: ${QUOTA_ALERT_THRESHOLD:80.0}
 
-  openrouter:
-    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
-    fetch-realtime-pricing: ${OPENROUTER_FETCH_REALTIME_PRICING:true}
-    accounts:
-      - name: ${OPENROUTER_ACCOUNT_1_NAME:openrouter-1}
-        api-key: ${OPENROUTER_ACCOUNT_1_KEY:}
-        priority: 1
-        enabled: ${OPENROUTER_ACCOUNT_1_ENABLED:false}
-      - name: ${OPENROUTER_ACCOUNT_2_NAME:openrouter-2}
-        api-key: ${OPENROUTER_ACCOUNT_2_KEY:}
-        priority: 2
-        enabled: ${OPENROUTER_ACCOUNT_2_ENABLED:false}
-
-# Token 使用统计与计费事件配置 - 生产环境
+# Token 使用统计配置 - 生产环境
 usage:
   metrics:
     timezone: ${USAGE_METRICS_TIMEZONE:Asia/Shanghai}
@@ -241,8 +201,6 @@ usage:
     usage-record-limit: ${USAGE_METRICS_RECORD_LIMIT:200}
     enable-aggregation: ${USAGE_METRICS_ENABLE_AGGREGATION:true}
     enable-billing-events: ${USAGE_METRICS_ENABLE_BILLING:false}
-    billing-stream-key: ${USAGE_METRICS_BILLING_STREAM:billing:events}
-    billing-stream-max-length: ${USAGE_METRICS_BILLING_MAXLEN:100000}
 
 # ====================================================
 # 日志配置 - 生产环境

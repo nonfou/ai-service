@@ -56,7 +56,7 @@ public class ChatController {
      */
     @PostMapping("/chat/completions")
     public Object openaiChatCompletions(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody @Validated ChatRequest request) {
         log.debug("OpenAI API 兼容接口调用: /v1/chat/completions");
         return handleChatRequest(authorization, request);
@@ -94,20 +94,6 @@ public class ChatController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody @Validated ClaudeRequest request) {
         log.info("Claude API count_tokens 接口调用: /v1/messages/count_tokens, model={}", request.getModel());
-
-        // 验证 API Key（与其他端点保持一致的安全检查）
-        String authHeader = StringUtils.hasText(xApiKey) ? "Bearer " + xApiKey : authorization;
-        if (!StringUtils.hasText(authHeader)) {
-            return ClaudeErrorResponse.fromStatusCode(401, "缺少认证信息");
-        }
-        try {
-            // 调用 workflow 服务进行认证验证（不执行实际请求）
-            chatWorkflowService.validateApiKey(authHeader);
-        } catch (ChatAuthorizationException e) {
-            return ClaudeErrorResponse.fromStatusCode(e.getStatusCode(), e.getMessage());
-        } catch (BusinessException e) {
-            return ClaudeErrorResponse.fromStatusCode(e.getCode(), e.getMessage());
-        }
 
         // 简单估算 token 数量（实际应该使用 tokenizer）
         // 这里使用粗略估算：约 4 个字符 = 1 个 token
@@ -161,7 +147,7 @@ public class ChatController {
      */
     @PostMapping("/embeddings")
     public Object embeddings(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody @Validated EmbeddingsRequest request) {
         log.debug("OpenAI API 兼容接口调用: /v1/embeddings, model={}", request.getModel());
         try {
@@ -191,7 +177,7 @@ public class ChatController {
      */
     @PostMapping("/responses")
     public Object responses(
-            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody @Validated ResponsesRequest request) {
         log.info("Responses API 接口调用: /v1/responses, model={}, stream={}", request.getModel(), request.getStream());
         return handleResponsesRequest(authorization, request);

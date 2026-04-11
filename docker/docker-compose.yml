@@ -15,17 +15,7 @@ services:
       # Spring 配置
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
       - SERVER_PORT=8080
-
-      # 数据库配置
-      - DB_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ai_api_platform}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
-      - DB_USERNAME=${MYSQL_USER:-root}
-      - DB_PASSWORD=${MYSQL_PASSWORD:-root123}
-
-      # Redis 配置
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - REDIS_DATABASE=${REDIS_DATABASE:-0}
+      - DB_PATH=${DB_PATH:-/app/data/ai_api_platform}
 
       # JWT 配置 (必需)
       - JWT_SECRET=${JWT_SECRET}
@@ -47,7 +37,6 @@ services:
       - MAIL_STARTTLS_ENABLE=${MAIL_STARTTLS_ENABLE:-true}
 
       # Cookie/Session 配置
-      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
 
       # 工单通知配置
@@ -59,12 +48,6 @@ services:
       # 后端代理配置
       - COPILOT_PROXY_BASE_URL=${COPILOT_PROXY_BASE_URL:-}
       - COPILOT_PROXY_API_KEY=${COPILOT_PROXY_API_KEY:-}
-      - BACKEND_DEFAULT_PROVIDER=${BACKEND_DEFAULT_PROVIDER:-copilot}
-
-      # OpenRouter 配置
-      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-      - OPENROUTER_ACCOUNT_1_KEY=${OPENROUTER_ACCOUNT_1_KEY:-}
-      - OPENROUTER_ACCOUNT_1_ENABLED=${OPENROUTER_ACCOUNT_1_ENABLED:-false}
 
       # 管理后台安全配置
       - ADMIN_ENABLE_RATE_LIMIT=${ADMIN_ENABLE_RATE_LIMIT:-true}
@@ -75,75 +58,13 @@ services:
       - JAVA_OPTS=${JAVA_OPTS:--Xmx512m -Xms256m}
     volumes:
       - ./logs/backend:/app/logs
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 60s
-    networks:
-      - ai-service-network
-
-  # ====================================================
-  # MySQL 数据库
-  # ====================================================
-  mysql:
-    image: mysql:9.0
-    container_name: ai-service-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_api_platform}
-      MYSQL_USER: ${MYSQL_USER:-}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-}
-      MYSQL_CHARSET: utf8mb4
-      MYSQL_COLLATION: utf8mb4_unicode_ci
-      TZ: Asia/Shanghai
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./init:/docker-entrypoint-initdb.d:ro
-      - ./conf/my.cnf:/etc/mysql/conf.d/my.cnf:ro
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root123}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    networks:
-      - ai-service-network
-
-  # ====================================================
-  # Redis 缓存
-  # ====================================================
-  redis:
-    image: redis:7-alpine
-    container_name: ai-service-redis
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    command: >
-      redis-server
-      --appendonly yes
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
-      ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - ai-service-network
 
@@ -222,12 +143,6 @@ services:
       start_period: 10s
     networks:
       - ai-service-network
-
-volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local
 
 networks:
   ai-service-network:
