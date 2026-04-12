@@ -59,6 +59,30 @@ pnpm dev
 
 默认访问地址：`http://localhost:5174`
 
+## 升级说明
+
+升级到包含 Token 统计功能的版本时，建议按下面流程处理：
+
+1. 备份当前 SQLite 数据库文件。
+2. 替换后端程序和前端静态资源。
+3. 重启服务。
+
+应用启动时会自动执行两类数据库脚本：
+
+- `schema_sqlite.sql`：用于基础表结构初始化。
+- `db/migration/sqlite/V*.sql`：用于按版本顺序执行增量升级脚本。
+
+这次升级包含 `V20260413_001__create_token_usage_records.sql`，会自动创建 `token_usage_records` 表和相关索引，不需要手工执行 SQL。
+
+如果你需要临时关闭自动迁移，可以设置：
+
+```bash
+# PowerShell
+$env:DB_MIGRATION_ENABLED="false"
+```
+
+正常情况下不建议关闭。服务启动日志中会输出“数据库迁移执行成功”或对应失败原因；如果迁移失败，应用会直接中止启动，避免出现半升级状态。
+
 ## Docker 启动
 
 开发/最小部署使用内存 H2：

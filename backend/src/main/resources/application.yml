@@ -23,6 +23,11 @@ spring:
       schema-locations: classpath:db/schema_sqlite.sql
       continue-on-error: false
 
+database:
+  migration:
+    enabled: ${DB_MIGRATION_ENABLED:true}
+    location-pattern: ${DB_MIGRATION_LOCATION_PATTERN:classpath*:db/migration/sqlite/V*.sql}
+
 mybatis-plus:
   mapper-locations: classpath:mapper/**/*.xml
   type-aliases-package: com.nonfou.github.entity
