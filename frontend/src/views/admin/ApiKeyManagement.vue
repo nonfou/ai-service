@@ -44,14 +44,14 @@
         <el-table-column label="高级交互进度" min-width="220">
           <template #default="{ row }">
             <div v-if="usagePreviewMap[row.id]?.loading" class="usage-inline-muted">同步中</div>
-            <div v-else-if="usagePreviewMap[row.id]?.premiumPercent !== null" class="usage-inline-progress">
+            <div v-else-if="usagePreviewMap[row.id]?.premiumUsedPercent !== null" class="usage-inline-progress">
               <el-progress
-                :percentage="usagePreviewMap[row.id]?.premiumPercent || 0"
-                :status="progressStatus(usagePreviewMap[row.id]?.premiumPercent || null)"
+                :percentage="usagePreviewMap[row.id]?.premiumUsedPercent || 0"
+                :status="usageProgressStatus(usagePreviewMap[row.id]?.premiumUsedPercent || null)"
                 :stroke-width="10"
               />
               <span class="usage-inline-meta">
-                {{ usagePreviewMap[row.id]?.premiumRemaining || '-' }} / {{ usagePreviewMap[row.id]?.premiumEntitlement || '-' }}
+                {{ usagePreviewMap[row.id]?.premiumUsed || '-' }} / {{ usagePreviewMap[row.id]?.premiumEntitlement || '-' }}
               </span>
             </div>
             <div v-else class="usage-inline-muted">-</div>
@@ -178,7 +178,7 @@
               <div>
                 <div class="quota-title">{{ quota.label }}</div>
                 <div class="quota-meta">
-                  剩余 {{ quota.remaining }} / 总量 {{ quota.entitlement }}
+                  已使用 {{ quota.used }} / 总量 {{ quota.entitlement }}
                 </div>
               </div>
               <el-tag :type="quota.unlimited ? 'success' : 'info'" size="small">
@@ -186,8 +186,8 @@
               </el-tag>
             </div>
             <el-progress
-              :percentage="quota.percentRemaining ?? 0"
-              :status="progressStatus(quota.percentRemaining)"
+              :percentage="quota.percentUsed ?? 0"
+              :status="usageProgressStatus(quota.percentUsed)"
               :stroke-width="12"
             />
             <div class="quota-footnote">
@@ -232,8 +232,8 @@ const usageSummary = ref({
 const usageQuotaCards = ref<Array<{
   key: string
   label: string
-  percentRemaining: number | null
-  remaining: string
+  percentUsed: number | null
+  used: string
   entitlement: string
   unlimited: boolean
   overagePermitted: boolean
@@ -242,8 +242,8 @@ const usagePreviewMap = ref<Record<string, {
   loading: boolean
   plan: string
   resetDate: string
-  premiumPercent: number | null
-  premiumRemaining: string
+  premiumUsedPercent: number | null
+  premiumUsed: string
   premiumEntitlement: string
 }>>({})
 
@@ -282,8 +282,8 @@ const syncUsagePreviewState = (rows: AdminApiKey[]) => {
     loading: boolean
     plan: string
     resetDate: string
-    premiumPercent: number | null
-    premiumRemaining: string
+    premiumUsedPercent: number | null
+    premiumUsed: string
     premiumEntitlement: string
   }> = {}
 
@@ -292,8 +292,8 @@ const syncUsagePreviewState = (rows: AdminApiKey[]) => {
       loading: false,
       plan: '-',
       resetDate: '-',
-      premiumPercent: null,
-      premiumRemaining: '-',
+      premiumUsedPercent: null,
+      premiumUsed: '-',
       premiumEntitlement: '-'
     }
   }
@@ -453,8 +453,8 @@ const loadUsagePreviews = async (rows: AdminApiKey[]) => {
       loading: true,
       plan: usagePreviewMap.value[row.id]?.plan || '-',
       resetDate: usagePreviewMap.value[row.id]?.resetDate || '-',
-      premiumPercent: usagePreviewMap.value[row.id]?.premiumPercent ?? null,
-      premiumRemaining: usagePreviewMap.value[row.id]?.premiumRemaining || '-',
+      premiumUsedPercent: usagePreviewMap.value[row.id]?.premiumUsedPercent ?? null,
+      premiumUsed: usagePreviewMap.value[row.id]?.premiumUsed || '-',
       premiumEntitlement: usagePreviewMap.value[row.id]?.premiumEntitlement || '-'
     }
 
@@ -466,8 +466,8 @@ const loadUsagePreviews = async (rows: AdminApiKey[]) => {
         loading: false,
         plan: '-',
         resetDate: '-',
-        premiumPercent: null,
-        premiumRemaining: '-',
+        premiumUsedPercent: null,
+        premiumUsed: '-',
         premiumEntitlement: '-'
       }
     }
@@ -498,19 +498,44 @@ const applyUsagePreview = (keyId: string, data: AdminApiKeyUsage) => {
     loading: false,
     plan: readText(data, 'copilot_plan'),
     resetDate: readText(data, 'quota_reset_date'),
-    premiumPercent: premium.percentRemaining,
-    premiumRemaining: premium.remaining,
+    premiumUsedPercent: premium.percentUsed,
+    premiumUsed: premium.used,
     premiumEntitlement: premium.entitlement
+  }
+}
+
+const fallbackCopyText = (value: string) => {
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', 'true')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-9999px'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  textarea.setSelectionRange(0, textarea.value.length)
+
+  try {
+    return document.execCommand('copy')
+  } finally {
+    document.body.removeChild(textarea)
   }
 }
 
 const copyLatestKey = async () => {
   if (!latestFullKey.value) return
+
   try {
-    await navigator.clipboard.writeText(latestFullKey.value)
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(latestFullKey.value)
+    } else if (!fallbackCopyText(latestFullKey.value)) {
+      throw new Error('fallback copy failed')
+    }
+
     message.success('已复制到剪贴板')
   } catch {
-    message.error('复制失败')
+    message.error('复制失败，请手动选中文本复制')
   }
 }
 
@@ -562,20 +587,57 @@ const buildQuotaCards = (data: AdminApiKeyUsage) => {
 
   return Object.entries(snapshots as Record<string, unknown>).map(([key, raw]) => {
     const snapshot = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-    const percentRaw = snapshot.percent_remaining
-    const percentRemaining =
-      typeof percentRaw === 'number' ? Math.max(0, Math.min(100, percentRaw)) : null
+    const quota = parseQuotaSnapshot(snapshot)
 
     return {
       key,
       label: formatQuotaLabel(key),
-      percentRemaining,
-      remaining: formatQuotaValue(snapshot.quota_remaining ?? snapshot.remaining),
-      entitlement: formatQuotaValue(snapshot.entitlement),
+      percentUsed: quota.percentUsed,
+      used: quota.used,
+      entitlement: quota.entitlement,
       unlimited: Boolean(snapshot.unlimited),
       overagePermitted: Boolean(snapshot.overage_permitted)
     }
   })
+}
+
+const parseQuotaNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
+
+const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
+
+const parseQuotaSnapshot = (snapshot: Record<string, unknown>) => {
+  const entitlementValue = parseQuotaNumber(snapshot.entitlement)
+  const remainingValue = parseQuotaNumber(snapshot.quota_remaining ?? snapshot.remaining)
+  const percentRemainingValue = parseQuotaNumber(snapshot.percent_remaining)
+
+  let usedValue: number | null = null
+  if (entitlementValue !== null && remainingValue !== null) {
+    usedValue = Math.max(0, entitlementValue - remainingValue)
+  }
+
+  let percentUsed: number | null = null
+  if (entitlementValue !== null && entitlementValue > 0 && usedValue !== null) {
+    percentUsed = clampPercent((usedValue / entitlementValue) * 100)
+  } else if (percentRemainingValue !== null) {
+    percentUsed = clampPercent(100 - percentRemainingValue)
+  }
+
+  return {
+    percentUsed,
+    used: formatQuotaValue(usedValue ?? (snapshot.used ?? '-')),
+    entitlement: formatQuotaValue(snapshot.entitlement)
+  }
 }
 
 const readQuotaSnapshot = (data: AdminApiKeyUsage, key: string) => {
@@ -584,19 +646,13 @@ const readQuotaSnapshot = (data: AdminApiKeyUsage, key: string) => {
     ? (snapshots as Record<string, unknown>)[key]
     : null
   const safeSnapshot = (snapshot && typeof snapshot === 'object' ? snapshot : {}) as Record<string, unknown>
-  const percentRaw = safeSnapshot.percent_remaining
-
-  return {
-    percentRemaining: typeof percentRaw === 'number' ? Math.max(0, Math.min(100, percentRaw)) : null,
-    remaining: formatQuotaValue(safeSnapshot.quota_remaining ?? safeSnapshot.remaining),
-    entitlement: formatQuotaValue(safeSnapshot.entitlement)
-  }
+  return parseQuotaSnapshot(safeSnapshot)
 }
 
-const progressStatus = (percent: number | null) => {
+const usageProgressStatus = (percent: number | null) => {
   if (percent === null) return undefined
-  if (percent <= 20) return 'exception'
-  if (percent <= 50) return 'warning'
+  if (percent >= 80) return 'exception'
+  if (percent >= 50) return 'warning'
   return 'success'
 }
 
