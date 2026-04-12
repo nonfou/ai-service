@@ -10,7 +10,6 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
@@ -32,18 +31,17 @@ import java.util.concurrent.TimeUnit;
 public class WebConfig {
 
     private final CopilotProxyProperties copilotProxyProperties;
+    private final HttpPoolProperties httpPoolProperties;
+    private final StreamingProperties streamingProperties;
 
     /**
-     * 跨域配置
-     *
-     * ✅ setAllowCredentials(true): 允许携带Cookie和认证信息
-     *    这对于HttpOnly Cookie认证是必需的
+     * 跨域配置。
      */
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOriginPattern("*");
-        config.setAllowCredentials(true);  // ✅ 允许携带Cookie(HttpOnly Cookie必需)
+        config.setAllowCredentials(true);
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         config.setMaxAge(3600L);
@@ -58,24 +56,21 @@ public class WebConfig {
      * 复用 TCP 连接，减少连接建立开销
      */
     @Bean
-    public PoolingHttpClientConnectionManager httpClientConnectionManager(
-            @Value("${http.pool.max-total:200}") int maxTotal,
-            @Value("${http.pool.max-per-route:50}") int maxPerRoute,
-            @Value("${http.pool.validate-after-inactivity-ms:2000}") int validateAfterInactivity
-    ) {
+    public PoolingHttpClientConnectionManager httpClientConnectionManager() {
         ConnectionConfig connectionConfig = ConnectionConfig.custom()
                 .setConnectTimeout(Timeout.ofMilliseconds(copilotProxyProperties.getConnectTimeoutMs()))
                 .setSocketTimeout(Timeout.ofMilliseconds(copilotProxyProperties.getReadTimeoutMs()))
-                .setValidateAfterInactivity(TimeValue.ofMilliseconds(validateAfterInactivity))
+                .setValidateAfterInactivity(TimeValue.ofMilliseconds(httpPoolProperties.getValidateAfterInactivityMs()))
                 .build();
 
         PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-                .setMaxConnTotal(maxTotal)
-                .setMaxConnPerRoute(maxPerRoute)
+                .setMaxConnTotal(httpPoolProperties.getMaxTotal())
+                .setMaxConnPerRoute(httpPoolProperties.getMaxPerRoute())
                 .setDefaultConnectionConfig(connectionConfig)
                 .build();
 
-        log.info("HTTP 连接池初始化: maxTotal={}, maxPerRoute={}", maxTotal, maxPerRoute);
+        log.info("HTTP 连接池初始化: maxTotal={}, maxPerRoute={}",
+                httpPoolProperties.getMaxTotal(), httpPoolProperties.getMaxPerRoute());
         return connectionManager;
     }
 
@@ -112,17 +107,12 @@ public class WebConfig {
      * SSE/流式请求专用线程池，避免每次请求都新建线程。
      */
     @Bean(name = "streamTaskExecutor")
-    public TaskExecutor streamTaskExecutor(
-            @Value("${backend.streaming.core-pool-size:4}") int corePoolSize,
-            @Value("${backend.streaming.max-pool-size:16}") int maxPoolSize,
-            @Value("${backend.streaming.queue-capacity:200}") int queueCapacity,
-            @Value("${backend.streaming.keep-alive-seconds:60}") int keepAliveSeconds
-    ) {
+    public TaskExecutor streamTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(corePoolSize);
-        executor.setMaxPoolSize(maxPoolSize);
-        executor.setQueueCapacity(queueCapacity);
-        executor.setKeepAliveSeconds(keepAliveSeconds);
+        executor.setCorePoolSize(streamingProperties.getCorePoolSize());
+        executor.setMaxPoolSize(streamingProperties.getMaxPoolSize());
+        executor.setQueueCapacity(streamingProperties.getQueueCapacity());
+        executor.setKeepAliveSeconds(streamingProperties.getKeepAliveSeconds());
         executor.setThreadNamePrefix("sse-worker-");
         executor.initialize();
         return executor;

@@ -10,8 +10,8 @@
             <path d="M2 12l10 5 10-5"/>
           </svg>
         </div>
-        <h1 class="brand-title">AI API Platform</h1>
-        <p class="brand-subtitle">智能 API 管理平台</p>
+        <h1 class="brand-title">Copilot Relay</h1>
+        <p class="brand-subtitle">API Key 路由与使用进度管理</p>
 
         <div class="brand-features">
           <div class="feature-item">
@@ -21,7 +21,7 @@
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
             </div>
-            <span>多模型统一管理</span>
+            <span>Copilot 路由管理</span>
           </div>
           <div class="feature-item">
             <div class="feature-icon">
@@ -30,7 +30,7 @@
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
             </div>
-            <span>实时用量统计</span>
+            <span>API Key 转发</span>
           </div>
           <div class="feature-item">
             <div class="feature-icon">
@@ -39,7 +39,7 @@
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
             </div>
-            <span>灵活计费方案</span>
+            <span>使用进度查看</span>
           </div>
         </div>
       </div>
@@ -89,11 +89,6 @@
             />
           </el-form-item>
 
-          <div class="form-options">
-            <el-checkbox v-model="rememberMe">记住我</el-checkbox>
-            <a href="#" class="forgot-link">忘记密码?</a>
-          </div>
-
           <el-form-item class="form-submit">
             <el-button
               type="primary"
@@ -108,7 +103,7 @@
         </el-form>
 
         <div class="login-footer">
-          <p>&copy; 2024 AI API Platform. All rights reserved.</p>
+          <p>&copy; 2026 Copilot Relay Admin</p>
         </div>
       </div>
     </div>
@@ -128,7 +123,6 @@ const router = useRouter()
 const adminStore = useAdminStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const rememberMe = ref(false)
 
 const loginForm = reactive({
   username: '',
@@ -347,22 +341,6 @@ const handleLogin = async () => {
 
 .login-form :deep(.el-input--large .el-input__wrapper) {
   height: 48px;
-}
-
-.form-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.forgot-link {
-  font-size: 14px;
-  color: var(--primary-color);
-}
-
-.forgot-link:hover {
-  color: var(--primary-light);
 }
 
 .form-submit {

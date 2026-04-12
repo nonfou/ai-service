@@ -1,113 +1,30 @@
-# ====================================================
-# 生产环境配置 - AI API Platform
-# ====================================================
-# 注意: 所有敏感信息必须通过环境变量设置,禁止硬编码
-# ====================================================
-
 server:
   port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: ai-api-platform
-
-  # H2 数据库配置 - 生产环境
   datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:file:${DB_PATH:/app/data/ai_api_platform};MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: ${DB_USERNAME:sa}
-    password: ${DB_PASSWORD:}
-
-    # 连接池配置
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:${DB_PATH:/app/data/ai_api_platform.db}
     hikari:
-      minimum-idle: 5
-      maximum-pool-size: 15
+      minimum-idle: 1
+      maximum-pool-size: 4
       connection-timeout: 20000
       pool-name: HikariPool-AIService-Prod
 
-  # H2 控制台 - 生产环境关闭
-  h2:
-    console:
-      enabled: false
-
-  # 邮件配置 - 生产环境
-  mail:
-    host: ${MAIL_HOST}  # 必须设置
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME}  # 必须设置
-    password: ${MAIL_PASSWORD}  # 必须设置
-    default-encoding: UTF-8
-    properties:
-      mail:
-        smtp:
-          auth: true
-          ssl:
-            enable: ${MAIL_SSL_ENABLE:false}
-            protocols: TLSv1.2
-          socketFactory:
-            class: ${MAIL_SOCKET_FACTORY_CLASS:}
-            port: ${MAIL_PORT:587}
-            fallback: false
-          starttls:
-            enable: ${MAIL_STARTTLS_ENABLE:true}
-            required: ${MAIL_STARTTLS_REQUIRED:true}
-          timeout: 10000
-          connectiontimeout: 10000
-
-# MyBatis Plus 配置 - 生产环境
 mybatis-plus:
-  mapper-locations: classpath:mapper/**/*.xml
-  type-aliases-package: com.nonfou.github.entity
   configuration:
-    map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
-  global-config:
-    db-config:
-      id-type: auto
-      logic-delete-field: deleted
-      logic-delete-value: 1
-      logic-not-delete-value: 0
 
-# JWT 配置 - 生产环境
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:604800000}
-  issuer: ${JWT_ISSUER}
+  issuer: ${JWT_ISSUER:prod}
 
-# 认证配置 - 生产环境
-auth:
-  verify-code:
-    ttl-seconds: ${AUTH_VERIFY_CODE_TTL_SECONDS:300}
-    min-interval-seconds: ${AUTH_VERIFY_CODE_MIN_INTERVAL:60}
-    max-per-hour: ${AUTH_VERIFY_CODE_MAX_PER_HOUR:10}
-    hash-secret: ${VERIFY_CODE_SECRET}
-
-# 系统配置缓存
 system-config:
   cache-ttl-seconds: ${SYSTEM_CONFIG_CACHE_TTL:60}
 
-# 支付宝配置 - 生产环境
-alipay:
-  app-id: ${ALIPAY_APP_ID}
-  private-key: ${ALIPAY_PRIVATE_KEY}
-  public-key: ${ALIPAY_PUBLIC_KEY}
-  gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipay.com/gateway.do}
-  notify-url: ${ALIPAY_NOTIFY_URL}
-  return-url: ${ALIPAY_RETURN_URL}
-  sign-type: RSA2
-  charset: UTF-8
-  format: json
-
-# 微信支付配置 - 生产环境
-wechat:
-  app-id: ${WECHAT_APP_ID}
-  mch-id: ${WECHAT_MCH_ID}
-  api-v3-key: ${WECHAT_API_V3_KEY}
-  merchant-serial-number: ${WECHAT_MERCHANT_SERIAL_NUMBER}
-  private-key-path: ${WECHAT_PRIVATE_KEY_PATH:classpath:apiclient_key.pem}
-  notify-url: ${WECHAT_NOTIFY_URL}
-
-# 管理后台安全配置 - 生产环境
 admin:
   security:
     enable-ip-whitelist: ${ADMIN_ENABLE_IP_WHITELIST:false}
@@ -118,12 +35,21 @@ admin:
     max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}
     lock-duration: ${ADMIN_LOCK_DURATION:30}
 
-# 加密配置 - 生产环境
 encryption:
   key: ${ENCRYPTION_KEY}
   iv: ${ENCRYPTION_IV:}
 
-# 后端账户调度配置 - 生产环境
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  requests-per-minute: ${RATE_LIMIT_RPM:60}
+  api-requests-per-minute: ${RATE_LIMIT_API_RPM:30}
+
+http:
+  pool:
+    max-total: ${HTTP_POOL_MAX_TOTAL:200}
+    max-per-route: ${HTTP_POOL_MAX_PER_ROUTE:50}
+    validate-after-inactivity-ms: ${HTTP_POOL_VALIDATE_AFTER_INACTIVITY_MS:2000}
+
 backend:
   client:
     models:
@@ -143,14 +69,12 @@ backend:
         gpt-5-1-codex-mini: gpt-5.1-codex-mini
         gemini-2-5-pro: gemini-2.5-pro
         gemini-3-0-pro: gemini-3-pro
-
   streaming:
     timeout-ms: ${BACKEND_STREAM_TIMEOUT_MS:300000}
     core-pool-size: ${BACKEND_STREAM_CORE_POOL:8}
     max-pool-size: ${BACKEND_STREAM_MAX_POOL:32}
     queue-capacity: ${BACKEND_STREAM_QUEUE:500}
     keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
-
   copilot:
     proxy:
       base-url: ${COPILOT_PROXY_BASE_URL:http://127.0.0.1:4141/v1}
@@ -160,51 +84,6 @@ backend:
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
       warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}
 
-  scheduler:
-    strategy: ${BACKEND_SCHEDULER_STRATEGY:HYBRID}
-
-    session-stickiness:
-      enabled: ${SESSION_STICKINESS_ENABLED:true}
-      ttl-hours: ${SESSION_STICKINESS_TTL_HOURS:1}
-      renewal-on-request: ${SESSION_RENEWAL_ON_REQUEST:true}
-
-    health-check:
-      enabled: ${HEALTH_CHECK_ENABLED:true}
-      interval-seconds: ${HEALTH_CHECK_INTERVAL:30}
-      timeout-seconds: ${HEALTH_CHECK_TIMEOUT:5}
-      failure-threshold: ${HEALTH_CHECK_FAILURE_THRESHOLD:3}
-      success-threshold: ${HEALTH_CHECK_SUCCESS_THRESHOLD:2}
-
-    load-balance:
-      enable-concurrent-limit: ${LOAD_BALANCE_CONCURRENT_LIMIT:true}
-      enable-rate-limit: ${LOAD_BALANCE_RATE_LIMIT:true}
-
-  pricing:
-    markup-rate: ${PRICING_MARKUP_RATE:1.2}
-    enable-account-multiplier: ${PRICING_ENABLE_ACCOUNT_MULTIPLIER:true}
-    enable-model-multiplier: ${PRICING_ENABLE_MODEL_MULTIPLIER:true}
-
-  quota:
-    default-daily-limit: ${QUOTA_DEFAULT_DAILY_LIMIT:100.00}
-    default-monthly-limit: ${QUOTA_DEFAULT_MONTHLY_LIMIT:2000.00}
-    enforce: ${QUOTA_ENFORCE:true}
-    alert-threshold: ${QUOTA_ALERT_THRESHOLD:80.0}
-
-# Token 使用统计配置 - 生产环境
-usage:
-  metrics:
-    timezone: ${USAGE_METRICS_TIMEZONE:Asia/Shanghai}
-    daily-ttl-days: ${USAGE_METRICS_DAILY_TTL:32}
-    monthly-ttl-days: ${USAGE_METRICS_MONTHLY_TTL:365}
-    hourly-ttl-days: ${USAGE_METRICS_HOURLY_TTL:7}
-    metrics-window-minutes: ${USAGE_METRICS_WINDOW_MINUTES:5}
-    usage-record-limit: ${USAGE_METRICS_RECORD_LIMIT:200}
-    enable-aggregation: ${USAGE_METRICS_ENABLE_AGGREGATION:true}
-    enable-billing-events: ${USAGE_METRICS_ENABLE_BILLING:false}
-
-# ====================================================
-# 日志配置 - 生产环境
-# ====================================================
 logging:
   level:
     root: WARN

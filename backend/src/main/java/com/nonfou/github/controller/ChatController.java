@@ -19,7 +19,6 @@ import com.nonfou.github.exception.ChatProcessingException;
 import com.nonfou.github.exception.ChatUpstreamException;
 import com.nonfou.github.exception.BusinessException;
 import com.nonfou.github.service.ChatWorkflowService;
-import com.nonfou.github.service.CopilotProxyService;
 import com.nonfou.github.exception.ApiErrorCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +45,6 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatWorkflowService chatWorkflowService;
-    private final CopilotProxyService copilotProxyService;
     private final ObjectMapper objectMapper;
     private final ModelMappingProperties modelMappingProperties;
 
@@ -95,6 +93,9 @@ public class ChatController {
             @RequestBody @Validated ClaudeRequest request) {
         log.info("Claude API count_tokens 接口调用: /v1/messages/count_tokens, model={}", request.getModel());
 
+        String authHeader = xApiKey != null ? "Bearer " + xApiKey : authorization;
+        chatWorkflowService.validateApiKey(authHeader);
+
         // 简单估算 token 数量（实际应该使用 tokenizer）
         // 这里使用粗略估算：约 4 个字符 = 1 个 token
         int estimatedTokens = 0;
@@ -122,10 +123,10 @@ public class ChatController {
      * 返回可用的模型列表
      */
     @RequestMapping("/models")
-    public Object listModels() {
+    public Object listModels(@RequestHeader(value = "Authorization", required = false) String authorization) {
         log.debug("OpenAI API 兼容接口调用: /v1/models");
         try {
-            ModelsResponse response = copilotProxyService.getModels();
+            ModelsResponse response = chatWorkflowService.handleModels(authorization);
             return response;
         } catch (ChatAuthorizationException e) {
             return Result.error(e.getStatusCode(), friendlyMessage(e.getStatusCode(), e.getMessage()));

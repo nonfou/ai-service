@@ -1,11 +1,11 @@
 package com.nonfou.github.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.nonfou.github.config.SystemConfigProperties;
 import com.nonfou.github.entity.SystemConfig;
 import com.nonfou.github.mapper.SystemConfigMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -19,13 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SystemConfigService {
 
-    @Autowired
-    private SystemConfigMapper systemConfigMapper;
-
-    @Value("${system-config.cache-ttl-seconds:60}")
-    private long cacheTtlSeconds;
+    private final SystemConfigMapper systemConfigMapper;
+    private final SystemConfigProperties systemConfigProperties;
 
     private final Map<String, CacheEntry> configCache = new ConcurrentHashMap<>();
 
@@ -121,6 +119,7 @@ public class SystemConfigService {
     }
 
     private Instant expireAt() {
+        long cacheTtlSeconds = systemConfigProperties.getCacheTtlSeconds();
         if (cacheTtlSeconds <= 0) {
             // 0 或负数表示不缓存
             return Instant.EPOCH;

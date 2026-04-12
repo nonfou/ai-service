@@ -1,8 +1,8 @@
 package com.nonfou.github.util;
 
+import com.nonfou.github.config.EncryptionProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -26,20 +26,18 @@ public class EncryptionUtil {
     private static final int GCM_TAG_LENGTH = 128;
     private static final int IV_LENGTH_BYTES = 12;
 
-    @Value("${encryption.key:}")
-    private String encryptionKey;
-
-    /**
-     * 旧版配置字段，现仅用于兼容性提示。
-     */
-    @Value("${encryption.iv:}")
-    private String deprecatedIv;
+    private final EncryptionProperties encryptionProperties;
 
     private final SecureRandom secureRandom = new SecureRandom();
     private SecretKeySpec keySpec;
 
+    public EncryptionUtil(EncryptionProperties encryptionProperties) {
+        this.encryptionProperties = encryptionProperties;
+    }
+
     @PostConstruct
     public void init() {
+        String encryptionKey = encryptionProperties.getKey();
         if (encryptionKey == null || encryptionKey.isBlank() ||
                 encryptionKey.startsWith("your-32-character")) {
             throw new IllegalStateException("必须配置 encryption.key，并保证其随机性");
@@ -50,7 +48,7 @@ public class EncryptionUtil {
             throw new IllegalStateException("encryption.key 长度需为 16/24/32 字节");
         }
 
-        if (deprecatedIv != null && !deprecatedIv.isBlank()) {
+        if (encryptionProperties.getIv() != null && !encryptionProperties.getIv().isBlank()) {
             log.warn("配置项 encryption.iv 已弃用，将忽略该值。系统会为每次加密生成随机 IV。");
         }
 

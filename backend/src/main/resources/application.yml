@@ -1,9 +1,3 @@
-# ====================================================
-# 通用配置 - 所有环境共享
-# ====================================================
-# 环境特定配置请放在 application-{profile}.yml 中
-# ====================================================
-
 server:
   port: ${SERVER_PORT:8080}
 
@@ -12,79 +6,28 @@ spring:
     name: ai-api-platform
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-
-  # 禁用 Spring Session（使用 STATELESS JWT 认证，不需要 Session）
   session:
     store-type: none
-
-  # H2 嵌入式数据库配置
   datasource:
-    driver-class-name: org.h2.Driver
-
-    # HikariCP 连接池配置
+    driver-class-name: org.sqlite.JDBC
     hikari:
-      minimum-idle: 2
-      maximum-pool-size: 10
+      minimum-idle: 1
+      maximum-pool-size: 4
       connection-timeout: 20000
       pool-name: HikariPool-AIService
       auto-commit: true
-
-  # H2 控制台（可选，用于调试）
-  h2:
-    console:
-      enabled: ${H2_CONSOLE_ENABLED:false}
-      path: /h2-console
-      settings:
-        web-allow-others: ${H2_CONSOLE_ALLOW_OTHERS:false}
-
-  # 数据库初始化
+      connection-test-query: SELECT 1
   sql:
     init:
       mode: always
-      schema-locations: classpath:db/schema_h2.sql
+      schema-locations: classpath:db/schema_sqlite.sql
       continue-on-error: false
 
-  # 邮件配置 - 具体值由环境配置提供
-  mail:
-    host: ${MAIL_HOST}
-    port: ${MAIL_PORT}
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
-    default-encoding: UTF-8
-    properties:
-      mail:
-        smtp:
-          auth: true
-          ssl:
-            enable: ${MAIL_SSL_ENABLE:false}
-            protocols: TLSv1.2
-          socketFactory:
-            class: ${MAIL_SOCKET_FACTORY_CLASS:}
-            port: ${MAIL_PORT:587}
-            fallback: false
-          starttls:
-            enable: ${MAIL_STARTTLS_ENABLE:true}
-            required: ${MAIL_STARTTLS_REQUIRED:true}
-          timeout: 5000
-          connectionTimeout: 5000
-
-  # Thymeleaf 配置 (用于邮件模板)
-  thymeleaf:
-    prefix: classpath:/templates/
-    suffix: .html
-    mode: HTML
-    encoding: UTF-8
-    cache: ${THYMELEAF_CACHE:true}  # 生产环境启用缓存，开发环境可设为false
-
-# MyBatis Plus 配置
 mybatis-plus:
   mapper-locations: classpath:mapper/**/*.xml
   type-aliases-package: com.nonfou.github.entity
   configuration:
     map-underscore-to-camel-case: true
-    # ✅ log-impl 已移除,由各环境配置文件自行设置
-    # 开发环境(dev): StdOutImpl - 输出到控制台
-    # 生产环境(prod): Slf4jImpl - 输出到日志文件
   global-config:
     db-config:
       id-type: auto
@@ -92,59 +35,39 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
-# JWT 配置
-# ⚠️ [安全要求] JWT_SECRET 必须通过环境变量设置,长度至少32字符
-# 生成方法: openssl rand -base64 32
 jwt:
-  secret: ${JWT_SECRET}  # ✅ 移除默认值,强制使用环境变量
-  expiration: ${JWT_EXPIRATION:604800000}  # 7天（毫秒）
-  issuer: ${JWT_ISSUER:localhost}  # Token 签发者标识，用于区分不同环境
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:604800000}
+  issuer: ${JWT_ISSUER:localhost}
 
-auth:
-  verify-code:
-    ttl-seconds: ${AUTH_VERIFY_CODE_TTL_SECONDS:300}
-    min-interval-seconds: ${AUTH_VERIFY_CODE_MIN_INTERVAL:60}
-    max-per-hour: ${AUTH_VERIFY_CODE_MAX_PER_HOUR:10}
-    # ⚠️ [安全要求] VERIFY_CODE_SECRET 必须通过环境变量设置
-    hash-secret: ${VERIFY_CODE_SECRET}  # ✅ 移除默认值
-
-ticket:
-  notify:
-    enabled: ${TICKET_NOTIFY_ENABLED:true}
-    admin-email: ${TICKET_ADMIN_EMAIL:}
-    admin-console-url: ${TICKET_ADMIN_CONSOLE_URL:}
-    user-portal-url: ${TICKET_USER_PORTAL_URL:}
-
-# 系统配置缓存
 system-config:
   cache-ttl-seconds: ${SYSTEM_CONFIG_CACHE_TTL:60}
 
-# 管理后台安全配置
 admin:
   security:
-    # IP白名单(不建议在IP不固定的情况下使用)
     enable-ip-whitelist: ${ADMIN_ENABLE_IP_WHITELIST:false}
     ip-whitelist: []
+    enable-rate-limit: ${ADMIN_ENABLE_RATE_LIMIT:true}
+    rate-limit: ${ADMIN_RATE_LIMIT:60}
+    enable-login-lock: ${ADMIN_ENABLE_LOGIN_LOCK:true}
+    max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}
+    lock-duration: ${ADMIN_LOCK_DURATION:30}
 
-    # ✅ 请求频率限制(已启用)
-    enable-rate-limit: ${ADMIN_ENABLE_RATE_LIMIT:true}  # 防止暴力破解
-    rate-limit: ${ADMIN_RATE_LIMIT:60}  # 每分钟最大请求数
-
-    # ✅ 登录失败锁定(已启用)
-    enable-login-lock: ${ADMIN_ENABLE_LOGIN_LOCK:true}  # 防止暴力破解
-    max-login-attempts: ${ADMIN_MAX_LOGIN_ATTEMPTS:5}  # 最大失败次数
-    lock-duration: ${ADMIN_LOCK_DURATION:30}  # 锁定时长(分钟)
-
-# ====================================================
-# 多账户中继服务配置
-# ====================================================
-
-# 加密配置
 encryption:
-  key: ${ENCRYPTION_KEY:}  # 必须是随机的 16/24/32 字节
-  iv: ${ENCRYPTION_IV:}  # 已弃用，仅为兼容保留
+  key: ${ENCRYPTION_KEY:}
+  iv: ${ENCRYPTION_IV:}
 
-# 后端账户调度配置
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  requests-per-minute: ${RATE_LIMIT_RPM:60}
+  api-requests-per-minute: ${RATE_LIMIT_API_RPM:30}
+
+http:
+  pool:
+    max-total: ${HTTP_POOL_MAX_TOTAL:200}
+    max-per-route: ${HTTP_POOL_MAX_PER_ROUTE:50}
+    validate-after-inactivity-ms: ${HTTP_POOL_VALIDATE_AFTER_INACTIVITY_MS:2000}
+
 backend:
   client:
     models:
@@ -164,87 +87,17 @@ backend:
         gpt-5-1-codex-mini: gpt-5.1-codex-mini
         gemini-2-5-pro: gemini-2.5-pro
         gemini-3-0-pro: gemini-3-pro
-
   streaming:
     timeout-ms: ${BACKEND_STREAM_TIMEOUT_MS:300000}
     core-pool-size: ${BACKEND_STREAM_CORE_POOL:4}
     max-pool-size: ${BACKEND_STREAM_MAX_POOL:16}
     queue-capacity: ${BACKEND_STREAM_QUEUE:500}
     keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
-
-  # Copilot 配置（直连 & Relay）
   copilot:
     proxy:
       base-url: ${COPILOT_PROXY_BASE_URL:http://127.0.0.1:4141/v1}
       api-key: ${COPILOT_PROXY_API_KEY:}
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
-      # 读超时：两次数据块之间的最大等待时间（10分钟，适用于 Claude 大模型长时间思考）
       read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:600000}
-      # SSE 超时：整个流式响应的最大持续时间（30分钟）
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
-      # Claude Code 热身请求使用的小模型（减少高级模型配额消耗）
       warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}
-
-  # 调度策略
-  scheduler:
-    # 策略类型: ROUND_ROBIN(轮询), LEAST_USED(最少使用), PRIORITY(优先级), HYBRID(混合), COST_OPTIMIZED(成本优先)
-    strategy: ${BACKEND_SCHEDULER_STRATEGY:HYBRID}
-
-    # 会话粘性配置
-    session-stickiness:
-      enabled: ${SESSION_STICKINESS_ENABLED:true}
-      ttl-hours: ${SESSION_STICKINESS_TTL_HOURS:1}  # 会话绑定有效期（小时）
-      renewal-on-request: ${SESSION_RENEWAL_ON_REQUEST:true}  # 每次请求是否续期
-
-    # 健康检查配置
-    health-check:
-      enabled: ${HEALTH_CHECK_ENABLED:true}
-      interval-seconds: ${HEALTH_CHECK_INTERVAL:30}  # 检查间隔（秒）
-      timeout-seconds: ${HEALTH_CHECK_TIMEOUT:5}  # 超时时间（秒）
-      failure-threshold: ${HEALTH_CHECK_FAILURE_THRESHOLD:3}  # 失败阈值（连续失败几次标记为不健康）
-      success-threshold: ${HEALTH_CHECK_SUCCESS_THRESHOLD:2}  # 成功阈值（连续成功几次恢复健康）
-
-    # 负载均衡配置
-    load-balance:
-      enable-concurrent-limit: ${LOAD_BALANCE_CONCURRENT_LIMIT:true}  # 启用并发限制
-      enable-rate-limit: ${LOAD_BALANCE_RATE_LIMIT:true}  # 启用速率限制
-
-  # 计费配置
-  pricing:
-    markup-rate: ${PRICING_MARKUP_RATE:1.2}  # 全局加成倍率（1.2 = 20%利润）
-    enable-account-multiplier: ${PRICING_ENABLE_ACCOUNT_MULTIPLIER:true}  # 启用账户倍率
-    enable-model-multiplier: ${PRICING_ENABLE_MODEL_MULTIPLIER:true}  # 启用模型倍率
-
-  # 配额配置
-  quota:
-    default-daily-limit: ${QUOTA_DEFAULT_DAILY_LIMIT:100.00}  # 默认每日配额（元）
-    default-monthly-limit: ${QUOTA_DEFAULT_MONTHLY_LIMIT:2000.00}  # 默认每月配额（元）
-    enforce: ${QUOTA_ENFORCE:true}  # 是否强制执行配额限制
-    alert-threshold: ${QUOTA_ALERT_THRESHOLD:80.0}  # 告警阈值（百分比）
-
-# Token 使用统计与计费事件配置
-usage:
-  metrics:
-    timezone: ${USAGE_METRICS_TIMEZONE:Asia/Shanghai}
-    daily-ttl-days: ${USAGE_METRICS_DAILY_TTL:32}
-    monthly-ttl-days: ${USAGE_METRICS_MONTHLY_TTL:365}
-    hourly-ttl-days: ${USAGE_METRICS_HOURLY_TTL:7}
-    metrics-window-minutes: ${USAGE_METRICS_WINDOW_MINUTES:5}
-    usage-record-limit: ${USAGE_METRICS_RECORD_LIMIT:200}
-    enable-aggregation: ${USAGE_METRICS_ENABLE_AGGREGATION:true}
-    enable-billing-events: ${USAGE_METRICS_ENABLE_BILLING:false}
-
-# ====================================================
-# Cookie 配置 (用于Token存储)
-# ====================================================
-app:
-  cookie:
-    secure: ${COOKIE_SECURE:true}  # Secure属性,开发环境设为false,生产环境必须为true
-
-# ====================================================
-# 速率限制配置
-# ====================================================
-rate-limit:
-  enabled: ${RATE_LIMIT_ENABLED:true}
-  requests-per-minute: ${RATE_LIMIT_RPM:60}  # 普通请求每分钟限制
-  api-requests-per-minute: ${RATE_LIMIT_API_RPM:30}  # API请求每分钟限制

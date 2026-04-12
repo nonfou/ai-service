@@ -11,7 +11,6 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # 复制 pnpm 工作空间配置（利用 Docker 缓存）
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY user-portal/package.json ./user-portal/
 COPY admin-portal/package.json ./admin-portal/
 
 # 安装依赖

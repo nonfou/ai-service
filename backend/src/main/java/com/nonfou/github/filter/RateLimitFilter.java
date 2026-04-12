@@ -2,12 +2,12 @@ package com.nonfou.github.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonfou.github.common.Result;
+import com.nonfou.github.config.RateLimitProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,23 +29,16 @@ import java.util.concurrent.TimeUnit;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
-
-    @Value("${rate-limit.enabled:true}")
-    private boolean enabled;
-
-    @Value("${rate-limit.requests-per-minute:60}")
-    private int requestsPerMinute;
-
-    @Value("${rate-limit.api-requests-per-minute:30}")
-    private int apiRequestsPerMinute;
+    private final RateLimitProperties rateLimitProperties;
 
     private static final String RATE_LIMIT_KEY_PREFIX = "rate_limit:";
     private static final long WINDOW_MILLIS = TimeUnit.MINUTES.toMillis(1);
 
     private final Map<String, LinkedList<Long>> requestWindows = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(ObjectMapper objectMapper) {
+    public RateLimitFilter(ObjectMapper objectMapper, RateLimitProperties rateLimitProperties) {
         this.objectMapper = objectMapper;
+        this.rateLimitProperties = rateLimitProperties;
     }
 
     @Scheduled(fixedDelay = 120_000)
@@ -61,7 +54,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        if (!enabled) {
+        if (!rateLimitProperties.isEnabled()) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -74,7 +67,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String clientIdentifier = getClientIdentifier(request);
-        int limit = uri.startsWith("/v1/") ? apiRequestsPerMinute : requestsPerMinute;
+        int limit = uri.startsWith("/v1/") ? rateLimitProperties.getApiRequestsPerMinute() : rateLimitProperties.getRequestsPerMinute();
 
         if (!isAllowed(clientIdentifier, limit)) {
             log.warn("速率限制触发: client={}, uri={}, limit={}/min", clientIdentifier, uri, limit);

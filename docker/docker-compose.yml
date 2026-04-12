@@ -1,7 +1,4 @@
 services:
-  # ====================================================
-  # AI API Platform 后端服务
-  # ====================================================
   backend:
     build:
       context: ../backend
@@ -12,49 +9,21 @@ services:
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
-      # Spring 配置
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
       - SERVER_PORT=8080
-      - DB_PATH=${DB_PATH:-/app/data/ai_api_platform}
-
-      # JWT 配置 (必需)
+      - DB_PATH=${DB_PATH:-/app/data/ai_api_platform.db}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-604800000}
-      - JWT_ISSUER=${JWT_ISSUER}
-
-      # 验证码配置 (必需)
-      - VERIFY_CODE_SECRET=${VERIFY_CODE_SECRET}
-
-      # 加密配置
+      - JWT_ISSUER=${JWT_ISSUER:-ai-service}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-
-      # 邮件配置
-      - MAIL_HOST=${MAIL_HOST:-smtp.example.com}
-      - MAIL_PORT=${MAIL_PORT:-587}
-      - MAIL_USERNAME=${MAIL_USERNAME:-}
-      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
-      - MAIL_SSL_ENABLE=${MAIL_SSL_ENABLE:-false}
-      - MAIL_STARTTLS_ENABLE=${MAIL_STARTTLS_ENABLE:-true}
-
-      # Cookie/Session 配置
-      - COOKIE_SECURE=${COOKIE_SECURE:-true}
-
-      # 工单通知配置
-      - TICKET_NOTIFY_ENABLED=${TICKET_NOTIFY_ENABLED:-true}
-      - TICKET_ADMIN_EMAIL=${TICKET_ADMIN_EMAIL:-}
-      - TICKET_ADMIN_CONSOLE_URL=${TICKET_ADMIN_CONSOLE_URL:-}
-      - TICKET_USER_PORTAL_URL=${TICKET_USER_PORTAL_URL:-}
-
-      # 后端代理配置
       - COPILOT_PROXY_BASE_URL=${COPILOT_PROXY_BASE_URL:-}
       - COPILOT_PROXY_API_KEY=${COPILOT_PROXY_API_KEY:-}
-
-      # 管理后台安全配置
       - ADMIN_ENABLE_RATE_LIMIT=${ADMIN_ENABLE_RATE_LIMIT:-true}
       - ADMIN_RATE_LIMIT=${ADMIN_RATE_LIMIT:-60}
       - ADMIN_ENABLE_LOGIN_LOCK=${ADMIN_ENABLE_LOGIN_LOCK:-true}
-
-      # JVM 配置
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_RPM=${RATE_LIMIT_RPM:-60}
+      - RATE_LIMIT_API_RPM=${RATE_LIMIT_API_RPM:-30}
       - JAVA_OPTS=${JAVA_OPTS:--Xmx512m -Xms256m}
     volumes:
       - ./logs/backend:/app/logs
@@ -68,9 +37,6 @@ services:
     networks:
       - ai-service-network
 
-  # ====================================================
-  # Nginx 反向代理 (AI API 入口)
-  # ====================================================
   nginx:
     image: nginx:alpine
     container_name: ai-service-nginx
@@ -92,35 +58,6 @@ services:
     networks:
       - ai-service-network
 
-  # ====================================================
-  # User Portal 前端 (用户端)
-  # ====================================================
-  user-portal:
-    build:
-      context: ../frontend
-      dockerfile: user-portal/Dockerfile
-    image: ai-api-platform-user-portal:latest
-    container_name: ai-service-user-portal
-    restart: unless-stopped
-    ports:
-      - "${USER_PORTAL_PORT:-80}:80"
-    volumes:
-      - ./nginx/user-portal.conf:/etc/nginx/nginx.conf:ro
-      - ./logs/nginx-user-portal:/var/log/nginx
-    depends_on:
-      - backend
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-    networks:
-      - ai-service-network
-
-  # ====================================================
-  # Admin Portal 前端 (管理端)
-  # ====================================================
   admin-portal:
     build:
       context: ../frontend

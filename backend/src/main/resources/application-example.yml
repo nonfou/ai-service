@@ -1,59 +1,11 @@
-# ====================================================
-# AI API Platform - H2 配置示例
-# ====================================================
-#
-# 说明:
-# 1. 开发环境默认使用内存 H2，无需额外数据库配置
-# 2. 生产环境使用文件型 H2，请通过 DB_PATH 指定持久化目录
-# 3. 请将此文件复制为 .env 或直接设置系统环境变量
-# 4. 标注 [必需] 的配置项必须设置，否则应用无法启动
-#
-# ====================================================
+DB_PATH=/app/data/ai_api_platform.db
 
-# ----------------------------------------------------
-# 数据库配置 (H2)
-# ----------------------------------------------------
-
-# [可选] 生产环境 H2 文件路径
-# 开发环境默认使用内存 H2，无需设置
-# 生产环境示例:
-DB_PATH=/app/data/ai_api_platform
-
-# [可选] H2 用户名
-DB_USERNAME=sa
-
-# [可选][敏感] H2 密码
-DB_PASSWORD=
-
-# [可选] 开发环境是否启用 H2 Console
-H2_CONSOLE_ENABLED=true
-
-
-# ----------------------------------------------------
-# 邮件服务配置
-# ----------------------------------------------------
-
-MAIL_HOST=smtp.example.com
-MAIL_PORT=587
-MAIL_USERNAME=service@example.com
-MAIL_PASSWORD=your_mail_password_or_auth_code
-MAIL_SSL_ENABLE=false
-MAIL_STARTTLS_ENABLE=true
-
-
-# ----------------------------------------------------
-# 安全密钥配置
-# ----------------------------------------------------
+SPRING_PROFILES_ACTIVE=prod
 
 JWT_SECRET=your_jwt_secret_key_at_least_32_characters_long
 JWT_EXPIRATION=604800000
+JWT_ISSUER=ai-service
 ENCRYPTION_KEY=your_32_chars_encryption_key
-VERIFY_CODE_SECRET=your_verify_code_secret_key
-
-
-# ----------------------------------------------------
-# Copilot Relay 配置
-# ----------------------------------------------------
 
 COPILOT_PROXY_BASE_URL=http://127.0.0.1:4141/v1
 COPILOT_PROXY_API_KEY=
@@ -62,11 +14,6 @@ COPILOT_PROXY_READ_TIMEOUT_MS=600000
 COPILOT_PROXY_STREAM_TIMEOUT_MS=1800000
 COPILOT_PROXY_WARMUP_MODEL=claude-haiku-4.5
 
-
-# ----------------------------------------------------
-# 管理后台安全配置
-# ----------------------------------------------------
-
 ADMIN_ENABLE_IP_WHITELIST=false
 ADMIN_ENABLE_RATE_LIMIT=true
 ADMIN_RATE_LIMIT=60
@@ -74,19 +21,6 @@ ADMIN_ENABLE_LOGIN_LOCK=true
 ADMIN_MAX_LOGIN_ATTEMPTS=5
 ADMIN_LOCK_DURATION=30
 
-
-# ====================================================
-# 最小配置指南
-# ====================================================
-#
-# 开发环境:
-# 1. 使用默认 dev profile
-# 2. 只需设置 JWT_SECRET / ENCRYPTION_KEY / VERIFY_CODE_SECRET
-# 3. 如需联调上游，再设置 COPILOT_PROXY_BASE_URL
-#
-# 生产环境:
-# 1. 设置 SPRING_PROFILES_ACTIVE=prod
-# 2. 设置 DB_PATH 指向持久化目录
-# 3. 设置所有安全密钥与邮件配置
-#
-# ====================================================
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_RPM=60
+RATE_LIMIT_API_RPM=30

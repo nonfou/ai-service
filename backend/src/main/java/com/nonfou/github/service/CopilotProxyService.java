@@ -64,6 +64,7 @@ public class CopilotProxyService implements ModelProxy {
 
     private final RestTemplate restTemplate;
     private final CopilotProxyProperties proxyProperties;
+    private final SystemConfigService systemConfigService;
     private final ObjectMapper objectMapper;
     private final TokenEstimator tokenEstimator;
     private final ClaudeStreamEventParser claudeStreamEventParser;
@@ -83,11 +84,11 @@ public class CopilotProxyService implements ModelProxy {
     public ChatResponse chat(ChatRequest request, ApiKey apiKey) {
         validateApiKey(apiKey);
         Map<String, Object> payload = buildPayload(request, false);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders());
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders(apiKey));
 
         try {
             ResponseEntity<ChatResponse> response = restTemplate.exchange(
-                    buildProxyUrl(ApiEndpoint.CHAT_COMPLETIONS.getPath()),
+                    buildProxyUrl(apiKey, ApiEndpoint.CHAT_COMPLETIONS.getPath()),
                     HttpMethod.POST,
                     entity,
                     ChatResponse.class
@@ -135,10 +136,10 @@ public class CopilotProxyService implements ModelProxy {
         ApiProtocol protocol = ApiProtocol.fromModel(request.getModel());
         if (protocol == ApiProtocol.ANTHROPIC) {
             // Claude 模型路由到 /v1/messages 端点，返回 OpenAI 格式响应
-            streamTaskExecutor.execute(() -> executeClaudeToOpenAiStream(request, emitter, callback));
+            streamTaskExecutor.execute(() -> executeClaudeToOpenAiStream(request, apiKey, emitter, callback));
         } else {
             // OpenAI 系列模型路由到 /v1/chat/completions 端点
-            streamTaskExecutor.execute(() -> executeStream(request, emitter, callback));
+            streamTaskExecutor.execute(() -> executeStream(request, apiKey, emitter, callback));
         }
         return emitter;
     }
@@ -158,11 +159,11 @@ public class CopilotProxyService implements ModelProxy {
     public SseEmitter claudeStream(ChatRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeClaudeStream(request, emitter, callback));
+        streamTaskExecutor.execute(() -> executeClaudeStream(request, apiKey, emitter, callback));
         return emitter;
     }
 
-    private void executeStream(ChatRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
+    private void executeStream(ChatRequest request, ApiKey apiKey, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         AtomicBoolean completed = new AtomicBoolean(false);
@@ -174,7 +175,7 @@ public class CopilotProxyService implements ModelProxy {
         int estimatedInputTokens = estimateInputTokens(request);
 
         try {
-            connection = openStreamingConnection();
+            connection = openStreamingConnection(apiKey);
             Map<String, Object> payload = buildPayload(request, true);
             writeRequestBody(connection, payload);
 
@@ -277,7 +278,7 @@ public class CopilotProxyService implements ModelProxy {
      * Claude 模型流式请求，调用 /v1/messages 端点并返回 OpenAI 格式响应
      * 用于 /v1/chat/completions 端点调用 Claude 模型的场景
      */
-    private void executeClaudeToOpenAiStream(ChatRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
+    private void executeClaudeToOpenAiStream(ChatRequest request, ApiKey apiKey, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         String chatCompletionId = "chatcmpl-" + System.currentTimeMillis();
@@ -297,7 +298,7 @@ public class CopilotProxyService implements ModelProxy {
         int estimatedInputTokens = estimateInputTokens(request);
 
         try {
-            connection = openClaudeStreamingConnection();
+            connection = openClaudeStreamingConnection(apiKey);
             Map<String, Object> payload = buildClaudePayloadFromChatRequest(request);
             writeRequestBody(connection, payload);
 
@@ -638,7 +639,7 @@ public class CopilotProxyService implements ModelProxy {
      * 执行 Claude 格式的流式请求
      * 将 OpenAI SSE 格式转换为 Anthropic SSE 格式
      */
-    private void executeClaudeStream(ChatRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
+    private void executeClaudeStream(ChatRequest request, ApiKey apiKey, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         String messageId = "msg_" + System.currentTimeMillis();
@@ -653,7 +654,7 @@ public class CopilotProxyService implements ModelProxy {
         int estimatedInputTokens = estimateInputTokens(request);
 
         try {
-            connection = openStreamingConnection();
+            connection = openStreamingConnection(apiKey);
             Map<String, Object> payload = buildPayload(request, true);
             writeRequestBody(connection, payload);
 
@@ -976,12 +977,13 @@ public class CopilotProxyService implements ModelProxy {
         return payload;
     }
 
-    private HttpHeaders buildHeaders() {
+    private HttpHeaders buildHeaders(ApiKey apiKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        if (StringUtils.hasText(proxyProperties.getApiKey())) {
-            headers.set(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+        String upstreamApiKey = resolveUpstreamApiKey(apiKey);
+        if (StringUtils.hasText(upstreamApiKey)) {
+            headers.set(HttpHeaders.AUTHORIZATION, formatBearer(upstreamApiKey));
         }
 
         if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
@@ -991,8 +993,8 @@ public class CopilotProxyService implements ModelProxy {
         return headers;
     }
 
-    private HttpURLConnection openStreamingConnection() throws Exception {
-        return openStreamingConnection(ApiEndpoint.CHAT_COMPLETIONS.getPath());
+    private HttpURLConnection openStreamingConnection(ApiKey apiKey) throws Exception {
+        return openStreamingConnection(apiKey, ApiEndpoint.CHAT_COMPLETIONS.getPath());
     }
 
     private void writeRequestBody(HttpURLConnection connection, Map<String, Object> payload) throws Exception {
@@ -1182,8 +1184,23 @@ public class CopilotProxyService implements ModelProxy {
                 .sum();
     }
 
-    private String baseUrl() {
-        String base = proxyProperties.getBaseUrl();
+    private String resolveUpstreamApiKey(ApiKey apiKey) {
+        if (apiKey != null && StringUtils.hasText(apiKey.getUpstreamApiKey())) {
+            return apiKey.getUpstreamApiKey().trim();
+        }
+
+        String configuredToken = systemConfigService.get("copilot_github_token");
+        if (StringUtils.hasText(configuredToken)) {
+            return configuredToken.trim();
+        }
+
+        return proxyProperties.getApiKey();
+    }
+
+    private String baseUrl(ApiKey apiKey) {
+        String base = apiKey != null && StringUtils.hasText(apiKey.getRelayBaseUrl())
+                ? apiKey.getRelayBaseUrl()
+                : systemConfigService.get("copilot_api_url", proxyProperties.getBaseUrl());
         if (!StringUtils.hasText(base)) {
             throw new ChatProcessingException("代理服务基础地址未配置");
         }
@@ -1197,8 +1214,8 @@ public class CopilotProxyService implements ModelProxy {
         return normalized;
     }
 
-    private String buildProxyUrl(String path) {
-        String base = baseUrl();
+    private String buildProxyUrl(ApiKey apiKey, String path) {
+        String base = baseUrl(apiKey);
         if (!StringUtils.hasText(path) || "/".equals(path)) {
             return base;
         }
@@ -1210,6 +1227,23 @@ public class CopilotProxyService implements ModelProxy {
         return base + normalizedPath;
     }
 
+    private String serviceRootUrl(ApiKey apiKey) {
+        String base = baseUrl(apiKey);
+        if (base.endsWith("/v1")) {
+            return base.substring(0, base.length() - 3);
+        }
+        return base;
+    }
+
+    private String buildServiceUrl(ApiKey apiKey, String path) {
+        String root = serviceRootUrl(apiKey);
+        if (!StringUtils.hasText(path) || "/".equals(path)) {
+            return root;
+        }
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        return root + normalizedPath;
+    }
+
     // ============================================================
     // Models API 支持
     // ============================================================
@@ -1217,12 +1251,13 @@ public class CopilotProxyService implements ModelProxy {
     /**
      * 获取可用模型列表
      */
-    public ModelsResponse getModels() {
-        HttpEntity<?> entity = new HttpEntity<>(buildHeaders());
+    public ModelsResponse getModels(ApiKey apiKey) {
+        validateApiKey(apiKey);
+        HttpEntity<?> entity = new HttpEntity<>(buildHeaders(apiKey));
 
         try {
             ResponseEntity<ModelsResponse> response = restTemplate.exchange(
-                    buildProxyUrl(ApiEndpoint.MODELS.getPath()),
+                    buildProxyUrl(apiKey, ApiEndpoint.MODELS.getPath()),
                     HttpMethod.GET,
                     entity,
                     ModelsResponse.class
@@ -1243,6 +1278,36 @@ public class CopilotProxyService implements ModelProxy {
         }
     }
 
+    /**
+     * 获取上游 usage 数据
+     */
+    public JsonNode getUsage(ApiKey apiKey) {
+        validateApiKey(apiKey);
+        HttpEntity<?> entity = new HttpEntity<>(buildHeaders(apiKey));
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    buildServiceUrl(apiKey, "/usage"),
+                    HttpMethod.GET,
+                    entity,
+                    String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && StringUtils.hasText(response.getBody())) {
+                return objectMapper.readTree(response.getBody());
+            }
+
+            throw new ChatProcessingException("获取 usage 失败，HTTP " + response.getStatusCode());
+        } catch (HttpStatusCodeException ex) {
+            throw translateException(ex);
+        } catch (ChatAuthorizationException | ChatProcessingException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("获取上游 usage 异常", ex);
+            throw new ChatProcessingException("usage 服务暂时不可用，请稍后重试", ex);
+        }
+    }
+
     // ============================================================
     // Embeddings API 支持
     // ============================================================
@@ -1253,11 +1318,11 @@ public class CopilotProxyService implements ModelProxy {
     public EmbeddingsResponse embeddings(EmbeddingsRequest request, ApiKey apiKey) {
         validateApiKey(apiKey);
         Map<String, Object> payload = buildEmbeddingsPayload(request);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders());
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders(apiKey));
 
         try {
             ResponseEntity<EmbeddingsResponse> response = restTemplate.exchange(
-                    buildProxyUrl(ApiEndpoint.EMBEDDINGS.getPath()),
+                    buildProxyUrl(apiKey, ApiEndpoint.EMBEDDINGS.getPath()),
                     HttpMethod.POST,
                     entity,
                     EmbeddingsResponse.class
@@ -1323,11 +1388,11 @@ public class CopilotProxyService implements ModelProxy {
     public ClaudeResponse claudeMessages(ClaudeRequest request, ApiKey apiKey) {
         validateApiKey(apiKey);
         Map<String, Object> payload = buildClaudePayload(request, false);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildClaudeHeaders());
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildClaudeHeaders(apiKey));
 
         try {
             ResponseEntity<ClaudeResponse> response = restTemplate.exchange(
-                    buildProxyUrl(ApiEndpoint.MESSAGES.getPath()),
+                    buildProxyUrl(apiKey, ApiEndpoint.MESSAGES.getPath()),
                     HttpMethod.POST,
                     entity,
                     ClaudeResponse.class
@@ -1360,7 +1425,7 @@ public class CopilotProxyService implements ModelProxy {
     public SseEmitter claudeMessagesStream(ClaudeRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeClaudeMessagesStream(request, emitter, callback));
+        streamTaskExecutor.execute(() -> executeClaudeMessagesStream(request, apiKey, emitter, callback));
         return emitter;
     }
 
@@ -1368,7 +1433,7 @@ public class CopilotProxyService implements ModelProxy {
      * 执行 Claude Messages API 流式请求
      * 透传模式：直接转发上游 SSE 事件，使用类型化对象解析
      */
-    private void executeClaudeMessagesStream(ClaudeRequest request, SseEmitter emitter, StreamCompletionCallback callback) {
+    private void executeClaudeMessagesStream(ClaudeRequest request, ApiKey apiKey, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
@@ -1382,7 +1447,7 @@ public class CopilotProxyService implements ModelProxy {
 
         try {
             // 传递 anthropic-beta 和 anthropic-version 头（Claude Code 需要）
-            connection = openClaudeStreamingConnection(request.getAnthropicBeta(), request.getAnthropicVersion());
+            connection = openClaudeStreamingConnection(apiKey, request.getAnthropicBeta(), request.getAnthropicVersion());
             Map<String, Object> payload = buildClaudePayload(request, true);
             writeRequestBody(connection, payload);
 
@@ -1566,13 +1631,14 @@ public class CopilotProxyService implements ModelProxy {
     /**
      * 构建 Claude API 请求头（包含 x-api-key）
      */
-    private HttpHeaders buildClaudeHeaders() {
+    private HttpHeaders buildClaudeHeaders(ApiKey apiKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        if (StringUtils.hasText(proxyProperties.getApiKey())) {
+        String upstreamApiKey = resolveUpstreamApiKey(apiKey);
+        if (StringUtils.hasText(upstreamApiKey)) {
             // Claude API 使用 x-api-key 或 Authorization
-            headers.set(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+            headers.set(HttpHeaders.AUTHORIZATION, formatBearer(upstreamApiKey));
         }
 
         if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
@@ -1585,14 +1651,14 @@ public class CopilotProxyService implements ModelProxy {
     /**
      * 打开 Claude Messages API 流式连接
      */
-    private HttpURLConnection openClaudeStreamingConnection() throws Exception {
-        return openClaudeStreamingConnection(null, null);
+    private HttpURLConnection openClaudeStreamingConnection(ApiKey apiKey) throws Exception {
+        return openClaudeStreamingConnection(apiKey, null, null);
     }
 
     /**
      * 打开 Claude Messages API 流式连接（带 anthropic-beta 和 anthropic-version 头）
      */
-    private HttpURLConnection openClaudeStreamingConnection(String anthropicBeta, String anthropicVersion) throws Exception {
+    private HttpURLConnection openClaudeStreamingConnection(ApiKey apiKey, String anthropicBeta, String anthropicVersion) throws Exception {
         Map<String, String> additionalHeaders = new HashMap<>();
         if (StringUtils.hasText(anthropicBeta)) {
             additionalHeaders.put("anthropic-beta", anthropicBeta);
@@ -1600,7 +1666,7 @@ public class CopilotProxyService implements ModelProxy {
         if (StringUtils.hasText(anthropicVersion)) {
             additionalHeaders.put("anthropic-version", anthropicVersion);
         }
-        return openStreamingConnection(ApiEndpoint.MESSAGES.getPath(),
+        return openStreamingConnection(apiKey, ApiEndpoint.MESSAGES.getPath(),
                 additionalHeaders.isEmpty() ? null : additionalHeaders);
     }
 
@@ -1634,11 +1700,11 @@ public class CopilotProxyService implements ModelProxy {
     public ResponsesResponse responses(ResponsesRequest request, ApiKey apiKey) {
         validateApiKey(apiKey);
         Map<String, Object> payload = buildResponsesPayload(request, false);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders());
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, buildHeaders(apiKey));
 
         try {
             ResponseEntity<ResponsesResponse> response = restTemplate.exchange(
-                    buildProxyUrl(ApiEndpoint.RESPONSES.getPath()),
+                    buildProxyUrl(apiKey, ApiEndpoint.RESPONSES.getPath()),
                     HttpMethod.POST,
                     entity,
                     ResponsesResponse.class
@@ -1671,17 +1737,17 @@ public class CopilotProxyService implements ModelProxy {
     public SseEmitter responsesStream(ResponsesRequest request, ApiKey apiKey) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeResponsesStream(request, emitter));
+        streamTaskExecutor.execute(() -> executeResponsesStream(request, apiKey, emitter));
         return emitter;
     }
 
-    private void executeResponsesStream(ResponsesRequest request, SseEmitter emitter) {
+    private void executeResponsesStream(ResponsesRequest request, ApiKey apiKey, SseEmitter emitter) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         AtomicBoolean completed = new AtomicBoolean(false);
 
         try {
-            connection = openStreamingConnection(ApiEndpoint.RESPONSES.getPath());
+            connection = openStreamingConnection(apiKey, ApiEndpoint.RESPONSES.getPath());
             Map<String, Object> payload = buildResponsesPayload(request, true);
             writeRequestBody(connection, payload);
 
@@ -1822,12 +1888,12 @@ public class CopilotProxyService implements ModelProxy {
         return payload;
     }
 
-    private HttpURLConnection openStreamingConnection(String path) throws Exception {
-        return openStreamingConnection(path, null);
+    private HttpURLConnection openStreamingConnection(ApiKey apiKey, String path) throws Exception {
+        return openStreamingConnection(apiKey, path, null);
     }
 
-    private HttpURLConnection openStreamingConnection(String path, Map<String, String> additionalHeaders) throws Exception {
-        URL url = new URL(buildProxyUrl(path));
+    private HttpURLConnection openStreamingConnection(ApiKey apiKey, String path, Map<String, String> additionalHeaders) throws Exception {
+        URL url = new URL(buildProxyUrl(apiKey, path));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
@@ -1836,8 +1902,9 @@ public class CopilotProxyService implements ModelProxy {
         connection.setReadTimeout(proxyProperties.getReadTimeoutMs());
         connection.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
-        if (StringUtils.hasText(proxyProperties.getApiKey())) {
-            connection.setRequestProperty(HttpHeaders.AUTHORIZATION, formatBearer(proxyProperties.getApiKey()));
+        String upstreamApiKey = resolveUpstreamApiKey(apiKey);
+        if (StringUtils.hasText(upstreamApiKey)) {
+            connection.setRequestProperty(HttpHeaders.AUTHORIZATION, formatBearer(upstreamApiKey));
         }
         if (!CollectionUtils.isEmpty(proxyProperties.getExtraHeaders())) {
             proxyProperties.getExtraHeaders().forEach(connection::setRequestProperty);

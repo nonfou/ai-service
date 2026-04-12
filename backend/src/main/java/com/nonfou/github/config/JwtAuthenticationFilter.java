@@ -23,10 +23,8 @@ import java.io.IOException;
 import java.util.Collections;
 
 /**
- * JWT 认证过滤器
- * 从请求头中提取 JWT Token,验证并设置 Spring Security 认证上下文
- *
- * ✅ [安全增强] 添加了详细的异常处理和安全审计日志
+ * JWT 认证过滤器。
+ * 仅从 Authorization Header 提取 Bearer Token，并设置认证上下文。
  */
 @Slf4j
 @Component
@@ -35,26 +33,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private JwtUtil jwtUtil;
 
-    private static final String AUTH_TOKEN_COOKIE_NAME = "auth_token";
-
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
         String requestUri = request.getRequestURI();
-        boolean isAdminRequest = requestUri.startsWith("/admin");
         String clientIp = getClientIp(request);
-        String token = null;
-
-        // 先尝试从 Authorization Header 获取 Token (显式传递的凭证优先生效)
-        token = extractTokenFromAuthorizationHeader(request);
-
-        // Admin Portal 与 User Portal 使用不同的凭证来源:
-        // - Admin: 仅接受 Authorization Header,避免被用户端 Cookie 影响
-        // - User : 仍然可以使用 HttpOnly Cookie
-        if (token == null && !isAdminRequest) {
-            token = extractTokenFromCookie(request);
-        }
+        String token = extractTokenFromAuthorizationHeader(request);
 
         // 如果找到Token,进行验证
         if (token != null) {
@@ -132,21 +117,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 继续过滤器链
         filterChain.doFilter(request, response);
-    }
-
-    /**
-     * 从Cookie中提取Token
-     */
-    private String extractTokenFromCookie(HttpServletRequest request) {
-        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (jakarta.servlet.http.Cookie cookie : cookies) {
-                if (AUTH_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
     }
 
     /**

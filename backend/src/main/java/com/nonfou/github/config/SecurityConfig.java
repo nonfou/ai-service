@@ -91,17 +91,12 @@ public class SecurityConfig {
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
-            .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+            .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 // 健康检查端点
                 .requestMatchers("/health", "/ready", "/live", "/api/health", "/api/ready", "/api/live", "/actuator/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                // 公开接口
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/models").permitAll()
+                .requestMatchers("/usage").permitAll()
                 .requestMatchers("/v1/**").permitAll()
-                .requestMatchers("/api/models/admin/**").hasRole("ADMIN")
                 .anyRequest().hasAnyRole("USER", "ADMIN")
             )
             // 使用 STATELESS，不创建 Session

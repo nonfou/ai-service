@@ -2,13 +2,13 @@ package com.nonfou.github.interceptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nonfou.github.common.Result;
-import com.nonfou.github.config.AdminSecurityConfig;
+import com.nonfou.github.config.AdminSecurityProperties;
 import com.nonfou.github.service.InMemoryCacheService;
 import com.nonfou.github.util.LogMaskUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -19,16 +19,12 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class AdminSecurityInterceptor implements HandlerInterceptor {
 
-    @Autowired
-    private AdminSecurityConfig adminSecurityConfig;
-
-    @Autowired
-    private InMemoryCacheService cacheService;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final AdminSecurityProperties adminSecurityProperties;
+    private final InMemoryCacheService cacheService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -43,16 +39,16 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
         String clientIp = getClientIp(request);
 
         // 1. IP白名单检查
-        if (adminSecurityConfig.isEnableIpWhitelist() && !isIpAllowed(clientIp)) {
+        if (adminSecurityProperties.isEnableIpWhitelist() && !isIpAllowed(clientIp)) {
             log.warn("⚠️ 管理后台访问被拒绝(IP不在白名单): IP={}, URI={}", LogMaskUtil.maskIp(clientIp), requestURI);
             sendErrorResponse(response, "访问被拒绝: IP地址不在白名单中");
             return false;
         }
 
         // 2. 请求频率限制检查
-        if (adminSecurityConfig.isEnableRateLimit() && !checkRateLimit(clientIp)) {
+        if (adminSecurityProperties.isEnableRateLimit() && !checkRateLimit(clientIp)) {
             log.warn("⚠️ 管理后台访问被限流: IP={}, URI={}, 限制={}/分钟",
-                LogMaskUtil.maskIp(clientIp), requestURI, adminSecurityConfig.getRateLimit());
+                LogMaskUtil.maskIp(clientIp), requestURI, adminSecurityProperties.getRateLimit());
             sendErrorResponse(response, "请求过于频繁,请稍后再试");
             return false;
         }
@@ -93,12 +89,12 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
      * 检查IP是否在白名单中
      */
     private boolean isIpAllowed(String clientIp) {
-        if (adminSecurityConfig.getIpWhitelist().isEmpty()) {
+        if (adminSecurityProperties.getIpWhitelist().isEmpty()) {
             return true;
         }
 
         // 支持IP段匹配 (如: 192.168.1.*)
-        for (String allowedIp : adminSecurityConfig.getIpWhitelist()) {
+        for (String allowedIp : adminSecurityProperties.getIpWhitelist()) {
             if (allowedIp.equals(clientIp)) {
                 return true;
             }
@@ -122,7 +118,7 @@ public class AdminSecurityInterceptor implements HandlerInterceptor {
         String countStr = cacheService.get(key);
         int count = countStr != null ? Integer.parseInt(countStr) : 0;
 
-        if (count >= adminSecurityConfig.getRateLimit()) {
+        if (count >= adminSecurityProperties.getRateLimit()) {
             return false;
         }
 

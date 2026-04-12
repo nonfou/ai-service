@@ -1,24 +1,25 @@
-package com.nonfou.github.entity;
+package com.nonfou.github.dto.response;
 
-import com.baomidou.mybatisplus.annotation.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 /**
- * API密钥实体
+ * 管理端 API Key 响应
  */
 @Data
-@TableName("api_keys")
-public class ApiKey {
-
-    @TableId(type = IdType.AUTO)
-    private Long id;
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AdminApiKeyResponse {
 
     /**
-     * 用户ID
+     * 主键 ID
      */
-    private Long userId;
+    private String id;
 
     /**
      * 密钥名称
@@ -26,7 +27,7 @@ public class ApiKey {
     private String keyName;
 
     /**
-     * API密钥
+     * 客户端 API Key
      */
     private String apiKey;
 
@@ -36,7 +37,7 @@ public class ApiKey {
     private String relayBaseUrl;
 
     /**
-     * 上游 API Key（加密存储）
+     * 脱敏后的上游 API Key
      */
     private String upstreamApiKey;
 
@@ -58,12 +59,5 @@ public class ApiKey {
     /**
      * 创建时间
      */
-    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-
-    /**
-     * 更新时间
-     */
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
 }

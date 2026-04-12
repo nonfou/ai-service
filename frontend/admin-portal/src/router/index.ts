@@ -14,54 +14,12 @@ const router = createRouter({
       name: 'Layout',
       component: () => import('../views/Layout.vue'),
       meta: { requiresAuth: true },
-      redirect: '/overview',
+      redirect: '/admin/api-keys',
       children: [
         {
-          path: '/overview',
-          name: 'Overview',
-          component: () => import('../views/Overview.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/users',
-          name: 'Users',
-          component: () => import('../views/Users.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/models',
-          name: 'Models',
-          component: () => import('../views/Models.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/plans',
-          name: 'Plans',
-          component: () => import('../views/Plans.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/orders',
-          name: 'Orders',
-          component: () => import('../views/Orders.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/tickets',
-          name: 'Tickets',
-          component: () => import('../views/Tickets.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/admin/backend-accounts',
-          name: 'BackendAccounts',
-          component: () => import('../views/admin/BackendAccounts.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: '/admin/quotas',
-          name: 'QuotaManagement',
-          component: () => import('../views/admin/QuotaManagement.vue'),
+          path: '/admin/api-keys',
+          name: 'ApiKeyManagement',
+          component: () => import('../views/admin/ApiKeyManagement.vue'),
           meta: { requiresAuth: true }
         }
       ]

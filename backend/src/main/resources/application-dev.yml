@@ -1,78 +1,22 @@
-# ====================================================
-# 开发环境配置
-# ====================================================
-
-# 环境特定的配置值
-# 数据库配置
 spring:
   datasource:
-    url: jdbc:h2:mem:ai_api_platform_dev;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-
-    # 开发环境连接池配置
+    url: jdbc:sqlite:./data/ai_api_platform_dev.db
     hikari:
-      minimum-idle: 2
-      maximum-pool-size: 5
+      minimum-idle: 1
+      maximum-pool-size: 2
       connection-timeout: 30000
 
-  # H2 控制台 - 开发环境开启
-  h2:
-    console:
-      enabled: true
-
-  # 邮件配置
-  mail:
-    host: ${MAIL_HOST:smtp.exmail.qq.com}
-    port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:support@xcoder.plus}
-    password: ${MAIL_PASSWORD:od8vgwT878ny7ebn}  # ⚠️ 请设置环境变量 MAIL_PASSWORD
-    properties:
-      mail:
-        smtp:
-          ssl:
-            enable: true
-          socketFactory:
-            class: javax.net.ssl.SSLSocketFactory
-            port: 465
-          starttls:
-            enable: false
-            required: false
-  servlet:
-    session:
-          cookie:
-            secure: false  # 开发环境使用HTTP,设为false
-
-# MyBatis Plus 开发环境配置
 mybatis-plus:
   configuration:
-    # 开发环境输出 SQL 到控制台
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
-# JWT 配置 - 开发环境
 jwt:
-  secret: ${JWT_SECRET:yswionRCkQglQbB3AlYOwrJ+eo+pR0FciMC5lWVtxWI=}  # ⚠️ 生产环境必须使用环境变量
+  secret: ${JWT_SECRET:yswionRCkQglQbB3AlYOwrJ+eo+pR0FciMC5lWVtxWI=}
 
-# 验证码配置 - 开发环境
-auth:
-  verify-code:
-    hash-secret: ${VERIFY_CODE_SECRET:49lnyc8hm2CSgbpZgg1MJt7GVWBT3k4yzBwgetm+0P0=}  # ⚠️ 生产环境必须使用环境变量
-    default-code: "123456"  # 开发环境默认测试验证码，生产环境不要配置此项
-
-# 加密配置 - 开发环境
 encryption:
-  key: ${ENCRYPTION_KEY:BzYuRUcVqTR09G9suRDaA05ewMoxFXe8}  # 32字符(32字节UTF-8)AES-256密钥, ⚠️ 生产环境必须使用环境变量
+  key: ${ENCRYPTION_KEY:BzYuRUcVqTR09G9suRDaA05ewMoxFXe8}
 
-# 管理后台安全配置 - 开发环境
 admin:
   security:
-    # 开发环境可以禁用速率限制
     enable-rate-limit: ${ADMIN_ENABLE_RATE_LIMIT:false}
     enable-login-lock: ${ADMIN_ENABLE_LOGIN_LOCK:false}
-
-# Cookie 配置 - 开发环境
-app:
-  cookie:
-    secure: false  # 开发环境使用HTTP,设为false
-
-# Session Cookie 配置 - 开发环境

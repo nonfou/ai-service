@@ -11,7 +11,7 @@
             <path d="M2 12l10 5 10-5"/>
           </svg>
         </div>
-        <span class="logo-text">AI API</span>
+        <span class="logo-text">Copilot</span>
       </div>
 
       <!-- 导航菜单 -->
@@ -51,12 +51,6 @@
         </div>
 
         <div class="header-right">
-          <!-- 通知图标 -->
-          <button class="header-btn">
-            <Bell />
-          </button>
-
-          <!-- 用户下拉菜单 -->
           <el-dropdown @command="handleCommand" trigger="click">
             <div class="user-dropdown">
               <div class="user-avatar-small">
@@ -67,14 +61,6 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="profile">
-                  <User class="dropdown-icon" />
-                  个人信息
-                </el-dropdown-item>
-                <el-dropdown-item command="settings">
-                  <Setting class="dropdown-icon" />
-                  系统设置
-                </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <SwitchButton class="dropdown-icon" />
                   退出登录
@@ -98,17 +84,10 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import {
-  DataAnalysis,
-  User,
-  Cpu,
-  ShoppingCart,
-  Tickets,
-  ChatDotRound,
+  Lock,
   UserFilled,
   ArrowDown,
-  SwitchButton,
-  Bell,
-  Setting
+  SwitchButton
 } from '@element-plus/icons-vue'
 import { useAdminStore } from '../stores/admin'
 import message from '../utils/message'
@@ -119,12 +98,7 @@ const adminStore = useAdminStore()
 
 // 菜单项配置
 const menuItems = [
-  { path: '/overview', title: '数据概览', icon: DataAnalysis },
-  { path: '/users', title: '用户管理', icon: User },
-  { path: '/models', title: '模型管理', icon: Cpu },
-  { path: '/plans', title: '套餐管理', icon: ShoppingCart },
-  { path: '/orders', title: '订单管理', icon: Tickets },
-  { path: '/tickets', title: '工单管理', icon: ChatDotRound }
+  { path: '/admin/api-keys', title: 'Copilot API Key', icon: Lock }
 ]
 
 const isActiveRoute = (path: string) => {
@@ -321,25 +295,6 @@ const handleCommand = async (command: string) => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.header-btn {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background-color: transparent;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-}
-
-.header-btn:hover {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
 }
 
 /* 用户下拉菜单 */

@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:user": "pnpm --filter @cc-web/user-portal dev",
+    "dev": "pnpm --filter @cc-web/admin-portal dev",
     "dev:admin": "pnpm --filter @cc-web/admin-portal dev",
-    "dev:all": "pnpm --parallel --filter \"@cc-web/*-portal\" dev",
-    "build:user": "pnpm --filter @cc-web/user-portal build",
+    "build": "pnpm --filter @cc-web/admin-portal build",
     "build:admin": "pnpm --filter @cc-web/admin-portal build",
     "build:all": "pnpm -r build"
   },

@@ -2,165 +2,185 @@ package com.nonfou.github.service;
 
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.nonfou.github.dto.request.CreateApiKeyRequest;
-import com.nonfou.github.dto.response.ApiKeyResponse;
+import com.nonfou.github.dto.request.AdminApiKeyCreateRequest;
+import com.nonfou.github.dto.request.AdminApiKeyUpdateRequest;
+import com.nonfou.github.dto.response.AdminApiKeyResponse;
 import com.nonfou.github.entity.ApiKey;
+import com.nonfou.github.entity.User;
 import com.nonfou.github.mapper.ApiKeyMapper;
+import com.nonfou.github.mapper.UserMapper;
+import com.nonfou.github.util.EncryptionUtil;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * API密钥服务
+ * 平台 API Key 服务
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ApiKeyService {
 
-    @Autowired
-    private ApiKeyMapper apiKeyMapper;
+    private static final String SYSTEM_USER_EMAIL = "system@local";
+    private static final String DEFAULT_RELAY_URL = "http://127.0.0.1:4141/v1";
+
+    private final ApiKeyMapper apiKeyMapper;
+    private final UserMapper userMapper;
+    private final EncryptionUtil encryptionUtil;
+    private final SystemConfigService systemConfigService;
 
     /**
-     * 创建API密钥
+     * 管理端获取平台 API Key 列表
+     */
+    public List<AdminApiKeyResponse> listAdminApiKeys() {
+        Long systemUserId = ensureSystemUserId();
+        return apiKeyMapper.selectList(systemUserKeyWrapper(systemUserId)).stream()
+                .map(item -> toAdminResponse(item, false))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 管理端创建平台 API Key
      */
     @Transactional
-    public ApiKeyResponse createApiKey(Long userId, CreateApiKeyRequest request) {
-        // 检查密钥名称是否重复
-        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ApiKey::getUserId, userId)
-                .eq(ApiKey::getKeyName, request.getKeyName());
-        if (apiKeyMapper.selectCount(wrapper) > 0) {
-            throw new RuntimeException("密钥名称已存在");
-        }
+    public AdminApiKeyResponse createAdminApiKey(AdminApiKeyCreateRequest request) {
+        Long systemUserId = ensureSystemUserId();
+        String keyName = normalizeRequiredText(request.getKeyName(), "密钥名称不能为空");
+        validateDuplicateKeyName(systemUserId, keyName, null);
 
-        // 生成API密钥
-        String apiKey = generateApiKey();
-
-        // 创建密钥记录
         ApiKey entity = new ApiKey();
-        entity.setUserId(userId);
-        entity.setKeyName(request.getKeyName());
-        entity.setApiKey(apiKey);
-        entity.setStatus(1); // 默认启用
+        entity.setId(IdUtil.getSnowflakeNextId());
+        entity.setUserId(systemUserId);
+        entity.setKeyName(keyName);
+        entity.setApiKey(generateApiKey());
+        entity.setRelayBaseUrl(normalizeRelayBaseUrl(request.getRelayBaseUrl()));
+        entity.setUpstreamApiKey(encryptOptional(request.getUpstreamApiKey()));
+        entity.setDescription(normalizeOptionalText(request.getDescription()));
+        entity.setStatus(1);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
+        apiKeyMapper.insertDirect(entity);
 
-        apiKeyMapper.insert(entity);
-        log.info("API密钥创建成功: userId={}, keyName={}", userId, request.getKeyName());
-
-        // 返回完整密钥（仅在创建时返回）
-        return ApiKeyResponse.builder()
-                .id(entity.getId())
-                .keyName(entity.getKeyName())
-                .apiKey(apiKey) // 完整密钥
-                .status(entity.getStatus())
-                .createdAt(entity.getCreatedAt())
-                .build();
+        log.info("创建平台 API Key 成功: keyId={}, keyName={}", entity.getId(), entity.getKeyName());
+        return toAdminResponse(entity, true);
     }
 
     /**
-     * 获取用户所有API密钥列表
-     */
-    public List<ApiKeyResponse> getUserApiKeys(Long userId) {
-        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ApiKey::getUserId, userId)
-                .orderByDesc(ApiKey::getCreatedAt);
-
-        List<ApiKey> keys = apiKeyMapper.selectList(wrapper);
-
-        return keys.stream().map(key -> ApiKeyResponse.builder()
-                .id(key.getId())
-                .keyName(key.getKeyName())
-                .apiKey(maskApiKey(key.getApiKey())) // 脱敏
-                .status(key.getStatus())
-                .lastUsedAt(key.getLastUsedAt())
-                .createdAt(key.getCreatedAt())
-                .build()
-        ).collect(Collectors.toList());
-    }
-
-    /**
-     * 更新密钥状态（启用/禁用）
+     * 管理端更新平台 API Key
      */
     @Transactional
-    public void updateApiKeyStatus(Long userId, Long keyId, Integer status) {
-        // 验证密钥归属
-        ApiKey apiKey = getApiKeyByUserAndId(userId, keyId);
-        if (apiKey == null) {
-            throw new RuntimeException("API密钥不存在");
+    public void updateAdminApiKey(Long keyId, AdminApiKeyUpdateRequest request) {
+        ApiKey apiKey = getAdminApiKey(keyId);
+
+        if (StringUtils.hasText(request.getKeyName())) {
+            String keyName = request.getKeyName().trim();
+            validateDuplicateKeyName(apiKey.getUserId(), keyName, keyId);
+            apiKey.setKeyName(keyName);
+        }
+        if (StringUtils.hasText(request.getRelayBaseUrl())) {
+            apiKey.setRelayBaseUrl(normalizeRelayBaseUrl(request.getRelayBaseUrl()));
+        }
+        if (request.getUpstreamApiKey() != null) {
+            apiKey.setUpstreamApiKey(encryptOptional(request.getUpstreamApiKey()));
+        }
+        if (request.getDescription() != null) {
+            apiKey.setDescription(normalizeOptionalText(request.getDescription()));
         }
 
+        apiKey.setUpdatedAt(LocalDateTime.now());
+        apiKeyMapper.updateById(apiKey);
+        log.info("更新平台 API Key 成功: keyId={}", keyId);
+    }
+
+    /**
+     * 管理端更新平台 API Key 状态
+     */
+    @Transactional
+    public void updateAdminApiKeyStatus(Long keyId, Integer status) {
+        ApiKey apiKey = getAdminApiKey(keyId);
         apiKey.setStatus(status);
         apiKey.setUpdatedAt(LocalDateTime.now());
         apiKeyMapper.updateById(apiKey);
-
-        log.info("API密钥状态更新: userId={}, keyId={}, status={}", userId, keyId, status);
+        log.info("更新平台 API Key 状态: keyId={}, status={}", keyId, status);
     }
 
     /**
-     * 删除API密钥
+     * 管理端删除平台 API Key
      */
     @Transactional
-    public void deleteApiKey(Long userId, Long keyId) {
-        // 验证密钥归属
-        ApiKey apiKey = getApiKeyByUserAndId(userId, keyId);
-        if (apiKey == null) {
-            throw new RuntimeException("API密钥不存在");
-        }
-
-        apiKeyMapper.deleteById(keyId);
-        log.info("API密钥删除成功: userId={}, keyId={}", userId, keyId);
+    public void deleteAdminApiKey(Long keyId) {
+        ApiKey apiKey = getAdminApiKey(keyId);
+        apiKeyMapper.deleteById(apiKey.getId());
+        log.info("删除平台 API Key: keyId={}", keyId);
     }
 
     /**
-     * 重新生成API密钥
+     * 管理端重新生成平台 API Key
      */
     @Transactional
-    public ApiKeyResponse regenerateApiKey(Long userId, Long keyId) {
-        // 验证密钥归属
-        ApiKey apiKey = getApiKeyByUserAndId(userId, keyId);
-        if (apiKey == null) {
-            throw new RuntimeException("API密钥不存在");
-        }
-
-        // 生成新密钥
-        String newApiKey = generateApiKey();
-        apiKey.setApiKey(newApiKey);
+    public AdminApiKeyResponse regenerateAdminApiKey(Long keyId) {
+        ApiKey apiKey = getAdminApiKey(keyId);
+        apiKey.setApiKey(generateApiKey());
         apiKey.setUpdatedAt(LocalDateTime.now());
         apiKeyMapper.updateById(apiKey);
 
-        log.info("API密钥重新生成: userId={}, keyId={}", userId, keyId);
-
-        // 返回完整新密钥
-        return ApiKeyResponse.builder()
-                .id(apiKey.getId())
-                .keyName(apiKey.getKeyName())
-                .apiKey(newApiKey) // 完整新密钥
-                .status(apiKey.getStatus())
-                .lastUsedAt(apiKey.getLastUsedAt())
-                .createdAt(apiKey.getCreatedAt())
-                .build();
+        log.info("重置平台 API Key: keyId={}", keyId);
+        return toAdminResponse(apiKey, true);
     }
 
     /**
-     * 根据API密钥查询用户ID（用于认证）
+     * 根据客户端 API Key 获取路由配置
      */
-    public Long getUserIdByApiKey(String apiKey) {
-        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ApiKey::getApiKey, apiKey)
-                .eq(ApiKey::getStatus, 1); // 仅查询启用的密钥
+    public ApiKey getRoutingApiKey(String apiKey) {
+        if (!StringUtils.hasText(apiKey)) {
+            return null;
+        }
 
-        ApiKey key = apiKeyMapper.selectOne(wrapper);
-        return key != null ? key.getUserId() : null;
+        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ApiKey::getApiKey, apiKey.trim())
+                .eq(ApiKey::getStatus, 1)
+                .orderByDesc(ApiKey::getId)
+                .last("LIMIT 1");
+
+        ApiKey entity = apiKeyMapper.selectOne(wrapper);
+        if (entity == null) {
+            return null;
+        }
+
+        if (StringUtils.hasText(entity.getUpstreamApiKey())) {
+            entity.setUpstreamApiKey(decryptOptional(entity.getUpstreamApiKey()));
+        }
+        if (!StringUtils.hasText(entity.getRelayBaseUrl())) {
+            entity.setRelayBaseUrl(resolveDefaultRelayBaseUrl());
+        }
+        return entity;
     }
 
     /**
-     * 更新密钥最后使用时间
+     * 根据管理端 ID 获取路由配置
+     */
+    public ApiKey getAdminRoutingApiKey(Long keyId) {
+        ApiKey apiKey = getAdminApiKey(keyId);
+        if (StringUtils.hasText(apiKey.getUpstreamApiKey())) {
+            apiKey.setUpstreamApiKey(decryptOptional(apiKey.getUpstreamApiKey()));
+        }
+        if (!StringUtils.hasText(apiKey.getRelayBaseUrl())) {
+            apiKey.setRelayBaseUrl(resolveDefaultRelayBaseUrl());
+        }
+        return apiKey;
+    }
+
+    /**
+     * 更新最后使用时间
      */
     @Transactional
     public void updateLastUsedTime(String apiKey) {
@@ -174,52 +194,134 @@ public class ApiKeyService {
         }
     }
 
-    /**
-     * 验证密钥是否有效
-     */
-    public boolean validateApiKey(String apiKey) {
-        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ApiKey::getApiKey, apiKey)
-                .eq(ApiKey::getStatus, 1);
-
-        return apiKeyMapper.selectCount(wrapper) > 0;
-    }
-
-    /**
-     * 根据API密钥字符串获取ApiKey实体（用于多账户调度）
-     */
-    public ApiKey getApiKeyEntity(String apiKey) {
-        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ApiKey::getApiKey, apiKey)
-                .eq(ApiKey::getStatus, 1); // 仅查询启用的密钥
-        return apiKeyMapper.selectOne(wrapper);
-    }
-
-    /**
-     * 获取指定用户的指定密钥
-     */
-    private ApiKey getApiKeyByUserAndId(Long userId, Long keyId) {
+    private LambdaQueryWrapper<ApiKey> systemUserKeyWrapper(Long userId) {
         LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ApiKey::getUserId, userId)
-                .eq(ApiKey::getId, keyId);
-        return apiKeyMapper.selectOne(wrapper);
+                .orderByDesc(ApiKey::getCreatedAt);
+        return wrapper;
     }
 
-    /**
-     * 生成API密钥
-     */
+    private ApiKey getAdminApiKey(Long keyId) {
+        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ApiKey::getUserId, ensureSystemUserId())
+                .eq(ApiKey::getId, keyId)
+                .last("LIMIT 1");
+
+        ApiKey apiKey = apiKeyMapper.selectOne(wrapper);
+        if (apiKey == null) {
+            throw new RuntimeException("API密钥不存在");
+        }
+        return apiKey;
+    }
+
+    private void validateDuplicateKeyName(Long userId, String keyName, Long excludeId) {
+        LambdaQueryWrapper<ApiKey> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ApiKey::getUserId, userId)
+                .eq(ApiKey::getKeyName, keyName);
+        if (excludeId != null) {
+            wrapper.ne(ApiKey::getId, excludeId);
+        }
+        if (apiKeyMapper.selectCount(wrapper) > 0) {
+            throw new RuntimeException("密钥名称已存在");
+        }
+    }
+
+    private AdminApiKeyResponse toAdminResponse(ApiKey apiKey, boolean showFullKey) {
+        return AdminApiKeyResponse.builder()
+                .id(String.valueOf(apiKey.getId()))
+                .keyName(apiKey.getKeyName())
+                .apiKey(showFullKey ? apiKey.getApiKey() : maskApiKey(apiKey.getApiKey()))
+                .relayBaseUrl(StringUtils.hasText(apiKey.getRelayBaseUrl()) ? apiKey.getRelayBaseUrl() : resolveDefaultRelayBaseUrl())
+                .upstreamApiKey(maskEncryptedOptional(apiKey.getUpstreamApiKey()))
+                .description(apiKey.getDescription())
+                .status(apiKey.getStatus())
+                .lastUsedAt(apiKey.getLastUsedAt())
+                .createdAt(apiKey.getCreatedAt())
+                .build();
+    }
+
+    private Long ensureSystemUserId() {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getEmail, SYSTEM_USER_EMAIL)
+                .last("LIMIT 1");
+
+        User user = userMapper.selectOne(wrapper);
+        if (user != null) {
+            return user.getId();
+        }
+
+        User entity = new User();
+        entity.setId(IdUtil.getSnowflakeNextId());
+        entity.setEmail(SYSTEM_USER_EMAIL);
+        entity.setPassword("");
+        entity.setBalance(BigDecimal.ZERO);
+        entity.setStatus(1);
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(LocalDateTime.now());
+        userMapper.insertDirect(entity);
+        return entity.getId();
+    }
+
+    private String resolveDefaultRelayBaseUrl() {
+        String configured = systemConfigService.get("copilot_api_url", DEFAULT_RELAY_URL);
+        return normalizeRelayBaseUrl(configured);
+    }
+
+    private String normalizeRelayBaseUrl(String relayBaseUrl) {
+        String value = normalizeRequiredText(relayBaseUrl, "转发地址不能为空");
+        String normalized = value;
+        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+            normalized = "http://" + normalized;
+        }
+        if (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (!normalized.toLowerCase(Locale.ROOT).contains("/v1")) {
+            normalized = normalized + "/v1";
+        }
+        return normalized;
+    }
+
+    private String normalizeRequiredText(String value, String errorMessage) {
+        if (!StringUtils.hasText(value)) {
+            throw new RuntimeException(errorMessage);
+        }
+        return value.trim();
+    }
+
+    private String normalizeOptionalText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String encryptOptional(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return encryptionUtil.encrypt(value.trim());
+    }
+
+    private String decryptOptional(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return encryptionUtil.decrypt(value);
+    }
+
+    private String maskEncryptedOptional(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "-";
+        }
+        return maskApiKey(decryptOptional(value));
+    }
+
     private String generateApiKey() {
         return "sk-" + IdUtil.fastSimpleUUID();
     }
 
-    /**
-     * 脱敏API密钥
-     */
     private String maskApiKey(String apiKey) {
-        if (apiKey == null || apiKey.length() < 12) {
+        if (!StringUtils.hasText(apiKey) || apiKey.length() < 12) {
             return apiKey;
         }
-        // 保留前8位和后4位,中间用***代替
         return apiKey.substring(0, 8) + "***" + apiKey.substring(apiKey.length() - 4);
     }
 }
