@@ -15,6 +15,7 @@
     <div class="stat-card-body">
       <div class="stat-value">{{ formattedValue }}</div>
       <div class="stat-label">{{ label }}</div>
+      <div v-if="description" class="stat-description">{{ description }}</div>
     </div>
   </div>
 </template>
@@ -32,6 +33,7 @@ const props = defineProps<{
   badge?: number | string
   prefix?: string
   to?: string
+  description?: string
 }>()
 
 const router = useRouter()
@@ -155,5 +157,11 @@ const handleClick = () => {
 .stat-label {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.stat-description {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 </style>

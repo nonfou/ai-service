@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:sqlite:./data/ai_api_platform_dev.db
+    url: jdbc:sqlite:${DB_PATH:../data/ai_api_platform_dev.db}
     hikari:
       minimum-idle: 1
       maximum-pool-size: 2

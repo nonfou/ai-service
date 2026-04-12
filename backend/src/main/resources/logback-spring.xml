@@ -48,7 +48,7 @@
         </rollingPolicy>
     </appender>
 
-    <!-- 文件输出 - 错���日志 -->
+    <!-- 文件输出 - 错误日志 -->
     <appender name="ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/error.log</file>
         <filter class="ch.qos.logback.classic.filter.LevelFilter">

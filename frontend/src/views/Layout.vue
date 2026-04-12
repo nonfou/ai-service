@@ -84,6 +84,8 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import {
+  DataAnalysis,
+  Histogram,
   Lock,
   UserFilled,
   ArrowDown,
@@ -98,6 +100,8 @@ const adminStore = useAdminStore()
 
 // 菜单项配置
 const menuItems = [
+  { path: '/admin/token-dashboard', title: 'Token 仪表盘', icon: DataAnalysis },
+  { path: '/admin/token-usage', title: '使用记录', icon: Histogram },
   { path: '/admin/api-keys', title: 'Copilot API Key', icon: Lock }
 ]
 

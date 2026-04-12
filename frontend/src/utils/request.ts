@@ -84,6 +84,32 @@ const buildBusinessError = (response: AxiosResponse<ApiResponse>) => {
   return error
 }
 
+const parseResponseMessage = async (data: unknown): Promise<string | undefined> => {
+  if (!data) {
+    return undefined
+  }
+
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text()
+      if (!text) {
+        return undefined
+      }
+      const parsed = JSON.parse(text) as Partial<ApiResponse>
+      return typeof parsed.message === 'string' ? parsed.message : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  if (typeof data === 'object' && data !== null && 'message' in data) {
+    const responseMessage = (data as { message?: unknown }).message
+    return typeof responseMessage === 'string' ? responseMessage : undefined
+  }
+
+  return undefined
+}
+
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
@@ -101,6 +127,10 @@ request.interceptors.request.use(
 // 响应拦截器 - 返回 ApiResponse 类型
 request.interceptors.response.use(
   async (response: AxiosResponse<ApiResponse>) => {
+    if (response.config.responseType === 'blob') {
+      return response as any
+    }
+
     const res = response.data
 
     // 如果返回的状态码不是200,则认为是错误
@@ -123,6 +153,7 @@ request.interceptors.response.use(
   async (error) => {
     if (error.response) {
       const { status, data } = error.response
+      const resolvedMessage = await parseResponseMessage(data)
 
       if (status === 401 || status === 403) {
         const confirmPromise = promptReLogin()
@@ -130,11 +161,11 @@ request.interceptors.response.use(
           await confirmPromise.catch(() => {})
         }
       } else if (status === 404) {
-        message.error('请求的资源不存在')
+        message.error(resolvedMessage || '请求的资源不存在')
       } else if (status === 500) {
-        message.error(data?.message || '服务器错误')
+        message.error(resolvedMessage || '服务器错误')
       } else {
-        message.error(data?.message || '请求失败')
+        message.error(resolvedMessage || '请求失败')
       }
     } else if (error.code === 'ECONNABORTED') {
       message.error('请求超时，服务器响应缓慢，请稍后重试')

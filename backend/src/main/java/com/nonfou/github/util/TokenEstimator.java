@@ -1,6 +1,9 @@
 package com.nonfou.github.util;
 
 import com.nonfou.github.dto.request.ChatRequest;
+import com.nonfou.github.dto.request.ClaudeRequest;
+import com.nonfou.github.dto.request.EmbeddingsRequest;
+import com.nonfou.github.dto.request.ResponsesRequest;
 import com.nonfou.github.service.CostCalculatorService;
 import org.springframework.stereotype.Component;
 
@@ -134,9 +137,85 @@ public class TokenEstimator {
     }
 
     /**
+     * 估算 Claude 请求输入 token。
+     */
+    public int estimateClaudeInputTokens(ClaudeRequest request) {
+        if (request == null) {
+            return 0;
+        }
+
+        int total = 0;
+        if (request.getMessages() != null) {
+            total += request.getMessages().stream()
+                    .map(ClaudeRequest.Message::getContent)
+                    .mapToInt(this::estimateContentTokens)
+                    .sum();
+        }
+        total += estimateContentTokens(request.getSystem());
+        return total;
+    }
+
+    /**
+     * 估算 Claude 请求的 token 使用情况。
+     */
+    public CostCalculatorService.TokenUsage estimateClaudeUsage(ClaudeRequest request, String responseText) {
+        return CostCalculatorService.TokenUsage.builder()
+                .inputTokens(estimateClaudeInputTokens(request))
+                .outputTokens(estimateTextTokens(responseText))
+                .cacheReadTokens(0)
+                .cacheWriteTokens(0)
+                .build();
+    }
+
+    /**
+     * 估算 Responses 请求输入 token。
+     */
+    public int estimateResponsesInputTokens(ResponsesRequest request) {
+        if (request == null) {
+            return 0;
+        }
+        return estimateContentTokens(request.getInput()) + estimateContentTokens(request.getInstructions());
+    }
+
+    /**
+     * 估算 Responses 请求的 token 使用情况。
+     */
+    public CostCalculatorService.TokenUsage estimateResponsesUsage(ResponsesRequest request, String responseText) {
+        return CostCalculatorService.TokenUsage.builder()
+                .inputTokens(estimateResponsesInputTokens(request))
+                .outputTokens(estimateTextTokens(responseText))
+                .cacheReadTokens(0)
+                .cacheWriteTokens(0)
+                .build();
+    }
+
+    /**
+     * 估算 Embeddings 请求输入 token。
+     */
+    public int estimateEmbeddingsInputTokens(EmbeddingsRequest request) {
+        if (request == null) {
+            return 0;
+        }
+        return estimateContentTokens(request.getInput());
+    }
+
+    /**
+     * 估算 Embeddings 请求的 token 使用情况。
+     */
+    public CostCalculatorService.TokenUsage estimateEmbeddingsUsage(EmbeddingsRequest request) {
+        int inputTokens = estimateEmbeddingsInputTokens(request);
+        return CostCalculatorService.TokenUsage.builder()
+                .inputTokens(inputTokens)
+                .outputTokens(0)
+                .cacheReadTokens(0)
+                .cacheWriteTokens(0)
+                .build();
+    }
+
+    /**
      * 估算任意内容结构的 token 数，兼容字符串、分段内容、工具调用等格式。
      */
-    private int estimateContentTokens(Object content) {
+    public int estimateContentTokens(Object content) {
         if (content == null) {
             return 0;
         }

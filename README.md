@@ -29,10 +29,20 @@ cd backend
 mvn spring-boot:run
 ```
 
-默认开发配置会使用内存 H2。如需通过环境变量指定上游 Copilot 地址，可设置：
+默认开发配置会使用仓库根目录下的 SQLite 文件库 `data/ai_api_platform_dev.db`，首次启动会自动初始化表结构和默认管理员。
+
+默认管理员账号：
+
+```text
+username: admin
+password: admin123
+```
+
+如需通过环境变量指定开发库路径或上游 Copilot 地址，可设置：
 
 ```bash
 # PowerShell
+$env:DB_PATH="../data/ai_api_platform_dev.db"
 $env:COPILOT_PROXY_BASE_URL="<your-copilot-relay-url>"
 $env:COPILOT_PROXY_API_KEY=""
 ```

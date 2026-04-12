@@ -173,6 +173,8 @@ public class CopilotProxyService implements ModelProxy {
         int cacheWriteTokens = 0;
         TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
         int estimatedInputTokens = estimateInputTokens(request);
+        long startedAt = System.currentTimeMillis();
+        long firstTokenLatencyMs = -1L;
 
         try {
             connection = openStreamingConnection(apiKey);
@@ -183,7 +185,8 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Copilot Proxy 流式鉴权失败: HTTP {}", status);
                 sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
-                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败",
+                        firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -194,7 +197,8 @@ public class CopilotProxyService implements ModelProxy {
                 sendStreamError(emitter, status,
                         friendly != null ? friendly : buildFriendlyMessage(status),
                         "processing_error");
-                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false,
+                        friendly != null ? friendly : buildFriendlyMessage(status), firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -220,6 +224,9 @@ public class CopilotProxyService implements ModelProxy {
                         JsonNode delta = choices.get(0).path("delta");
                         String content = safeText(delta.get("content"));
                         if (StringUtils.hasText(content)) {
+                            if (firstTokenLatencyMs < 0) {
+                                firstTokenLatencyMs = System.currentTimeMillis() - startedAt;
+                            }
                             charCounter.append(content);
                         }
                     }
@@ -263,12 +270,12 @@ public class CopilotProxyService implements ModelProxy {
                     .cacheReadTokens(cacheReadTokens)
                     .cacheWriteTokens(cacheWriteTokens)
                     .build();
-            invokeCallback(callback, tokenUsage, true, null);
+            invokeCallback(callback, tokenUsage, true, null, firstTokenLatencyMs, startedAt);
         } catch (Exception ex) {
             log.error("Copilot Proxy 流式调用异常", ex);
             sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "上游模型服务流式接口异常", "processing_error");
-            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage(), firstTokenLatencyMs, startedAt);
         } finally {
             closeResources(reader, connection);
         }
@@ -296,6 +303,8 @@ public class CopilotProxyService implements ModelProxy {
 
         // 预先估算输入 token
         int estimatedInputTokens = estimateInputTokens(request);
+        long startedAt = System.currentTimeMillis();
+        long firstTokenLatencyMs = -1L;
 
         try {
             connection = openClaudeStreamingConnection(apiKey);
@@ -306,7 +315,8 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Claude 流式鉴权失败: HTTP {}", status);
                 sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
-                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败",
+                        firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -315,7 +325,8 @@ public class CopilotProxyService implements ModelProxy {
                 log.error("Claude 流式调用失败: HTTP {}, body={}", status, errorBody);
                 String friendly = extractFriendlyMessage(errorBody);
                 sendStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status), "processing_error");
-                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false,
+                        friendly != null ? friendly : buildFriendlyMessage(status), firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -362,6 +373,9 @@ public class CopilotProxyService implements ModelProxy {
                         if ("text_delta".equals(deltaType)) {
                             String content = safeText(delta.get("text"));
                             if (StringUtils.hasText(content)) {
+                                if (firstTokenLatencyMs < 0) {
+                                    firstTokenLatencyMs = System.currentTimeMillis() - startedAt;
+                                }
                                 charCounter.append(content);
                                 // 发送 OpenAI 格式的流式响应
                                 sendOpenAiStreamChunk(emitter, chatCompletionId, model, content, null);
@@ -427,11 +441,11 @@ public class CopilotProxyService implements ModelProxy {
                     .cacheReadTokens(cacheReadTokens)
                     .cacheWriteTokens(cacheWriteTokens)
                     .build();
-            invokeCallback(callback, tokenUsage, true, null);
+            invokeCallback(callback, tokenUsage, true, null, firstTokenLatencyMs, startedAt);
         } catch (Exception ex) {
             log.error("Claude 流式调用异常", ex);
             sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常", "processing_error");
-            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage(), firstTokenLatencyMs, startedAt);
         } finally {
             closeResources(reader, connection);
         }
@@ -652,6 +666,8 @@ public class CopilotProxyService implements ModelProxy {
 
         // 预先估算输入 token（基于请求消息）
         int estimatedInputTokens = estimateInputTokens(request);
+        long startedAt = System.currentTimeMillis();
+        long firstTokenLatencyMs = -1L;
 
         try {
             connection = openStreamingConnection(apiKey);
@@ -662,7 +678,8 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Claude 流式鉴权失败: HTTP {}", status);
                 sendClaudeStreamError(emitter, status, "上游模型服务鉴权失败");
-                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败",
+                        firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -671,7 +688,8 @@ public class CopilotProxyService implements ModelProxy {
                 log.error("Claude 流式调用失败: HTTP {}, body={}", status, errorBody);
                 String friendly = extractFriendlyMessage(errorBody);
                 sendClaudeStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status));
-                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false,
+                        friendly != null ? friendly : buildFriendlyMessage(status), firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -700,6 +718,9 @@ public class CopilotProxyService implements ModelProxy {
                         JsonNode delta = choices.get(0).path("delta");
                         String content = safeText(delta.get("content"));
                         if (StringUtils.hasText(content)) {
+                            if (firstTokenLatencyMs < 0) {
+                                firstTokenLatencyMs = System.currentTimeMillis() - startedAt;
+                            }
                             charCounter.append(content);
                             sendClaudeContentBlockDelta(emitter, content);
                         }
@@ -753,20 +774,27 @@ public class CopilotProxyService implements ModelProxy {
                     .cacheReadTokens(cacheReadTokens)
                     .cacheWriteTokens(cacheWriteTokens)
                     .build();
-            invokeCallback(callback, tokenUsage, true, null);
+            invokeCallback(callback, tokenUsage, true, null, firstTokenLatencyMs, startedAt);
         } catch (Exception ex) {
             log.error("Claude 流式调用异常", ex);
             sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(), "上游模型服务流式接口异常");
-            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage(), firstTokenLatencyMs, startedAt);
         } finally {
             closeResources(reader, connection);
         }
     }
 
-    private void invokeCallback(StreamCompletionCallback callback, TokenUsage tokenUsage, boolean success, String errorMessage) {
+    private void invokeCallback(StreamCompletionCallback callback, TokenUsage tokenUsage, boolean success,
+                                String errorMessage, long firstTokenLatencyMs, long startedAt) {
         if (callback != null) {
             try {
-                callback.onComplete(tokenUsage, success, errorMessage);
+                callback.onComplete(StreamCompletionResult.builder()
+                        .tokenUsage(tokenUsage)
+                        .success(success)
+                        .errorMessage(errorMessage)
+                        .firstTokenLatencyMs(firstTokenLatencyMs >= 0 ? firstTokenLatencyMs : null)
+                        .durationMs(Math.max(System.currentTimeMillis() - startedAt, 0))
+                        .build());
             } catch (Exception e) {
                 log.error("流式回调执行失败", e);
             }
@@ -1446,7 +1474,9 @@ public class CopilotProxyService implements ModelProxy {
         int cacheWriteTokens = 0;
 
         // 预先估算输入 token（基于请求消息）
-        int estimatedInputTokens = estimateClaudeInputTokens(request);
+        int estimatedInputTokens = tokenEstimator.estimateClaudeInputTokens(request);
+        long startedAt = System.currentTimeMillis();
+        long firstTokenLatencyMs = -1L;
 
         try {
             // 传递 anthropic-beta 和 anthropic-version 头（Claude Code 需要）
@@ -1458,7 +1488,8 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Claude Messages API 流式鉴权失败: HTTP {}", status);
                 sendClaudeStreamError(emitter, status, "上游模型服务鉴权失败");
-                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败",
+                        firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -1467,7 +1498,8 @@ public class CopilotProxyService implements ModelProxy {
                 log.error("Claude Messages API 流式调用失败: HTTP {}, body={}", status, errorBody);
                 String friendly = extractFriendlyMessage(errorBody);
                 sendClaudeStreamError(emitter, status, friendly != null ? friendly : buildFriendlyMessage(status));
-                invokeCallback(callback, TokenUsage.builder().build(), false, friendly != null ? friendly : buildFriendlyMessage(status));
+                invokeCallback(callback, TokenUsage.builder().build(), false,
+                        friendly != null ? friendly : buildFriendlyMessage(status), firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -1517,6 +1549,9 @@ public class CopilotProxyService implements ModelProxy {
                     // 使用类型化方法收集文本内容用于估算 token
                     String textContent = event.getTextContent();
                     if (StringUtils.hasText(textContent)) {
+                        if (firstTokenLatencyMs < 0) {
+                            firstTokenLatencyMs = System.currentTimeMillis() - startedAt;
+                        }
                         charCounter.append(textContent);
                     }
 
@@ -1562,13 +1597,13 @@ public class CopilotProxyService implements ModelProxy {
                     .cacheReadTokens(cacheReadTokens)
                     .cacheWriteTokens(cacheWriteTokens)
                     .build();
-            invokeCallback(callback, tokenUsage, true, null);
+            invokeCallback(callback, tokenUsage, true, null, firstTokenLatencyMs, startedAt);
         } catch (SocketTimeoutException ex) {
             log.error("Claude Messages API 流式调用超时: {}", ex.getMessage());
             sendClaudeStreamError(emitter, HttpStatus.GATEWAY_TIMEOUT.value(),
                     "上游模型服务响应超时，请稍后重试或缩短对话长度");
             invokeCallback(callback, TokenUsage.builder().build(), false,
-                    "流式响应超时: " + ex.getMessage());
+                    "流式响应超时: " + ex.getMessage(), firstTokenLatencyMs, startedAt);
         } catch (Exception ex) {
             log.error("Claude Messages API 流式调用异常", ex);
             String errorMessage = ex.getMessage();
@@ -1579,7 +1614,7 @@ public class CopilotProxyService implements ModelProxy {
                 sendClaudeStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         "上游模型服务流式接口异常");
             }
-            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage());
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage(), firstTokenLatencyMs, startedAt);
         } finally {
             closeResources(reader, connection);
         }
@@ -1676,23 +1711,6 @@ public class CopilotProxyService implements ModelProxy {
     /**
      * 估算 Claude 请求的输入 token 数
      */
-    private int estimateClaudeInputTokens(ClaudeRequest request) {
-        if (request == null || request.getMessages() == null) {
-            return 0;
-        }
-        int tokens = request.getMessages().stream()
-                .map(ClaudeRequest.Message::getContent)
-                .mapToInt(content -> tokenEstimator.estimateTextTokens(content != null ? content.toString() : ""))
-                .sum();
-
-        // 加上 system prompt 的 token
-        if (request.getSystem() != null) {
-            tokens += tokenEstimator.estimateTextTokens(request.getSystem().toString());
-        }
-
-        return tokens;
-    }
-
     // ============================================================
     // Responses API 支持（用于 Codex 系列模型）
     // ============================================================
@@ -1738,16 +1756,30 @@ public class CopilotProxyService implements ModelProxy {
      * 流式 Responses 请求，透传 Copilot Relay 的 SSE。
      */
     public SseEmitter responsesStream(ResponsesRequest request, ApiKey apiKey) {
+        return responsesStream(request, apiKey, null);
+    }
+
+    public SseEmitter responsesStream(ResponsesRequest request, ApiKey apiKey, StreamCompletionCallback callback) {
         validateApiKey(apiKey);
         SseEmitter emitter = new SseEmitter(proxyProperties.getStreamTimeoutMs());
-        streamTaskExecutor.execute(() -> executeResponsesStream(request, apiKey, emitter));
+        streamTaskExecutor.execute(() -> executeResponsesStream(request, apiKey, emitter, callback));
         return emitter;
     }
 
-    private void executeResponsesStream(ResponsesRequest request, ApiKey apiKey, SseEmitter emitter) {
+    private void executeResponsesStream(ResponsesRequest request, ApiKey apiKey, SseEmitter emitter, StreamCompletionCallback callback) {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         AtomicBoolean completed = new AtomicBoolean(false);
+        TokenEstimator.StreamingCharCounter charCounter = new TokenEstimator.StreamingCharCounter();
+        int inputTokens = 0;
+        int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
+        int estimatedInputTokens = tokenEstimator.estimateResponsesInputTokens(request);
+        boolean success = true;
+        String errorMessage = null;
+        long startedAt = System.currentTimeMillis();
+        long firstTokenLatencyMs = -1L;
 
         try {
             connection = openStreamingConnection(apiKey, ApiEndpoint.RESPONSES.getPath());
@@ -1758,6 +1790,8 @@ public class CopilotProxyService implements ModelProxy {
             if (status == HttpStatus.UNAUTHORIZED.value() || status == HttpStatus.FORBIDDEN.value()) {
                 log.warn("Copilot Proxy Responses 流式鉴权失败: HTTP {}", status);
                 sendStreamError(emitter, status, "上游模型服务鉴权失败", "authorization_error");
+                invokeCallback(callback, TokenUsage.builder().build(), false, "上游模型服务鉴权失败",
+                        firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -1768,6 +1802,8 @@ public class CopilotProxyService implements ModelProxy {
                 sendStreamError(emitter, status,
                         friendly != null ? friendly : buildFriendlyMessage(status),
                         "processing_error");
+                invokeCallback(callback, TokenUsage.builder().build(), false,
+                        friendly != null ? friendly : buildFriendlyMessage(status), firstTokenLatencyMs, startedAt);
                 return;
             }
 
@@ -1789,6 +1825,36 @@ public class CopilotProxyService implements ModelProxy {
                         emitter.send(SseEmitter.event().data(data));
                     }
 
+                    try {
+                        JsonNode eventNode = objectMapper.readTree(data);
+                        boolean appendedText = appendResponsesText(currentEvent, eventNode, charCounter);
+                        if (appendedText && firstTokenLatencyMs < 0) {
+                            firstTokenLatencyMs = System.currentTimeMillis() - startedAt;
+                        }
+                        JsonNode usageNode = findResponsesUsageNode(eventNode);
+                        if (!usageNode.isMissingNode()) {
+                            if (usageNode.has("input_tokens")) {
+                                inputTokens = usageNode.path("input_tokens").asInt(inputTokens);
+                            }
+                            if (usageNode.has("output_tokens")) {
+                                outputTokens = usageNode.path("output_tokens").asInt(outputTokens);
+                            }
+                            JsonNode inputDetails = usageNode.path("input_tokens_details");
+                            if (!inputDetails.isMissingNode() && inputDetails.has("cached_tokens")) {
+                                cacheReadTokens = inputDetails.path("cached_tokens").asInt(cacheReadTokens);
+                            }
+                            JsonNode outputDetails = usageNode.path("output_tokens_details");
+                            if (!outputDetails.isMissingNode() && outputDetails.has("reasoning_tokens")) {
+                                cacheWriteTokens = outputDetails.path("reasoning_tokens").asInt(cacheWriteTokens);
+                            }
+                        }
+                        if ("response.failed".equals(currentEvent)) {
+                            success = false;
+                            errorMessage = extractResponsesErrorMessage(eventNode);
+                        }
+                    } catch (Exception ignored) {
+                    }
+
                     // 检查是否完成
                     if ("response.completed".equals(currentEvent) || "response.failed".equals(currentEvent)) {
                         completed.set(true);
@@ -1803,13 +1869,93 @@ public class CopilotProxyService implements ModelProxy {
                 emitter.send(SseEmitter.event().name("response.completed").data("{\"type\":\"response.completed\"}"));
             }
             emitter.complete();
+            int finalInputTokens = inputTokens > 0 ? inputTokens : estimatedInputTokens;
+            int finalOutputTokens = outputTokens > 0 ? outputTokens : charCounter.estimateTokens();
+            TokenUsage tokenUsage = TokenUsage.builder()
+                    .inputTokens(finalInputTokens)
+                    .outputTokens(finalOutputTokens)
+                    .cacheReadTokens(cacheReadTokens)
+                    .cacheWriteTokens(cacheWriteTokens)
+                    .build();
+            invokeCallback(callback, tokenUsage, success, errorMessage, firstTokenLatencyMs, startedAt);
         } catch (Exception ex) {
             log.error("Copilot Proxy Responses 流式调用异常", ex);
             sendStreamError(emitter, HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "上游模型服务流式接口异常", "processing_error");
+            invokeCallback(callback, TokenUsage.builder().build(), false, ex.getMessage(), firstTokenLatencyMs, startedAt);
         } finally {
             closeResources(reader, connection);
         }
+    }
+
+    private JsonNode findResponsesUsageNode(JsonNode eventNode) {
+        if (eventNode == null) {
+            return objectMapper.createObjectNode().path("usage");
+        }
+        JsonNode usage = eventNode.path("usage");
+        if (!usage.isMissingNode()) {
+            return usage;
+        }
+        JsonNode response = eventNode.path("response");
+        if (!response.isMissingNode()) {
+            JsonNode responseUsage = response.path("usage");
+            if (!responseUsage.isMissingNode()) {
+                return responseUsage;
+            }
+        }
+        return objectMapper.createObjectNode().path("usage");
+    }
+
+    private boolean appendResponsesText(String currentEvent, JsonNode eventNode, TokenEstimator.StreamingCharCounter charCounter) {
+        boolean appended = false;
+        String delta = safeText(eventNode.get("delta"));
+        if (StringUtils.hasText(delta)) {
+            charCounter.append(delta);
+            appended = true;
+        }
+
+        if (currentEvent != null && currentEvent.contains("text")) {
+            String text = safeText(eventNode.get("text"));
+            if (StringUtils.hasText(text)) {
+                charCounter.append(text);
+                appended = true;
+            }
+        }
+
+        JsonNode part = eventNode.path("part");
+        String partText = safeText(part.get("text"));
+        if (StringUtils.hasText(partText)) {
+            charCounter.append(partText);
+            appended = true;
+        }
+
+        JsonNode item = eventNode.path("item");
+        if (!item.isMissingNode()) {
+            JsonNode content = item.path("content");
+            if (content.isArray()) {
+                for (JsonNode contentItem : content) {
+                    String text = safeText(contentItem.get("text"));
+                    if (StringUtils.hasText(text)) {
+                        charCounter.append(text);
+                        appended = true;
+                    }
+                }
+            }
+        }
+        return appended;
+    }
+
+    private String extractResponsesErrorMessage(JsonNode eventNode) {
+        if (eventNode == null) {
+            return null;
+        }
+        JsonNode error = eventNode.path("error");
+        if (!error.isMissingNode()) {
+            String message = safeText(error.get("message"));
+            return StringUtils.hasText(message) ? message : safeText(error.get("code"));
+        }
+        String message = safeText(eventNode.get("message"));
+        return StringUtils.hasText(message) ? message : null;
     }
 
     private Map<String, Object> buildResponsesPayload(ResponsesRequest request, boolean stream) {

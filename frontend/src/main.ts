@@ -1,9 +1,31 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import {
+  ElAlert,
+  ElButton,
+  ElCard,
+  ElConfigProvider,
+  ElDialog,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
+  ElEmpty,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElLoadingDirective,
+  ElOption,
+  ElPagination,
+  ElProgress,
+  ElRadioButton,
+  ElRadioGroup,
+  ElSelect,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+  ElTooltip
+} from 'element-plus'
 
 import App from './App.vue'
 import router from './router'
@@ -11,13 +33,38 @@ import './style.css'
 
 const app = createApp(App)
 
-// 注册 Element Plus 图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
+const elementComponents = [
+  ElAlert,
+  ElButton,
+  ElCard,
+  ElConfigProvider,
+  ElDialog,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
+  ElEmpty,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElOption,
+  ElPagination,
+  ElProgress,
+  ElRadioButton,
+  ElRadioGroup,
+  ElSelect,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+  ElTooltip
+]
+
+for (const component of elementComponents) {
+  app.component(component.name!, component)
 }
+
+app.directive('loading', ElLoadingDirective)
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus, { locale: zhCn })
 
 app.mount('#app')

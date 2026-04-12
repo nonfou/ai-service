@@ -14,8 +14,20 @@ const router = createRouter({
       name: 'Layout',
       component: () => import('../views/Layout.vue'),
       meta: { requiresAuth: true },
-      redirect: '/admin/api-keys',
+      redirect: '/admin/token-dashboard',
       children: [
+        {
+          path: '/admin/token-dashboard',
+          name: 'TokenDashboard',
+          component: () => import('../views/admin/TokenDashboard.vue'),
+          meta: { requiresAuth: true }
+        },
+        {
+          path: '/admin/token-usage',
+          name: 'TokenUsage',
+          component: () => import('../views/admin/TokenUsage.vue'),
+          meta: { requiresAuth: true }
+        },
         {
           path: '/admin/api-keys',
           name: 'ApiKeyManagement',
