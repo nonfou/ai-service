@@ -1200,9 +1200,12 @@ public class CopilotProxyService implements ModelProxy {
     private String baseUrl(ApiKey apiKey) {
         String base = apiKey != null && StringUtils.hasText(apiKey.getRelayBaseUrl())
                 ? apiKey.getRelayBaseUrl()
-                : systemConfigService.get("copilot_api_url", proxyProperties.getBaseUrl());
+                : systemConfigService.get("copilot_api_url");
         if (!StringUtils.hasText(base)) {
-            throw new ChatProcessingException("代理服务基础地址未配置");
+            base = proxyProperties.getBaseUrl();
+        }
+        if (!StringUtils.hasText(base)) {
+            throw new ChatProcessingException("未配置 Copilot Relay 地址，请先设置动态转发地址");
         }
         String normalized = base.trim();
         if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {

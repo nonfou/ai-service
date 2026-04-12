@@ -11,10 +11,10 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       SERVER_PORT: 8080
       DB_PATH: ${DB_PATH:-/app/data/ai_api_platform.db}
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-604800000}
       JWT_ISSUER: ${JWT_ISSUER:-ai-service}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       COPILOT_PROXY_BASE_URL: ${COPILOT_PROXY_BASE_URL:-}
       COPILOT_PROXY_API_KEY: ${COPILOT_PROXY_API_KEY:-}
       ADMIN_RATE_LIMIT: ${ADMIN_RATE_LIMIT:-60}
@@ -54,17 +54,17 @@ services:
     networks:
       - ai-service-network
 
-  admin-portal:
+  frontend:
     build:
       context: ../frontend
       dockerfile: Dockerfile
-    image: ai-api-platform-admin-portal:latest
+    image: ai-service-frontend:latest
     restart: unless-stopped
     ports:
-      - "${ADMIN_PORTAL_PORT:-9001}:80"
+      - "${FRONTEND_PORT:-9001}:80"
     volumes:
-      - ./nginx/admin-portal.conf:/etc/nginx/nginx.conf:ro
-      - ./logs/nginx-admin-portal:/var/log/nginx
+      - ./nginx/frontend.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx-frontend:/var/log/nginx
     depends_on:
       backend:
         condition: service_healthy

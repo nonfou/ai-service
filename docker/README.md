@@ -11,12 +11,12 @@
 
 ```bash
 cd docker
-cp .env.copilot.example .env.copilot
+cp .env.example .env.copilot
 ```
 
 至少修改以下配置：
 
-- `COPILOT_PROXY_BASE_URL`：指向你的 Copilot Relay，例如 `http://127.0.0.1:4141/v1`
+- `COPILOT_PROXY_BASE_URL`：按实际运行时动态配置；不再提供默认值
 - `COPILOT_PROXY_API_KEY`：如果上游需要额外鉴权则填写，否则留空
 
 启动:
@@ -38,7 +38,15 @@ docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --bui
 ```bash
 cd docker
 cp .env.example .env
-# 编辑 .env，至少设置 JWT_SECRET、ENCRYPTION_KEY、COPILOT_PROXY_BASE_URL
+# 编辑 .env，至少设置 JWT_SECRET、ENCRYPTION_KEY
+```
+
+`ENCRYPTION_KEY` 必须是 16/24/32 字节的随机字符串；最简单是直接填 32 个 ASCII 字符。
+
+示例：
+
+```bash
+ENCRYPTION_KEY=replace_with_32_chars_secret_key
 ```
 
 生产启动:
@@ -62,4 +70,4 @@ curl http://localhost:8080/v1/models
 curl http://localhost:9001/health
 ```
 
-若你的 Copilot Relay 不带 `/v1` 前缀，请把 `COPILOT_PROXY_BASE_URL` 配成完整实际地址。
+`COPILOT_PROXY_BASE_URL` 现在没有默认值；如需通过环境变量提供，请填写完整实际地址。

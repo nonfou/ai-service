@@ -95,9 +95,8 @@ backend:
     keep-alive-seconds: ${BACKEND_STREAM_KEEP_ALIVE:60}
   copilot:
     proxy:
-      base-url: ${COPILOT_PROXY_BASE_URL:http://127.0.0.1:4141/v1}
+      base-url: ${COPILOT_PROXY_BASE_URL:}
       api-key: ${COPILOT_PROXY_API_KEY:}
       connect-timeout-ms: ${COPILOT_PROXY_CONNECT_TIMEOUT_MS:10000}
       read-timeout-ms: ${COPILOT_PROXY_READ_TIMEOUT_MS:600000}
       stream-timeout-ms: ${COPILOT_PROXY_STREAM_TIMEOUT_MS:1800000}
-      warmup-model: ${COPILOT_PROXY_WARMUP_MODEL:claude-haiku-4.5}

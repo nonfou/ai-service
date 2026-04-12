@@ -1,6 +1,5 @@
 package com.nonfou.github.service;
 
-import com.nonfou.github.config.CopilotProxyProperties;
 import com.nonfou.github.dto.request.ChatRequest;
 import com.nonfou.github.dto.request.ClaudeRequest;
 import com.nonfou.github.dto.request.EmbeddingsRequest;
@@ -29,7 +28,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class ChatWorkflowService {
 
     private final CopilotProxyService copilotProxyService;
-    private final CopilotProxyProperties copilotProxyProperties;
     private final ApiKeyService apiKeyService;
 
     public ChatResponse handleChat(String authorization, ChatRequest request) {
@@ -49,13 +47,11 @@ public class ChatWorkflowService {
 
     public ClaudeResponse handleClaudeChat(String authorization, ClaudeRequest request) {
         request.setStream(false);
-        applyWarmupModelOptimization(request);
         return copilotProxyService.claudeMessages(request, requireApiKey(authorization));
     }
 
     public SseEmitter handleClaudeStreamRequest(String authorization, ClaudeRequest request) {
         request.setStream(true);
-        applyWarmupModelOptimization(request);
         return copilotProxyService.claudeMessagesStream(request, requireApiKey(authorization), null);
     }
 
@@ -115,24 +111,4 @@ public class ChatWorkflowService {
         return StringUtils.hasText(value) ? value : null;
     }
 
-    /**
-     * Claude Code 热身请求使用更便宜的小模型，避免无意义消耗上游配额。
-     */
-    private void applyWarmupModelOptimization(ClaudeRequest request) {
-        boolean hasAnthropicBeta = request.getAnthropicBeta() != null && !request.getAnthropicBeta().isEmpty();
-        boolean noTools = request.getTools() == null || request.getTools().isEmpty();
-
-        if (!hasAnthropicBeta || !noTools) {
-            return;
-        }
-
-        String warmupModel = copilotProxyProperties.getWarmupModel();
-        if (warmupModel == null || warmupModel.isEmpty()) {
-            return;
-        }
-
-        String originalModel = request.getModel();
-        request.setModel(warmupModel);
-        log.debug("Claude Code 热身请求优化: {} -> {}", originalModel, warmupModel);
-    }
 }

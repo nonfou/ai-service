@@ -10,7 +10,6 @@ Spring Boot AI 代理服务，包含后端 API 与前端管理端。当前运行
 - `POST /v1/responses`
 - `POST /v1/messages`
 - `POST /v1/messages/count_tokens`
-- Claude Code 热身请求模型降级
 - 模型别名映射
 
 ## 当前约束
@@ -30,11 +29,11 @@ cd backend
 mvn spring-boot:run
 ```
 
-默认开发配置会使用内存 H2；真正需要配置的只有上游 Copilot 地址：
+默认开发配置会使用内存 H2。如需通过环境变量指定上游 Copilot 地址，可设置：
 
 ```bash
 # PowerShell
-$env:COPILOT_PROXY_BASE_URL="http://127.0.0.1:4141/v1"
+$env:COPILOT_PROXY_BASE_URL="<your-copilot-relay-url>"
 $env:COPILOT_PROXY_API_KEY=""
 ```
 
@@ -56,7 +55,7 @@ pnpm dev
 
 ```bash
 cd docker
-cp .env.copilot.example .env.copilot
+cp .env.example .env.copilot
 # 编辑 COPILOT_PROXY_BASE_URL
 
 docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --build
@@ -67,9 +66,11 @@ docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --bui
 ```bash
 cd docker
 cp .env.example .env
-# 编辑 .env，至少设置 DB_PATH、JWT_SECRET、ENCRYPTION_KEY、COPILOT_PROXY_BASE_URL
+# 编辑 .env，至少设置 DB_PATH、JWT_SECRET、ENCRYPTION_KEY
 docker compose --env-file .env -f docker-compose.yml up -d --build
 ```
+
+其中 `ENCRYPTION_KEY` 必须是 16/24/32 字节字符串；建议直接使用 32 个随机 ASCII 字符。
 
 ## 调用示例
 

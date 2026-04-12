@@ -60,7 +60,7 @@ INSERT OR IGNORE INTO users (email, password, balance, status)
 VALUES ('system@local', '', 0, 1);
 
 INSERT OR IGNORE INTO system_config (config_key, config_value, description)
-VALUES ('copilot_api_url', 'http://127.0.0.1:4141/v1', 'Copilot API 代理地址');
+VALUES ('copilot_api_url', '', 'Copilot API 代理地址');
 
 INSERT OR IGNORE INTO system_config (config_key, config_value, description)
 VALUES ('copilot_github_token', '', 'GitHub Token');

@@ -7,6 +7,7 @@ import com.nonfou.github.dto.request.AdminApiKeyUpdateRequest;
 import com.nonfou.github.dto.response.AdminApiKeyResponse;
 import com.nonfou.github.entity.ApiKey;
 import com.nonfou.github.entity.User;
+import com.nonfou.github.exception.BusinessException;
 import com.nonfou.github.mapper.ApiKeyMapper;
 import com.nonfou.github.mapper.UserMapper;
 import com.nonfou.github.util.EncryptionUtil;
@@ -31,7 +32,6 @@ import java.util.stream.Collectors;
 public class ApiKeyService {
 
     private static final String SYSTEM_USER_EMAIL = "system@local";
-    private static final String DEFAULT_RELAY_URL = "http://127.0.0.1:4141/v1";
 
     private final ApiKeyMapper apiKeyMapper;
     private final UserMapper userMapper;
@@ -160,7 +160,7 @@ public class ApiKeyService {
             entity.setUpstreamApiKey(decryptOptional(entity.getUpstreamApiKey()));
         }
         if (!StringUtils.hasText(entity.getRelayBaseUrl())) {
-            entity.setRelayBaseUrl(resolveDefaultRelayBaseUrl());
+            entity.setRelayBaseUrl(requireConfiguredRelayBaseUrl());
         }
         return entity;
     }
@@ -174,7 +174,7 @@ public class ApiKeyService {
             apiKey.setUpstreamApiKey(decryptOptional(apiKey.getUpstreamApiKey()));
         }
         if (!StringUtils.hasText(apiKey.getRelayBaseUrl())) {
-            apiKey.setRelayBaseUrl(resolveDefaultRelayBaseUrl());
+            apiKey.setRelayBaseUrl(requireConfiguredRelayBaseUrl());
         }
         return apiKey;
     }
@@ -231,7 +231,7 @@ public class ApiKeyService {
                 .id(String.valueOf(apiKey.getId()))
                 .keyName(apiKey.getKeyName())
                 .apiKey(showFullKey ? apiKey.getApiKey() : maskApiKey(apiKey.getApiKey()))
-                .relayBaseUrl(StringUtils.hasText(apiKey.getRelayBaseUrl()) ? apiKey.getRelayBaseUrl() : resolveDefaultRelayBaseUrl())
+                .relayBaseUrl(StringUtils.hasText(apiKey.getRelayBaseUrl()) ? apiKey.getRelayBaseUrl() : resolveConfiguredRelayBaseUrl())
                 .upstreamApiKey(maskEncryptedOptional(apiKey.getUpstreamApiKey()))
                 .description(apiKey.getDescription())
                 .status(apiKey.getStatus())
@@ -262,8 +262,19 @@ public class ApiKeyService {
         return entity.getId();
     }
 
-    private String resolveDefaultRelayBaseUrl() {
-        String configured = systemConfigService.get("copilot_api_url", DEFAULT_RELAY_URL);
+    private String requireConfiguredRelayBaseUrl() {
+        String configured = resolveConfiguredRelayBaseUrl();
+        if (!StringUtils.hasText(configured)) {
+            throw new BusinessException("未配置 Copilot Relay 地址，请先在管理端为 API Key 填写转发地址");
+        }
+        return configured;
+    }
+
+    private String resolveConfiguredRelayBaseUrl() {
+        String configured = systemConfigService.get("copilot_api_url");
+        if (!StringUtils.hasText(configured)) {
+            return null;
+        }
         return normalizeRelayBaseUrl(configured);
     }
 
