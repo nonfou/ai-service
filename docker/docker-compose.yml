@@ -4,27 +4,24 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     image: ai-api-platform-backend:latest
-    container_name: ai-service-backend
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
-      - SERVER_PORT=8080
-      - DB_PATH=${DB_PATH:-/app/data/ai_api_platform.db}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRATION=${JWT_EXPIRATION:-604800000}
-      - JWT_ISSUER=${JWT_ISSUER:-ai-service}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - COPILOT_PROXY_BASE_URL=${COPILOT_PROXY_BASE_URL:-}
-      - COPILOT_PROXY_API_KEY=${COPILOT_PROXY_API_KEY:-}
-      - ADMIN_ENABLE_RATE_LIMIT=${ADMIN_ENABLE_RATE_LIMIT:-true}
-      - ADMIN_RATE_LIMIT=${ADMIN_RATE_LIMIT:-60}
-      - ADMIN_ENABLE_LOGIN_LOCK=${ADMIN_ENABLE_LOGIN_LOCK:-true}
-      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
-      - RATE_LIMIT_RPM=${RATE_LIMIT_RPM:-60}
-      - RATE_LIMIT_API_RPM=${RATE_LIMIT_API_RPM:-30}
-      - JAVA_OPTS=${JAVA_OPTS:--Xmx512m -Xms256m}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SERVER_PORT: 8080
+      DB_PATH: ${DB_PATH:-/app/data/ai_api_platform.db}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-604800000}
+      JWT_ISSUER: ${JWT_ISSUER:-ai-service}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      COPILOT_PROXY_BASE_URL: ${COPILOT_PROXY_BASE_URL:-}
+      COPILOT_PROXY_API_KEY: ${COPILOT_PROXY_API_KEY:-}
+      ADMIN_RATE_LIMIT: ${ADMIN_RATE_LIMIT:-60}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_RPM: ${RATE_LIMIT_RPM:-60}
+      RATE_LIMIT_API_RPM: ${RATE_LIMIT_API_RPM:-30}
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx512m -Xms256m}
     volumes:
       - ./logs/backend:/app/logs
       - ./data:/app/data
@@ -39,7 +36,6 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: ai-service-nginx
     restart: unless-stopped
     ports:
       - "9000:80"
@@ -63,7 +59,6 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     image: ai-api-platform-admin-portal:latest
-    container_name: ai-service-admin-portal
     restart: unless-stopped
     ports:
       - "${ADMIN_PORTAL_PORT:-9001}:80"
@@ -71,7 +66,8 @@ services:
       - ./nginx/admin-portal.conf:/etc/nginx/nginx.conf:ro
       - ./logs/nginx-admin-portal:/var/log/nginx
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s

@@ -5,6 +5,8 @@
 - `docker-compose.copilot.yml`: 开发/最小部署，使用内存 H2
 - `docker-compose.yml`: 完整部署，包含后端、API 反向代理和前端管理端
 
+`docker/` 目录当前只保留实际生效的 compose、nginx 配置和环境变量示例文件。
+
 ## 1. 开发/最小部署
 
 ```bash
@@ -31,11 +33,12 @@ docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --bui
 
 ## 2. 完整部署
 
-准备生产环境变量:
+准备完整部署环境变量:
 
 ```bash
 cd docker
-# 编辑 .env，设置安全密钥、DB_PATH 和上游代理配置
+cp .env.example .env
+# 编辑 .env，至少设置 JWT_SECRET、ENCRYPTION_KEY、COPILOT_PROXY_BASE_URL
 ```
 
 生产启动:
@@ -48,7 +51,7 @@ docker compose --env-file .env -f docker-compose.yml up -d --build
 
 - 默认 `prod` profile
 - 数据通过 `./data:/app/data` 挂载到文件型 H2
-- `DB_PATH` 默认为 `/app/data/ai_api_platform`
+- `DB_PATH` 默认示例为 `/app/data/ai_api_platform.db`
 - 会同时启动后端、API Nginx 和前端管理端
 
 ## 3. 验证

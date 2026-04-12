@@ -66,6 +66,7 @@ docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --bui
 
 ```bash
 cd docker
+cp .env.example .env
 # 编辑 .env，至少设置 DB_PATH、JWT_SECRET、ENCRYPTION_KEY、COPILOT_PROXY_BASE_URL
 docker compose --env-file .env -f docker-compose.yml up -d --build
 ```
