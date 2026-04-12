@@ -3,7 +3,7 @@
 当前仓库保留两套部署入口:
 
 - `docker-compose.copilot.yml`: 开发/最小部署，使用内存 H2
-- `docker-compose.yml`: 生产部署，使用文件型 H2 持久化
+- `docker-compose.yml`: 完整部署，包含后端、API 反向代理和前端管理端
 
 ## 1. 开发/最小部署
 
@@ -29,13 +29,13 @@ docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --bui
 - 默认内存 H2，重启后数据会重建
 - 适合只验证代理链路
 
-## 2. 生产部署
+## 2. 完整部署
 
 准备生产环境变量:
 
 ```bash
 cd docker
-# 编辑 .env，设置安全密钥与 DB_PATH
+# 编辑 .env，设置安全密钥、DB_PATH 和上游代理配置
 ```
 
 生产启动:
@@ -49,12 +49,14 @@ docker compose --env-file .env -f docker-compose.yml up -d --build
 - 默认 `prod` profile
 - 数据通过 `./data:/app/data` 挂载到文件型 H2
 - `DB_PATH` 默认为 `/app/data/ai_api_platform`
+- 会同时启动后端、API Nginx 和前端管理端
 
 ## 3. 验证
 
 ```bash
 curl http://localhost:8080/health
 curl http://localhost:8080/v1/models
+curl http://localhost:9001/health
 ```
 
 若你的 Copilot Relay 不带 `/v1` 前缀，请把 `COPILOT_PROXY_BASE_URL` 配成完整实际地址。

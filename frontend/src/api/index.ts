@@ -32,13 +32,17 @@ export interface AdminApiKey {
 
 export type AdminApiKeyUsage = Record<string, unknown>
 
+const asApiResponse = <T>(promise: Promise<unknown>) => {
+  return promise as Promise<ApiResponse<T>>
+}
+
 export const adminAPI = {
   login: (data: AdminLoginRequest) => {
-    return request.post<ApiResponse<AdminLoginResponse>>('/admin/login', data)
+    return asApiResponse<AdminLoginResponse>(request.post('/admin/login', data))
   },
 
   getAdminApiKeys: () => {
-    return request.get<ApiResponse<AdminApiKey[]>>('/admin/api-keys')
+    return asApiResponse<AdminApiKey[]>(request.get('/admin/api-keys'))
   },
 
   createAdminApiKey: (data: {
@@ -47,7 +51,7 @@ export const adminAPI = {
     upstreamApiKey?: string
     description?: string
   }) => {
-    return request.post<ApiResponse<AdminApiKey>>('/admin/api-keys', data)
+    return asApiResponse<AdminApiKey>(request.post('/admin/api-keys', data))
   },
 
   updateAdminApiKey: (keyId: string, data: {
@@ -56,23 +60,23 @@ export const adminAPI = {
     upstreamApiKey?: string
     description?: string
   }) => {
-    return request.put<ApiResponse<null>>(`/admin/api-keys/${keyId}`, data)
+    return asApiResponse<null>(request.put(`/admin/api-keys/${keyId}`, data))
   },
 
   updateAdminApiKeyStatus: (keyId: string, status: number) => {
-    return request.put<ApiResponse<null>>(`/admin/api-keys/${keyId}/status`, { status })
+    return asApiResponse<null>(request.put(`/admin/api-keys/${keyId}/status`, { status }))
   },
 
   deleteAdminApiKey: (keyId: string) => {
-    return request.delete<ApiResponse<null>>(`/admin/api-keys/${keyId}`)
+    return asApiResponse<null>(request.delete(`/admin/api-keys/${keyId}`))
   },
 
   regenerateAdminApiKey: (keyId: string) => {
-    return request.post<ApiResponse<AdminApiKey>>(`/admin/api-keys/${keyId}/regenerate`)
+    return asApiResponse<AdminApiKey>(request.post(`/admin/api-keys/${keyId}/regenerate`))
   },
 
   getAdminApiKeyUsage: (keyId: string) => {
-    return request.get<ApiResponse<AdminApiKeyUsage>>(`/admin/api-keys/${keyId}/usage`)
+    return asApiResponse<AdminApiKeyUsage>(request.get(`/admin/api-keys/${keyId}/usage`))
   }
 }
 

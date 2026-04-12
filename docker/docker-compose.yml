@@ -61,7 +61,7 @@ services:
   admin-portal:
     build:
       context: ../frontend
-      dockerfile: admin-portal/Dockerfile
+      dockerfile: Dockerfile
     image: ai-api-platform-admin-portal:latest
     container_name: ai-service-admin-portal
     restart: unless-stopped

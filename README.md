@@ -1,6 +1,6 @@
 # ai-service
 
-最小化的 Spring Boot AI 代理服务。当前运行主路径只依赖一个可配置的 Copilot Relay 地址，对外保留 OpenAI / Anthropic / Codex 兼容接口。
+Spring Boot AI 代理服务，包含后端 API 与前端管理端。当前运行主路径只依赖一个可配置的 Copilot Relay 地址，对外保留 OpenAI / Anthropic / Codex 兼容接口。
 
 ## 保留能力
 
@@ -17,11 +17,13 @@
 
 - `/v1/*` 不做本地 API Key 鉴权
 - 运行主路径不依赖用户余额、订阅、计费和多上游路由
-- 现有前端、后台和业务模块仍保留在仓库中，但不再是最小部署方案的一部分
 
 ## 本地启动
 
-要求：本机可用 JDK 21 和 Maven。
+要求：
+
+- 本机可用 JDK 21 和 Maven
+- 如需运行前端管理端，需安装 Node.js 18+ 与 pnpm 9+
 
 ```bash
 cd backend
@@ -38,6 +40,16 @@ $env:COPILOT_PROXY_API_KEY=""
 
 如果上游不是 `/v1` 根路径，请直接填完整 Base URL。
 
+前端管理端本地启动：
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+默认访问地址：`http://localhost:5174`
+
 ## Docker 启动
 
 开发/最小部署使用内存 H2：
@@ -50,11 +62,11 @@ cp .env.copilot.example .env.copilot
 docker compose --env-file .env.copilot -f docker-compose.copilot.yml up -d --build
 ```
 
-生产部署使用文件型 H2，并通过 `DB_PATH` 持久化数据：
+完整部署使用文件型 H2，并通过 `DB_PATH` 持久化数据，同时启动前端管理端：
 
 ```bash
 cd docker
-# 编辑 .env，至少设置 DB_PATH、JWT_SECRET、VERIFY_CODE_SECRET、ENCRYPTION_KEY
+# 编辑 .env，至少设置 DB_PATH、JWT_SECRET、ENCRYPTION_KEY、COPILOT_PROXY_BASE_URL
 docker compose --env-file .env -f docker-compose.yml up -d --build
 ```
 

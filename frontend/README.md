@@ -1,15 +1,19 @@
-# AI API Platform - Frontend
+# AI Service Frontend
 
-当前前端仅保留 `admin-portal` 管理端应用，用户端页面与相关工作区配置已移除。
+`frontend/` 现在是单应用前端根目录，承载管理端页面，不再使用 workspace 子应用结构。
 
 ## 项目结构
 
 ```text
 frontend/
-├── admin-portal/        # 管理端应用 (端口: 5174)
-├── pnpm-workspace.yaml  # Workspace 配置
-├── package.json         # 根脚本
-└── README.md
+├── src/                # 页面、路由、状态管理、接口封装
+├── public/             # 静态资源
+├── .env.development    # 开发环境变量
+├── .env.production     # 生产环境变量
+├── Dockerfile          # 前端镜像构建
+├── index.html          # Vite 入口
+├── package.json        # 前端脚本与依赖
+└── vite.config.ts      # Vite 配置
 ```
 
 ## 技术栈
@@ -30,24 +34,9 @@ frontend/
 
 ## 本地开发
 
-安装依赖：
-
 ```bash
 cd frontend
 pnpm install
-```
-
-启动管理端：
-
-```bash
-cd frontend
-pnpm dev
-```
-
-或：
-
-```bash
-cd frontend/admin-portal
 pnpm dev
 ```
 
@@ -60,25 +49,32 @@ cd frontend
 pnpm build
 ```
 
+如需同时执行类型检查：
+
+```bash
+cd frontend
+pnpm build:check
+```
+
 ## 环境变量
 
-开发环境 `frontend/admin-portal/.env.development`：
+开发环境 `frontend/.env.development`：
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 VITE_PORT=5174
 ```
 
-生产环境 `frontend/admin-portal/.env.production`：
+生产环境 `frontend/.env.production`：
 
 ```env
-VITE_API_BASE_URL=https://api.yourdomain.com
+VITE_API_BASE_URL=
 VITE_PORT=5174
 ```
 
 ## 功能范围
 
-当前保留的页面能力：
+当前前端提供：
 
 1. 管理员登录
 2. Copilot API Key 管理
@@ -87,12 +83,6 @@ VITE_PORT=5174
 ## Docker 构建
 
 ```bash
-cd frontend/admin-portal
-docker build -t cc-web-admin-portal .
+cd frontend
+docker build -t ai-service-admin-portal .
 ```
-
-## 相关文档
-
-- [后端 API 文档](../docs/backend/api.md)
-- [Vue 3 文档](https://cn.vuejs.org/)
-- [Element Plus 文档](https://element-plus.org/zh-CN/)

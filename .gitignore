@@ -32,6 +32,8 @@ Thumbs.db
 
 # Logs
 logs/
+docker/logs/
+backend/logs/
 *.log
 
 # Test coverage
@@ -42,14 +44,18 @@ coverage/
 *.tmp
 *.temp
 .cache/
+.tmp-test-logs/
+.playwright-mcp/
 
 # Database
 *.sqlite
 *.db
+*.db-*
 *.mv.db
 *.trace.db
 /backend/data/
 /docker/data/
+/data/
 
 # Docker
 .dockerignore
@@ -75,10 +81,10 @@ backend/mvnw.cmd
 .settings/
 
 # Vue / Vite
-frontend/**/.vite/
-frontend/**/dist/
-frontend/**/node_modules/
-frontend/**/yarn.lock
+frontend/.vite/
+frontend/dist/
+frontend/node_modules/
+frontend/yarn.lock
 
 .claude/settings.local.json
 .claude/settings.json
