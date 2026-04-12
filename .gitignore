@@ -48,6 +48,7 @@ coverage/
 .cache/
 .tmp-test-logs/
 .playwright-mcp/
+.claude/
 
 # Database
 *.sqlite
@@ -88,5 +89,3 @@ frontend/dist/
 frontend/node_modules/
 frontend/yarn.lock
 
-.claude/settings.local.json
-.claude/settings.json
