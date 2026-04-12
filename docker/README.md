@@ -3,7 +3,7 @@
 当前仓库保留两套部署入口:
 
 - `docker-compose.copilot.yml`: 开发/最小部署，使用内存 H2
-- `docker-compose.yml`: 完整部署，包含后端、API 反向代理和前端管理端
+- `docker-compose.yml`: 完整部署，前端 Nginx 统一托管页面并代理后端 API
 
 `docker/` 目录当前只保留实际生效的 compose、nginx 配置和环境变量示例文件。
 
@@ -60,14 +60,15 @@ docker compose --env-file .env -f docker-compose.yml up -d --build
 - 默认 `prod` profile
 - 数据通过 `./data:/app/data` 挂载到文件型 H2
 - `DB_PATH` 默认示例为 `/app/data/ai_api_platform.db`
-- 会同时启动后端、API Nginx 和前端管理端
+- 对外只暴露一个端口，默认 `9000`
+- 前端页面与 `/v1`、`/admin`、`/api` 都走同一个入口
 
 ## 3. 验证
 
 ```bash
-curl http://localhost:8080/health
-curl http://localhost:8080/v1/models
-curl http://localhost:9001/health
+curl http://localhost:9000/health
+curl http://localhost:9000/v1/models
+curl http://localhost:9000/
 ```
 
 `COPILOT_PROXY_BASE_URL` 现在没有默认值；如需通过环境变量提供，请填写完整实际地址。

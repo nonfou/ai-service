@@ -72,6 +72,8 @@ docker compose --env-file .env -f docker-compose.yml up -d --build
 
 其中 `ENCRYPTION_KEY` 必须是 16/24/32 字节字符串；建议直接使用 32 个随机 ASCII 字符。
 
+完整部署对外只暴露一个入口端口，默认 `9000`，同时承载前端页面和后端 API 代理。
+
 ## 调用示例
 
 ```bash
